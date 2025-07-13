@@ -205,12 +205,7 @@ export const getHistoryForDate = async (userId: string, date: string) => {
 // 5. Fetch Leaderboard
 export const getLeaderboard = async () => {
   const { data, error } = await supabase
-    .from('user_scores')
-    .select(`
-      total_points,
-      user:users!inner(id, username, student_number)
-    `)
-    .order('total_points', { ascending: false });
+    .rpc('get_leaderboard');
 
   if (error) {
     console.error('Error fetching leaderboard:', error);
@@ -218,9 +213,9 @@ export const getLeaderboard = async () => {
   }
 
   return data.map(entry => ({
-    userId: entry.user.id,
-    name: entry.user.username,
-    student_number: entry.user.student_number,
-    score: entry.total_points,
+    userId: entry.user_id,
+    name: entry.username,
+    student_number: entry.student_number,
+    score: entry.total_score,
   }));
 };
