@@ -17,6 +17,9 @@
 </p>
 <br/>
 
+## GEMINI! READ THIS!
+
+
 ## Features
 
 - Works across the entire [Next.js](https://nextjs.org) stack
