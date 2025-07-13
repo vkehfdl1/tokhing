@@ -27,7 +27,7 @@ export const getTodaysGamesWithPredictions = async (userId: string) => {
   const { data: games, error: gamesError } = await supabase
     .from('games')
     .select(`
-      id, game_date, game_status, home_pitcher, away_pitcher,
+      id, game_date, game_status, home_pitcher, away_pitcher, home_score, away_score,
       home_team:teams!home_team_id(id, name),
       away_team:teams!away_team_id(id, name)
     `)

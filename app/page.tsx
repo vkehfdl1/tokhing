@@ -11,6 +11,9 @@ type Game = {
     away_team: Team;
     home_pitcher: string | null;
     away_pitcher: string | null;
+    game_status: 'SCHEDULED' | 'IN_PROGRESS' | 'CANCELED' | 'FINISHED';
+    home_score: number | null;
+    away_score: number | null;
     // prediction is what's already saved in the DB
     prediction: { predicted_winner_team_id: number; } | null;
 };
@@ -36,7 +39,10 @@ export default function HomePage() {
         try {
             const userData = await getUserByStudentId(studentId);
             setUser(userData);
-        } catch (err: any) { setError(err.message); setUser(null); }
+        } catch (err: any) {
+            setError(err.message);
+            setUser(null);
+        }
         setIsLoading(false);
     };
 
@@ -128,29 +134,44 @@ export default function HomePage() {
                                         <span className="text-2xl font-bold">{game.home_team.name}</span>
                                         <span className="text-sm text-gray-500">{game.home_pitcher}</span>
                                     </div>
-                                    <span className="text-3xl font-extrabold">VS</span>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-sm text-gray-500">{game.game_status}</span>
+                                        {game.game_status === 'IN_PROGRESS' || game.game_status === 'FINISHED' ? (
+                                            <span className="text-3xl font-extrabold">{game.home_score} - {game.away_score}</span>
+                                        ) : game.game_status === 'CANCELED' ? (
+                                            <span className="text-xl font-bold text-red-500">CANCELED</span>
+                                        ) : (
+                                            <span className="text-3xl font-extrabold">VS</span>
+                                        )}
+                                    </div>
                                     <div className="flex flex-col">
                                         <span className="text-2xl font-bold">{game.away_team.name}</span>
                                         <span className="text-sm text-gray-500">{game.away_pitcher}</span>
                                     </div>
                                 </div>
 
-                                {hasSubmitted ? (
-                                    <div className="mt-6 text-center">
-                                        <p className="text-lg text-gray-800">Your pick: <span className="font-bold">{submittedPick === game.home_team.id ? game.home_team.name : game.away_team.name}</span></p>
-                                    </div>
+                                {game.game_status === 'SCHEDULED' ? (
+                                    hasSubmitted ? (
+                                        <div className="mt-6 text-center">
+                                            <p className="text-lg text-gray-800">Your pick: <span className="font-bold">{submittedPick === game.home_team.id ? game.home_team.name : game.away_team.name}</span></p>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-center gap-4 mt-6">
+                                            <button 
+                                                onClick={() => handleSelectPick(game.id, game.home_team.id, game.home_team.name)}
+                                                className={`w-full py-3 font-bold rounded-lg transition ${currentPick?.predictedTeamId === game.home_team.id ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800'}`}>
+                                                {game.home_team.name} Win
+                                            </button>
+                                            <button 
+                                                onClick={() => handleSelectPick(game.id, game.away_team.id, game.away_team.name)}
+                                                className={`w-full py-3 font-bold rounded-lg transition ${currentPick?.predictedTeamId === game.away_team.id ? 'bg-red-600 text-white' : 'bg-red-200 text-red-800'}`}>
+                                                {game.away_team.name} Win
+                                            </button>
+                                        </div>
+                                    )
                                 ) : (
-                                    <div className="flex justify-center gap-4 mt-6">
-                                        <button 
-                                            onClick={() => handleSelectPick(game.id, game.home_team.id, game.home_team.name)}
-                                            className={`w-full py-3 font-bold rounded-lg transition ${currentPick?.predictedTeamId === game.home_team.id ? 'bg-green-600 text-white' : 'bg-green-200 text-green-800'}`}>
-                                            {game.home_team.name} Win
-                                        </button>
-                                        <button 
-                                            onClick={() => handleSelectPick(game.id, game.away_team.id, game.away_team.name)}
-                                            className={`w-full py-3 font-bold rounded-lg transition ${currentPick?.predictedTeamId === game.away_team.id ? 'bg-red-600 text-white' : 'bg-red-200 text-red-800'}`}>
-                                            {game.away_team.name} Win
-                                        </button>
+                                    <div className="mt-6 text-center">
+                                        <p className="text-lg text-gray-800">Predictions are closed for this game.</p>
                                     </div>
                                 )}
                             </div>
