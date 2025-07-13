@@ -93,37 +93,113 @@ export const submitMultiplePredictions = async (userId: string, predictions: { g
 
 // 4. Fetch Prediction History for a User
 export const getPredictionHistory = async (userId: string) => {
-    const { data, error } = await supabase
+    // 1. Define the date range: from the first day of the current month to yesterday.
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // 2. Fetch all finished games within this date range.
+    const { data: games, error: gamesError } = await supabase
         .from('games')
         .select(`
             id, game_date, home_score, away_score,
             home_team:teams!home_team_id(id, name),
-            away_team:teams!away_team_id(id, name),
-            predictions!inner(predicted_winner_team_id)
+            away_team:teams!away_team_id(id, name)
         `)
-        .eq('predictions.user_id', userId)
+        .gte('game_date', firstDayOfMonth.toISOString().slice(0, 10))
+        .lte('game_date', yesterday.toISOString().slice(0, 10))
         .eq('is_finished', true)
         .order('game_date', { ascending: false });
 
-    if (error) {
-        console.error('Error fetching prediction history:', error);
-        return [];
+    if (gamesError) {
+        console.error('Error fetching games for history:', gamesError);
+        throw new Error('Could not fetch game history.');
     }
 
-    return data.map(game => {
-        const prediction = game.predictions[0];
-        const actual_winner_id = game.home_score > game.away_score ? game.home_team_id : game.away_team_id;
-        const predicted_team_id = prediction.predicted_winner_team_id;
-        const teams = { home: game.home_team, away: game.away_team };
+    // 3. Fetch all of the user's predictions for these games.
+    const gameIds = games.map(g => g.id);
+    const { data: predictions, error: predsError } = await supabase
+        .from('predictions')
+        .select('game_id, predicted_winner_team_id')
+        .eq('user_id', userId)
+        .in('game_id', gameIds);
+
+    if (predsError) {
+        console.error('Error fetching user predictions for history:', predsError);
+        // Continue without predictions if this fails
+    }
+
+    // 4. Combine the data.
+    return games.map(game => {
+        const prediction = predictions?.find(p => p.game_id === game.id);
+        const actual_winner_id = game.home_score > game.away_score ? game.home_team.id : game.away_team.id;
         
         return {
             ...game,
-            prediction: {
-                predicted_team_name: predicted_team_id === teams.home.id ? teams.home.name : teams.away.name,
-                is_correct: predicted_team_id === actual_winner_id,
-            },
+            prediction: prediction ? {
+                predicted_team_name: prediction.predicted_winner_team_id === game.home_team.id ? game.home_team.name : game.away_team.name,
+                is_correct: prediction.predicted_winner_team_id === actual_winner_id,
+            } : null, // Return null if no prediction was made
         };
     });
+};
+
+// 4b. Fetch Prediction History for a specific date
+export const getHistoryForDate = async (userId: string, date: string) => {
+    // 1. Fetch all finished games for the given date.
+    const { data: games, error: gamesError } = await supabase
+        .from('games')
+        .select(`
+            id, game_date, home_score, away_score,
+            home_team:teams!home_team_id(id, name),
+            away_team:teams!away_team_id(id, name)
+        `)
+        .eq('game_date', date)
+        .eq('is_finished', true);
+
+    if (gamesError) {
+        console.error(`Error fetching games for date ${date}:`, gamesError);
+        throw new Error('Could not fetch game history for that date.');
+    }
+
+    if (games.length === 0) {
+        return { games: [], totalPoints: 0 };
+    }
+
+    // 2. Fetch the user's predictions for these games.
+    const gameIds = games.map(g => g.id);
+    const { data: predictions, error: predsError } = await supabase
+        .from('predictions')
+        .select('game_id, predicted_winner_team_id, points_earned')
+        .eq('user_id', userId)
+        .in('game_id', gameIds);
+
+    if (predsError) {
+        console.error(`Error fetching predictions for date ${date}:`, predsError);
+        // Continue, but predictions will be missing.
+    }
+
+    // 3. Combine the data and calculate total points for the day.
+    let totalPoints = 0;
+    const combinedData = games.map(game => {
+        const prediction = predictions?.find(p => p.game_id === game.id);
+        if (prediction && prediction.points_earned) {
+            totalPoints += prediction.points_earned;
+        }
+        const actual_winner_id = game.home_score > game.away_score ? game.home_team.id : game.away_team.id;
+
+        return {
+            ...game,
+            prediction: prediction ? {
+                predicted_team_name: prediction.predicted_winner_team_id === game.home_team.id ? game.home_team.name : game.away_team.name,
+                is_correct: prediction.predicted_winner_team_id === actual_winner_id,
+                points_earned: prediction.points_earned || 0,
+            } : null,
+        };
+    });
+
+    return { games: combinedData, totalPoints };
 };
 
 // 5. Fetch Leaderboard
