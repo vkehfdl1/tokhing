@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getUserByStudentId } from '@/lib/api';
 import DailyHistoryCard from '@/components/daily-history-card';
+import PredictionRatioChart from '@/components/prediction-ratio-chart'; // Import the new component
 
 // --- TYPE DEFINITIONS ---
 type User = { id: string; student_number: string; name: string; };
@@ -103,6 +104,10 @@ export default function HistoryPage() {
                         >Next Day &gt;</button>
                     </div>
                     <h3 className="text-xl font-bold text-gray-700 mb-3">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+                    
+                    {/* Prediction Ratio Chart for the selected date */}
+                    <PredictionRatioChart date={selectedDate} />
+
                     <DailyHistoryCard userId={user.id} date={selectedDate} />
                 </div>
             )}

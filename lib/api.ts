@@ -2,8 +2,13 @@ import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 
-// Helper to get today's date string in YYYY-MM-DD format
-const getISODate = (date = new Date()) => date.toISOString().slice(0, 10);
+// Helper to get today's date string in YYYY-MM-DD format for KST
+export const getISODate = (date = new Date()) => {
+  const offset = date.getTimezoneOffset() * 60 * 1000; // Convert minutes to milliseconds
+  const kstOffset = 9 * 60 * 60 * 1000; // KST is UTC+9
+  const kstDate = new Date(date.getTime() + kstOffset + offset);
+  return kstDate.toISOString().slice(0, 10);
+};
 
 // 1. Fetch User by Student ID
 export const getUserByStudentId = async (studentId: string) => {
@@ -218,4 +223,17 @@ export const getLeaderboard = async () => {
     student_number: entry.student_number,
     score: entry.total_score,
   }));
+};
+
+// 6. Fetch Prediction Ratios for a specific date
+export const getPredictionRatios = async (date: string) => {
+  console.log(`Fetching prediction ratios for date: ${date}`); // Added for debugging
+  const { data, error } = await supabase
+    .rpc('get_prediction_ratios_by_date_grouped', { target_date: date });
+
+  if (error) {
+    console.error(`Error fetching prediction ratios for date ${date}:`, error);
+    return [];
+  }
+  return data;
 };
