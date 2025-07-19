@@ -28,6 +28,19 @@ interface Game {
   game_status: "SCHEDULED" | "LIVE" | "FINISHED";
 }
 
+interface CrawledMatch {
+  result: {
+    home_team: string;
+    away_team: string;
+    home_pitcher: string;
+    away_pitcher: string;
+    home_score: number | null;
+    away_score: number | null;
+  };
+  is_finished: boolean;
+  start_time: string;
+}
+
 // Utility function to get KST date
 const getKSTDate = (offsetDays = 0): string => {
   const now = new Date();
@@ -115,6 +128,131 @@ function MatchManagement({
     setGames(updatedGames);
   };
 
+  const autoFillMatches = async () => {
+    try {
+      setLoading(true);
+
+      // Call the edge function
+      const { data, error } = await supabase.functions.invoke("crawl_kbo", {
+        body: { date: targetDate },
+      });
+
+      if (error) {
+        console.error("Error calling crawl_kbo function:", error);
+        alert("Error fetching match data. Please try again.");
+        return;
+      }
+
+      if (!data.success) {
+        alert("Failed to fetch match data from KBO.");
+        return;
+      }
+
+      // First, get team name to ID mappings
+      const { data: teamsData, error: teamsError } = await supabase
+        .from("teams")
+        .select("id, name, short_name");
+
+      if (teamsError) {
+        console.error("Error fetching teams:", teamsError);
+        alert("Error fetching team data.");
+        return;
+      }
+
+      const teamNameToId = new Map<string, number>();
+      teamsData.forEach((team) => {
+        teamNameToId.set(team.name, team.id);
+        teamNameToId.set(team.short_name, team.id);
+      });
+
+      // Convert crawled data to Game objects
+      const crawledGames: Game[] = [];
+      const unmatchedTeams: string[] = [];
+
+      data.data.forEach((match: CrawledMatch) => {
+        const homeTeamId = teamNameToId.get(match.result.home_team);
+        const awayTeamId = teamNameToId.get(match.result.away_team);
+
+        if (!homeTeamId) {
+          unmatchedTeams.push(match.result.home_team);
+        }
+        if (!awayTeamId) {
+          unmatchedTeams.push(match.result.away_team);
+        }
+
+        crawledGames.push({
+          game_date: targetDate,
+          game_time: match.start_time,
+          home_team_id: homeTeamId || 0,
+          away_team_id: awayTeamId || 0,
+          home_pitcher: match.result.home_pitcher || "",
+          away_pitcher: match.result.away_pitcher || "",
+          home_score: match.result.home_score,
+          away_score: match.result.away_score,
+          game_status: match.is_finished ? "FINISHED" : "SCHEDULED",
+        });
+      });
+
+      // Merge with existing games
+      const updatedGames = [...games];
+
+      crawledGames.forEach((crawledGame) => {
+        // Find if there's an existing game with same home and away teams
+        const existingIndex = updatedGames.findIndex(
+          (game) =>
+            game.home_team_id === crawledGame.home_team_id &&
+            game.away_team_id === crawledGame.away_team_id
+        );
+
+        if (existingIndex >= 0) {
+          // Update existing game (keep the ID)
+          updatedGames[existingIndex] = {
+            ...updatedGames[existingIndex],
+            game_time: crawledGame.game_time,
+            home_pitcher: crawledGame.home_pitcher,
+            away_pitcher: crawledGame.away_pitcher,
+            home_score: crawledGame.home_score,
+            away_score: crawledGame.away_score,
+            game_status: crawledGame.game_status,
+          };
+        } else {
+          // Add new game
+          updatedGames.push(crawledGame);
+        }
+      });
+
+      setGames(updatedGames);
+
+      const newMatchesCount = crawledGames.length;
+      const updatedMatchesCount = crawledGames.filter((crawledGame) =>
+        games.some(
+          (game) =>
+            game.home_team_id === crawledGame.home_team_id &&
+            game.away_team_id === crawledGame.away_team_id
+        )
+      ).length;
+
+      let message = `Auto-fill completed! ${
+        newMatchesCount - updatedMatchesCount
+      } new matches added, ${updatedMatchesCount} existing matches updated.`;
+
+      if (unmatchedTeams.length > 0) {
+        const uniqueUnmatchedTeams = [...new Set(unmatchedTeams)];
+        message += `\n\nWarning: Some teams were not found in the database and set to ID 0: ${uniqueUnmatchedTeams.join(
+          ", "
+        )}`;
+      }
+
+      message += "\n\nPlease review and save changes.";
+      alert(message);
+    } catch (error) {
+      console.error("Error auto-filling matches:", error);
+      alert("Error auto-filling matches. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const saveGames = async () => {
     try {
       setLoading(true);
@@ -170,6 +308,13 @@ function MatchManagement({
           {targetDate})
         </h2>
         <div className="space-x-2">
+          <Button
+            onClick={autoFillMatches}
+            variant="secondary"
+            disabled={loading}
+          >
+            {loading ? "Auto-filling..." : "Auto-fill from KBO"}
+          </Button>
           <Button onClick={addNewGame} variant="outline">
             Add New Match
           </Button>
@@ -181,12 +326,20 @@ function MatchManagement({
 
       {games.length === 0 ? (
         <Card className="p-6 text-center">
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             No matches scheduled for this date.
           </p>
-          <Button onClick={addNewGame} className="mt-4">
-            Add First Match
-          </Button>
+          <div className="space-x-2">
+            <Button onClick={autoFillMatches} disabled={loading}>
+              {loading ? "Auto-filling..." : "Auto-fill from KBO"}
+            </Button>
+            <Button onClick={addNewGame} variant="outline">
+              Add Manual Match
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">
+            💡 Try auto-fill first to get KBO schedule data automatically
+          </p>
         </Card>
       ) : (
         <div className="space-y-4">
