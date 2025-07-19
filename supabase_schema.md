@@ -15,8 +15,8 @@ CREATE TABLE public.games (
   updated_at timestamp with time zone DEFAULT now(),
   game_status USER-DEFINED NOT NULL DEFAULT 'SCHEDULED'::"GAME_STATUS",
   CONSTRAINT games_pkey PRIMARY KEY (id),
-  CONSTRAINT games_away_team_id_fkey FOREIGN KEY (away_team_id) REFERENCES public.teams(id),
-  CONSTRAINT games_home_team_id_fkey FOREIGN KEY (home_team_id) REFERENCES public.teams(id)
+  CONSTRAINT games_home_team_id_fkey FOREIGN KEY (home_team_id) REFERENCES public.teams(id),
+  CONSTRAINT games_away_team_id_fkey FOREIGN KEY (away_team_id) REFERENCES public.teams(id)
 );
 CREATE TABLE public.predictions (
   id integer NOT NULL DEFAULT nextval('predictions_id_seq'::regclass),
@@ -28,9 +28,9 @@ CREATE TABLE public.predictions (
   points_earned integer DEFAULT 0,
   settled_at timestamp with time zone,
   CONSTRAINT predictions_pkey PRIMARY KEY (id),
-  CONSTRAINT predictions_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id),
   CONSTRAINT predictions_predicted_winner_team_id_fkey FOREIGN KEY (predicted_winner_team_id) REFERENCES public.teams(id),
-  CONSTRAINT predictions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
+  CONSTRAINT predictions_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id),
+  CONSTRAINT predictions_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id)
 );
 CREATE TABLE public.teams (
   id integer NOT NULL DEFAULT nextval('teams_id_seq'::regclass),
