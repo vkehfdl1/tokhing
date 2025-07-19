@@ -113,7 +113,7 @@ export default function HomePage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-8">
       <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
-        Today's Predictions
+        오늘의 토킹 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -124,17 +124,17 @@ export default function HomePage() {
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="Enter your Student ID"
+            placeholder="학번을 입력해 주세요"
             className="flex-grow text-black bg-white"
           />
           <Button onClick={handleLogin} disabled={isLoading} className="px-6">
-            {isLoading ? "Loading..." : "Login"}
+            {isLoading ? "로딩 중..." : "로그인"}
           </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold text-gray-800">
-            Welcome, {user.name}!
+            {user.name}님 환영합니다.
           </h2>
         </div>
       )}
@@ -181,7 +181,7 @@ export default function HomePage() {
                       </span>
                     ) : game.game_status === "CANCELED" ? (
                       <span className="text-xl font-bold text-red-500">
-                        CANCELED
+                        경기 취소
                       </span>
                     ) : (
                       <span className="text-3xl font-extrabold">VS</span>
@@ -200,13 +200,13 @@ export default function HomePage() {
                 {game.game_status === "CANCELED" ? (
                   <div className="mt-6 text-center">
                     <p className="text-lg text-gray-800">
-                      This game has been canceled.
+                      해당 경기는 취소되었습니다.
                     </p>
                   </div>
                 ) : hasSubmitted ? (
                   <div className="mt-6 text-center">
                     <p className="text-lg text-gray-800">
-                      Your pick:{" "}
+                      부원님의 예측 : {" "}
                       <span className="font-bold">
                         {submittedPick === game.home_team.id
                           ? game.home_team.name
@@ -230,7 +230,7 @@ export default function HomePage() {
                           : "bg-green-200 text-green-800"
                       }`}
                     >
-                      {game.home_team.name} Win
+                      {game.home_team.name}가 승리한다
                     </button>
                     <button
                       onClick={() =>
@@ -246,13 +246,13 @@ export default function HomePage() {
                           : "bg-red-200 text-red-800"
                       }`}
                     >
-                      {game.away_team.name} Win
+                      {game.away_team.name}가 승리한다
                     </button>
                   </div>
                 ) : (
                   <div className="mt-6 text-center">
                     <p className="text-lg text-gray-800">
-                      Predictions are closed for this game.
+                      이 경기에 대한 예측은 마감되었습니다.
                     </p>
                   </div>
                 )}
@@ -279,13 +279,13 @@ export default function HomePage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white p-8 rounded-lg shadow-2xl">
             <h3 className="text-xl font-bold mb-4 text-gray-900">
-              Confirm Your Predictions
+              예측을 제출하시겠습니까?
             </h3>
             <ul className="list-disc list-inside mb-6 text-gray-700">
               {Array.from(selectedPicks.values()).map((pick) => (
                 <li key={pick.gameId}>
-                  You picked the{" "}
-                  <span className="font-bold">{pick.teamName}</span> to win.
+                  {" "}
+                  <span className="font-bold">{pick.teamName}</span>
                 </li>
               ))}
             </ul>
@@ -294,13 +294,13 @@ export default function HomePage() {
                 onClick={() => setShowConfirmation(false)}
                 className="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg"
               >
-                Cancel
+                취소
               </button>
               <button
                 onClick={handleConfirmSubmission}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg"
               >
-                Confirm & Submit
+                제출
               </button>
             </div>
           </div>

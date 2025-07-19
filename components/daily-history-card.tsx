@@ -77,7 +77,7 @@ export default function DailyHistoryCard({
   return (
     <div className="bg-white p-6 rounded-xl shadow-md">
       <h3 className="text-lg font-bold text-gray-800 mb-4">
-        Total Points Earned: {dailyData.totalPoints}
+        총 획득한 점수: {dailyData.totalPoints}
       </h3>
       <div className="space-y-4">
         {dailyData.games.map((game) => {
@@ -110,7 +110,7 @@ export default function DailyHistoryCard({
                 </div>
                 <div className="text-right">
                   <p className="text-gray-700">
-                    Your pick:{" "}
+                    당신의 예측 : {" "}
                     <span className="font-bold">
                       {game.prediction?.predicted_team_name ?? "N/A"}
                     </span>
@@ -125,12 +125,12 @@ export default function DailyHistoryCard({
                     >
                       {game.prediction
                         ? game.prediction.is_correct
-                          ? "✓ Correct"
-                          : "✗ Wrong"
+                          ? "✓ 적중"
+                          : "✗ 예측 실패"
                         : "No prediction"}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Points: {game.prediction?.points_earned ?? 0}
+                      점수: {game.prediction?.points_earned ?? 0}
                       {game.prediction &&
                         !game.prediction.is_settled &&
                         " (pending)"}

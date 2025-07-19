@@ -42,7 +42,7 @@ export default function PredictionRatioChart({
 
   if (isLoading) {
     return (
-      <p className="text-center text-gray-500">Loading prediction ratios...</p>
+      <p className="text-center text-gray-500">예측 비율 로딩 중...</p>
     );
   }
 
@@ -55,7 +55,7 @@ export default function PredictionRatioChart({
   if (ratios.length === 0) {
     return (
       <p className="text-center text-gray-500">
-        No prediction data for active games on this date.
+        해당 날짜의 승부 예측 데이터를 찾을 수 없습니다.
       </p>
     );
   }

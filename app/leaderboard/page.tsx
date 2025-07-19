@@ -26,10 +26,10 @@ export default function LeaderboardPage() {
 
     return (
         <div className="w-full max-w-4xl mx-auto p-8">
-            <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">Leaderboard</h1>
+            <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">토킹 실시간 순위</h1>
 
             {isLoading ? (
-                <p className="text-center">Loading leaderboard...</p>
+                <p className="text-center">로딩 중...</p>
             ) : (
                 <div className="bg-white rounded-xl shadow-md">
                     <ul className="divide-y divide-gray-200">

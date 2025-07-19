@@ -7,9 +7,10 @@ export default function Navigation() {
     const pathname = usePathname();
 
     const links = [
-        { href: '/', label: 'Home' },
-        { href: '/history', label: 'History' },
-        { href: '/leaderboard', label: 'Leaderboard' },
+        { href: '/', label: '오늘의 예측' },
+        { href: '/history', label: '기록' },
+        { href: '/leaderboard', label: '순위' },
+        { href: '/admin', label: '프런트' },
     ];
 
     return (

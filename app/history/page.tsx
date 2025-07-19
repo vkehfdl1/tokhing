@@ -64,7 +64,7 @@ export default function HistoryPage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-8">
       <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
-        Prediction History
+        예측 기록
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -76,17 +76,17 @@ export default function HistoryPage() {
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="Enter your Student ID"
+            placeholder="학번을 입력해 주세요"
             className="flex-grow text-black bg-white"
           />
           <Button onClick={handleLogin} disabled={isLoading} className="px-6">
-            {isLoading ? "Loading..." : "Login"}
+            {isLoading ? "로딩 중..." : "로그인"}
           </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold text-gray-800">
-            Welcome, {user.name}!
+            {user.name}님의 기록
           </h2>
         </div>
       )}
@@ -101,7 +101,7 @@ export default function HistoryPage() {
               disabled={isPreviousDisabled}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              &lt; Previous Day
+              &lt; 전 날
             </button>
             <input
               type="date"
@@ -116,11 +116,11 @@ export default function HistoryPage() {
               disabled={isNextDisabled}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Next Day &gt;
+              다음 날 &gt;
             </button>
           </div>
           <h3 className="text-xl font-bold text-gray-700 mb-6">
-            {new Date(selectedDate).toLocaleDateString("en-US", {
+            {new Date(selectedDate).toLocaleDateString("ko-KR", {
               weekday: "long",
               year: "numeric",
               month: "long",

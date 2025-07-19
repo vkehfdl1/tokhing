@@ -313,13 +313,13 @@ function MatchManagement({
             variant="secondary"
             disabled={loading}
           >
-            {loading ? "Auto-filling..." : "Auto-fill from KBO"}
+            {loading ? "Auto-filling..." : "자동 채우기"}
           </Button>
           <Button onClick={addNewGame} variant="outline">
-            Add New Match
+            새 경기 추가
           </Button>
           <Button onClick={saveGames} disabled={loading}>
-            {loading ? "Saving..." : "Save All Changes"}
+            {loading ? "Saving..." : "변경 사항 저장하기"}
           </Button>
         </div>
       </div>
@@ -327,18 +327,18 @@ function MatchManagement({
       {games.length === 0 ? (
         <Card className="p-6 text-center">
           <p className="text-muted-foreground mb-4">
-            No matches scheduled for this date.
+            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를 시도해 주세요.
           </p>
           <div className="space-x-2">
             <Button onClick={autoFillMatches} disabled={loading}>
-              {loading ? "Auto-filling..." : "Auto-fill from KBO"}
+              {loading ? "Auto-filling..." : "자동 채우기"}
             </Button>
             <Button onClick={addNewGame} variant="outline">
-              Add Manual Match
+              수동으로 추가하기
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4">
-            💡 Try auto-fill first to get KBO schedule data automatically
+            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지 기다려주세요.
           </p>
         </Card>
       ) : (
@@ -347,7 +347,7 @@ function MatchManagement({
             <Card key={index} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`time-${index}`}>Game Time</Label>
+                  <Label htmlFor={`time-${index}`}>경기 시작 시간</Label>
                   <Input
                     id={`time-${index}`}
                     type="time"
@@ -359,7 +359,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`home-team-${index}`}>Home Team</Label>
+                  <Label htmlFor={`home-team-${index}`}>홈 팀</Label>
                   <Select
                     id={`home-team-${index}`}
                     value={game.home_team_id}
@@ -380,7 +380,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`away-team-${index}`}>Away Team</Label>
+                  <Label htmlFor={`away-team-${index}`}>원정 팀</Label>
                   <Select
                     id={`away-team-${index}`}
                     value={game.away_team_id}
@@ -401,7 +401,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`status-${index}`}>Status</Label>
+                  <Label htmlFor={`status-${index}`}>경기 상태</Label>
                   <Select
                     id={`status-${index}`}
                     value={game.game_status}
@@ -417,15 +417,15 @@ function MatchManagement({
                       )
                     }
                   >
-                    <option value="SCHEDULED">Scheduled</option>
-                    <option value="IN_PROGRESS">In Progress</option>
-                    <option value="FINISHED">Finished</option>
-                    <option value="CANCELED">Canceled</option>
+                    <option value="SCHEDULED">시작 전</option>
+                    <option value="IN_PROGRESS">경기 중</option>
+                    <option value="FINISHED">경기 종료</option>
+                    <option value="CANCELED">취소</option>
                   </Select>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`home-pitcher-${index}`}>Home Pitcher</Label>
+                  <Label htmlFor={`home-pitcher-${index}`}>홈 팀 선발 투수</Label>
                   <Input
                     id={`home-pitcher-${index}`}
                     value={game.home_pitcher}
@@ -437,7 +437,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`away-pitcher-${index}`}>Away Pitcher</Label>
+                  <Label htmlFor={`away-pitcher-${index}`}>원정 팀 선발 투수</Label>
                   <Input
                     id={`away-pitcher-${index}`}
                     value={game.away_pitcher}
@@ -449,7 +449,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`home-score-${index}`}>Home Score</Label>
+                  <Label htmlFor={`home-score-${index}`}>홈 팀 점수</Label>
                   <Input
                     id={`home-score-${index}`}
                     type="number"
@@ -467,7 +467,7 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`away-score-${index}`}>Away Score</Label>
+                  <Label htmlFor={`away-score-${index}`}>원정 팀 점수</Label>
                   <Input
                     id={`away-score-${index}`}
                     type="number"
@@ -491,7 +491,7 @@ function MatchManagement({
                   onClick={() => removeGame(index)}
                   size="sm"
                 >
-                  Remove Match
+                  경기 삭제하기
                 </Button>
               </div>
             </Card>
@@ -524,10 +524,10 @@ function AdminDashboard() {
             onClick={() => setCurrentView("dashboard")}
             className="mb-4"
           >
-            ← Back to Dashboard
+            ← 메뉴로 돌아가기
           </Button>
           <div className="text-sm text-muted-foreground mb-2">
-            Current KST Time: {getCurrentKSTTime()}
+            현재 시각: {getCurrentKSTTime()}
           </div>
         </div>
 
@@ -553,33 +553,33 @@ function AdminDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">Admin Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome to the admin control panel
+          토킹 관리 대시보드에 오신 것을 환영합니다.
         </p>
         <div className="text-sm text-muted-foreground mt-2">
-          Current KST Time: {getCurrentKSTTime()}
+          현재 시각: {getCurrentKSTTime()}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">Today&apos;s Matches</h3>
+          <h3 className="text-xl font-semibold mb-3">오늘의 경기</h3>
           <p className="text-muted-foreground mb-4">
-            Manage today&apos;s game schedule and scores
+            오늘 경기 정보를 관리합니다.
           </p>
           <Button onClick={() => setCurrentView("today")}>
-            Manage Today&apos;s Matches
+            접속
           </Button>
         </Card>
 
         <Card className="p-6">
           <h3 className="text-xl font-semibold mb-3">
-            Tomorrow&apos;s Matches
+            내일의 경기
           </h3>
           <p className="text-muted-foreground mb-4">
-            Schedule and configure tomorrow&apos;s games
+            내일 경기 정보를 관리합니다.
           </p>
           <Button onClick={() => setCurrentView("tomorrow")}>
-            Manage Tomorrow&apos;s Matches
+            접속
           </Button>
         </Card>
 
@@ -624,7 +624,7 @@ function AdminDashboard() {
             window.location.reload();
           }}
         >
-          Logout
+          로그아웃
         </Button>
       </div>
     </div>
@@ -686,9 +686,9 @@ function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md p-6">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">Admin Access</h1>
+          <h1 className="text-2xl font-bold mb-2">토킹 관리</h1>
           <p className="text-muted-foreground">
-            Enter admin password to continue
+            프런트 인증을 위해 비밀번호를 입력하세요
           </p>
         </div>
 
@@ -696,7 +696,7 @@ function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
           <div>
             <Input
               type="password"
-              placeholder="Admin password"
+              placeholder="운영진 비밀번호"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -716,12 +716,12 @@ function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
             className="w-full"
             disabled={isLoading || !password}
           >
-            {isLoading ? "Verifying..." : "Access Admin Panel"}
+            {isLoading ? "인증 중..." : "프런트 인증하기"}
           </Button>
         </form>
 
         <div className="mt-6 text-xs text-muted-foreground">
-          <p>⚠️ This area is restricted to authorized administrators only.</p>
+          <p>⚠️ 이 메뉴는 루킹 프런트만 접근할 수 있습니다.</p>
         </div>
       </Card>
     </div>
