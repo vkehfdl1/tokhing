@@ -9,6 +9,14 @@ interface Team {
   short_name: string;
 }
 
+interface GameWithTeams {
+  id: number;
+  home_team_id: number;
+  away_team_id: number;
+  home_team: Team | Team[];
+  away_team: Team | Team[];
+}
+
 interface Game {
   id?: number;
   game_date: string;
@@ -187,17 +195,26 @@ export const getPredictionHistory = async (userId: string) => {
   // 4. Combine the data.
   return games.map((game) => {
     const prediction = predictions?.find((p) => p.game_id === game.id);
+
+    // Handle both array and object formats for team data
+    const homeTeam = Array.isArray(game.home_team)
+      ? game.home_team[0]
+      : game.home_team;
+    const awayTeam = Array.isArray(game.away_team)
+      ? game.away_team[0]
+      : game.away_team;
+
     const actual_winner_id =
-      game.home_score > game.away_score ? game.home_team.id : game.away_team.id;
+      game.home_score > game.away_score ? homeTeam.id : awayTeam.id;
 
     return {
       ...game,
       prediction: prediction
         ? {
             predicted_team_name:
-              prediction.predicted_winner_team_id === game.home_team.id
-                ? game.home_team.name
-                : game.away_team.name,
+              prediction.predicted_winner_team_id === homeTeam.id
+                ? homeTeam.name
+                : awayTeam.name,
             is_correct:
               prediction.predicted_winner_team_id === actual_winner_id,
           }
@@ -208,62 +225,112 @@ export const getPredictionHistory = async (userId: string) => {
 
 // 4b. Fetch Prediction History for a specific date
 export const getHistoryForDate = async (userId: string, date: string) => {
-  // 1. Fetch all finished games for the given date.
+  // 1. Fetch all games for the given date that have finished (have scores)
   const { data: games, error: gamesError } = await supabase
     .from("games")
     .select(
       `
-            id, game_date, home_score, away_score,
+            id, game_date, home_score, away_score, game_status,
             home_team:teams!home_team_id(id, name),
             away_team:teams!away_team_id(id, name)
         `
     )
     .eq("game_date", date)
-    .eq("is_finished", true);
+    .eq("game_status", "FINISHED");
 
   if (gamesError) {
     console.error(`Error fetching games for date ${date}:`, gamesError);
     throw new Error("Could not fetch game history for that date.");
   }
 
-  if (games.length === 0) {
-    return { games: [], totalPoints: 0 };
+  // 2. Fetch the user's predictions for all games on this date (not just finished ones)
+  // This way we can show predictions even for games that haven't finished yet
+  const { data: allDayGames, error: allGamesError } = await supabase
+    .from("games")
+    .select("id")
+    .eq("game_date", date);
+
+  if (allGamesError) {
+    console.error(`Error fetching all games for date ${date}:`, allGamesError);
+    throw new Error("Could not fetch games for prediction lookup.");
   }
 
-  // 2. Fetch the user's predictions for these games.
-  const gameIds = games.map((g) => g.id);
+  const allGameIds = allDayGames.map((g) => g.id);
   const { data: predictions, error: predsError } = await supabase
     .from("predictions")
-    .select("game_id, predicted_winner_team_id, points_earned")
+    .select("game_id, predicted_winner_team_id, points_earned, is_settled")
     .eq("user_id", userId)
-    .in("game_id", gameIds);
+    .in("game_id", allGameIds);
 
   if (predsError) {
     console.error(`Error fetching predictions for date ${date}:`, predsError);
     // Continue, but predictions will be missing.
   }
 
-  // 3. Combine the data and calculate total points for the day.
+  // 3. If no finished games, but user has predictions, show message about pending games
+  if (games.length === 0) {
+    const userPredictionsCount = predictions?.length || 0;
+    if (userPredictionsCount > 0) {
+      return {
+        games: [],
+        totalPoints: 0,
+        message: `You have ${userPredictionsCount} prediction(s) for this date, but games haven't finished yet.`,
+      };
+    }
+    return { games: [], totalPoints: 0 };
+  }
+
+  // 4. Combine the data and calculate total points for the day.
   let totalPoints = 0;
   const combinedData = games.map((game) => {
     const prediction = predictions?.find((p) => p.game_id === game.id);
-    if (prediction && prediction.points_earned) {
+
+    // Calculate points earned only for settled predictions
+    if (prediction && prediction.points_earned && prediction.is_settled) {
       totalPoints += prediction.points_earned;
     }
-    const actual_winner_id =
-      game.home_score > game.away_score ? game.home_team.id : game.away_team.id;
+
+    // Determine the actual winner (handle ties if necessary)
+    let actual_winner_id = null;
+    let gameResult = "TIE";
+    if (game.home_score !== null && game.away_score !== null) {
+      if (game.home_score > game.away_score) {
+        // Handle both array and object formats for team data
+        actual_winner_id =
+          (Array.isArray(game.home_team) ? game.home_team[0] : game.home_team)
+            ?.id || null;
+        gameResult = "HOME_WIN";
+      } else if (game.away_score > game.home_score) {
+        actual_winner_id =
+          (Array.isArray(game.away_team) ? game.away_team[0] : game.away_team)
+            ?.id || null;
+        gameResult = "AWAY_WIN";
+      }
+    }
+
+    // Get team names and ids safely
+    const homeTeam = Array.isArray(game.home_team)
+      ? game.home_team[0]
+      : game.home_team;
+    const awayTeam = Array.isArray(game.away_team)
+      ? game.away_team[0]
+      : game.away_team;
 
     return {
       ...game,
+      gameResult,
       prediction: prediction
         ? {
             predicted_team_name:
-              prediction.predicted_winner_team_id === game.home_team.id
-                ? game.home_team.name
-                : game.away_team.name,
+              prediction.predicted_winner_team_id === homeTeam.id
+                ? homeTeam.name
+                : awayTeam.name,
             is_correct:
-              prediction.predicted_winner_team_id === actual_winner_id,
+              actual_winner_id !== null
+                ? prediction.predicted_winner_team_id === actual_winner_id
+                : false,
             points_earned: prediction.points_earned || 0,
+            is_settled: prediction.is_settled || false,
           }
         : null,
     };
@@ -281,12 +348,19 @@ export const getLeaderboard = async () => {
     return [];
   }
 
-  return data.map((entry: any) => ({
-    userId: entry.user_id,
-    name: entry.username,
-    student_number: entry.student_number,
-    score: entry.total_score,
-  }));
+  return data.map(
+    (entry: {
+      user_id: string;
+      username: string;
+      student_number: string;
+      total_score: number;
+    }) => ({
+      userId: entry.user_id,
+      name: entry.username,
+      student_number: entry.student_number,
+      score: entry.total_score,
+    })
+  );
 };
 
 // 6. Fetch Prediction Ratios for a specific date
@@ -302,6 +376,90 @@ export const getPredictionRatios = async (date: string) => {
     return [];
   }
   return data;
+};
+
+// 6a. Fetch Prediction Ratios for games with IN_PROGRESS or FINISHED status only
+export const getPredictionRatiosForActiveGames = async (date: string) => {
+  console.log(`Fetching prediction ratios for active games on date: ${date}`);
+
+  // First get the games for the date with IN_PROGRESS or FINISHED status
+  const { data: games, error: gamesError } = await supabase
+    .from("games")
+    .select(
+      `
+      id,
+      home_team_id,
+      away_team_id,
+      home_team:teams!home_team_id(name),
+      away_team:teams!away_team_id(name)
+    `
+    )
+    .eq("game_date", date)
+    .in("game_status", ["IN_PROGRESS", "FINISHED"]);
+
+  if (gamesError) {
+    console.error(`Error fetching active games for date ${date}:`, gamesError);
+    return [];
+  }
+
+  if (!games || games.length === 0) {
+    return [];
+  }
+
+  const gameIds = games.map((g) => g.id);
+
+  // Get predictions for these games
+  const { data: predictions, error: predictionsError } = await supabase
+    .from("predictions")
+    .select("game_id, predicted_winner_team_id")
+    .in("game_id", gameIds);
+
+  if (predictionsError) {
+    console.error(
+      `Error fetching predictions for active games:`,
+      predictionsError
+    );
+    return [];
+  }
+
+  // Calculate ratios for each game
+  const ratios = games.map((game) => {
+    const gamePredictions =
+      predictions?.filter((p) => p.game_id === game.id) || [];
+    const totalPredictions = gamePredictions.length;
+
+    const homeTeam = Array.isArray(game.home_team)
+      ? game.home_team[0]
+      : game.home_team;
+    const awayTeam = Array.isArray(game.away_team)
+      ? game.away_team[0]
+      : game.away_team;
+
+    if (totalPredictions === 0) {
+      return {
+        home_team_name: homeTeam?.name || "Unknown",
+        away_team_name: awayTeam?.name || "Unknown",
+        home_team_ratio: 0,
+        away_team_ratio: 0,
+      };
+    }
+
+    const homePredictions = gamePredictions.filter(
+      (p) => p.predicted_winner_team_id === game.home_team_id
+    ).length;
+    const awayPredictions = gamePredictions.filter(
+      (p) => p.predicted_winner_team_id === game.away_team_id
+    ).length;
+
+    return {
+      home_team_name: homeTeam?.name || "Unknown",
+      away_team_name: awayTeam?.name || "Unknown",
+      home_team_ratio: (homePredictions / totalPredictions) * 100,
+      away_team_ratio: (awayPredictions / totalPredictions) * 100,
+    };
+  });
+
+  return ratios;
 };
 
 // Admin Functions for Game Management

@@ -300,10 +300,10 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* --- PREDICTION RATIO CHART -- */}
+      {/* --- PREDICTION RATIO CHART --
       <div className="mt-12">
         <PredictionRatioChart date={getISODate()} />
-      </div>
+      </div> */}
     </div>
   );
 }
