@@ -340,8 +340,11 @@ export const getHistoryForDate = async (userId: string, date: string) => {
 };
 
 // 5. Fetch Leaderboard
-export const getLeaderboard = async () => {
-  const { data, error } = await supabase.rpc("get_leaderboard");
+export const getLeaderboard = async (startDate?: string, endDate?: string) => {
+  const { data, error } = await supabase.rpc("get_leaderboard", {
+    start_date: startDate,
+    end_date: endDate,
+  });
 
   if (error) {
     console.error("Error fetching leaderboard:", error);
