@@ -5,9 +5,7 @@ import {
   getUserByStudentId,
   getTodaysGamesWithPredictions,
   submitMultiplePredictions,
-  getISODate,
 } from "@/lib/api";
-import PredictionRatioChart from "@/components/prediction-ratio-chart";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -194,54 +192,58 @@ export default function HomePage() {
                   </div>
                 </div>
 
-                {game.game_status === "SCHEDULED" ? (
-                  hasSubmitted ? (
-                    <div className="mt-6 text-center">
-                      <p className="text-lg text-gray-800">
-                        Your pick:{" "}
-                        <span className="font-bold">
-                          {submittedPick === game.home_team.id
-                            ? game.home_team.name
-                            : game.away_team.name}
-                        </span>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center gap-4 mt-6">
-                      <button
-                        onClick={() =>
-                          handleSelectPick(
-                            game.id,
-                            game.home_team.id,
-                            game.home_team.name
-                          )
-                        }
-                        className={`w-full py-3 font-bold rounded-lg transition ${
-                          currentPick?.predictedTeamId === game.home_team.id
-                            ? "bg-green-600 text-white"
-                            : "bg-green-200 text-green-800"
-                        }`}
-                      >
-                        {game.home_team.name} Win
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleSelectPick(
-                            game.id,
-                            game.away_team.id,
-                            game.away_team.name
-                          )
-                        }
-                        className={`w-full py-3 font-bold rounded-lg transition ${
-                          currentPick?.predictedTeamId === game.away_team.id
-                            ? "bg-red-600 text-white"
-                            : "bg-red-200 text-red-800"
-                        }`}
-                      >
-                        {game.away_team.name} Win
-                      </button>
-                    </div>
-                  )
+                {game.game_status === "CANCELED" ? (
+                  <div className="mt-6 text-center">
+                    <p className="text-lg text-gray-800">
+                      This game has been canceled.
+                    </p>
+                  </div>
+                ) : hasSubmitted ? (
+                  <div className="mt-6 text-center">
+                    <p className="text-lg text-gray-800">
+                      Your pick:{" "}
+                      <span className="font-bold">
+                        {submittedPick === game.home_team.id
+                          ? game.home_team.name
+                          : game.away_team.name}
+                      </span>
+                    </p>
+                  </div>
+                ) : game.game_status === "SCHEDULED" ? (
+                  <div className="flex justify-center gap-4 mt-6">
+                    <button
+                      onClick={() =>
+                        handleSelectPick(
+                          game.id,
+                          game.home_team.id,
+                          game.home_team.name
+                        )
+                      }
+                      className={`w-full py-3 font-bold rounded-lg transition ${
+                        currentPick?.predictedTeamId === game.home_team.id
+                          ? "bg-green-600 text-white"
+                          : "bg-green-200 text-green-800"
+                      }`}
+                    >
+                      {game.home_team.name} Win
+                    </button>
+                    <button
+                      onClick={() =>
+                        handleSelectPick(
+                          game.id,
+                          game.away_team.id,
+                          game.away_team.name
+                        )
+                      }
+                      className={`w-full py-3 font-bold rounded-lg transition ${
+                        currentPick?.predictedTeamId === game.away_team.id
+                          ? "bg-red-600 text-white"
+                          : "bg-red-200 text-red-800"
+                      }`}
+                    >
+                      {game.away_team.name} Win
+                    </button>
+                  </div>
                 ) : (
                   <div className="mt-6 text-center">
                     <p className="text-lg text-gray-800">
@@ -299,11 +301,6 @@ export default function HomePage() {
           </div>
         </div>
       )}
-
-      {/* --- PREDICTION RATIO CHART --
-      <div className="mt-12">
-        <PredictionRatioChart date={getISODate()} />
-      </div> */}
     </div>
   );
 }
