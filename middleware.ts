@@ -15,8 +15,9 @@ export const config = {
      * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
      * - history (public page)
      * - leaderboard (public page)
+     * - admin (admin page)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|history|leaderboard|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|history|leaderboard|admin|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
