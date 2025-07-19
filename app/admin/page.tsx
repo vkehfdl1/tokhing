@@ -25,7 +25,7 @@ interface Game {
   away_pitcher: string;
   home_score: number | null;
   away_score: number | null;
-  game_status: "SCHEDULED" | "LIVE" | "FINISHED";
+  game_status: "SCHEDULED" | "IN_PROGRESS" | "FINISHED" | "CANCELED";
 }
 
 interface CrawledMatch {
@@ -409,13 +409,18 @@ function MatchManagement({
                       updateGame(
                         index,
                         "game_status",
-                        e.target.value as "SCHEDULED" | "LIVE" | "FINISHED"
+                        e.target.value as
+                          | "SCHEDULED"
+                          | "IN_PROGRESS"
+                          | "FINISHED"
+                          | "CANCELED"
                       )
                     }
                   >
                     <option value="SCHEDULED">Scheduled</option>
-                    <option value="LIVE">Live</option>
+                    <option value="IN_PROGRESS">In Progress</option>
                     <option value="FINISHED">Finished</option>
+                    <option value="CANCELED">Canceled</option>
                   </Select>
                 </div>
 
