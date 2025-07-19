@@ -6,6 +6,8 @@ import {
   getTodaysGamesWithPredictions,
   submitMultiplePredictions,
 } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -117,21 +119,17 @@ export default function HomePage() {
       {/* --- LOGIN FORM -- */}
       {!user ? (
         <div className="flex gap-4 mb-8">
-          <input
+          <Input
             type="text"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             placeholder="Enter your Student ID"
-            className="flex-grow p-3 border border-gray-300 rounded-lg text-black"
+            className="flex-grow text-black bg-white"
           />
-          <button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg"
-          >
+          <Button onClick={handleLogin} disabled={isLoading} className="px-6">
             {isLoading ? "Loading..." : "Login"}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
@@ -155,7 +153,14 @@ export default function HomePage() {
             const submittedPick = game.prediction?.predicted_winner_team_id;
 
             return (
-              <div key={game.id} className="p-6 bg-white rounded-xl shadow-md">
+              <div
+                key={game.id}
+                className={`p-6 rounded-xl shadow-md ${
+                  game.game_status === "CANCELED"
+                    ? "bg-red-50 border-2 border-red-200"
+                    : "bg-white"
+                }`}
+              >
                 <div className="grid grid-cols-3 items-center text-center text-gray-800">
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold">

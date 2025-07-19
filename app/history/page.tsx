@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { getUserByStudentId } from "@/lib/api";
 import DailyHistoryCard from "@/components/daily-history-card";
 import PredictionRatioChart from "@/components/prediction-ratio-chart"; // Import the new component
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 // --- TYPE DEFINITIONS ---
 type User = { id: string; student_number: string; name: string };
@@ -66,28 +68,25 @@ export default function HistoryPage() {
       </h1>
 
       {/* --- LOGIN FORM -- */}
+      {/* --- LOGIN FORM -- */}
       {!user ? (
         <div className="flex gap-4 mb-8">
-          <input
+          <Input
             type="text"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             placeholder="Enter your Student ID"
-            className="flex-grow p-3 border border-gray-300 rounded-lg text-black"
+            className="flex-grow text-black bg-white"
           />
-          <button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg"
-          >
+          <Button onClick={handleLogin} disabled={isLoading} className="px-6">
             {isLoading ? "Loading..." : "Login"}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
           <h2 className="text-2xl font-semibold text-gray-800">
-            History for {user.name}
+            Welcome, {user.name}!
           </h2>
         </div>
       )}
