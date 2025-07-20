@@ -243,12 +243,13 @@ export const getHistoryForDate = async (userId: string, date: string) => {
     throw new Error("Could not fetch game history for that date.");
   }
 
-  // 2. Fetch the user's predictions for all games on this date (not just finished ones)
+  // 2. Fetch the user's predictions for all games on this date (only finished ones)
   // This way we can show predictions even for games that haven't finished yet
   const { data: allDayGames, error: allGamesError } = await supabase
     .from("games")
     .select("id")
-    .eq("game_date", date);
+    .eq("game_date", date)
+    .eq("game_status", "FINISHED");
 
   if (allGamesError) {
     console.error(`Error fetching all games for date ${date}:`, allGamesError);
