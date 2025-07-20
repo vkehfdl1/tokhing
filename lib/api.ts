@@ -2,33 +2,6 @@ import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 
-// Type definitions
-interface Team {
-  id: number;
-  name: string;
-  short_name: string;
-}
-
-interface GameWithTeams {
-  id: number;
-  home_team_id: number;
-  away_team_id: number;
-  home_team: Team | Team[];
-  away_team: Team | Team[];
-}
-
-interface Game {
-  id?: number;
-  game_date: string;
-  game_time: string;
-  home_team_id: number;
-  away_team_id: number;
-  home_pitcher: string;
-  away_pitcher: string;
-  home_score: number | null;
-  away_score: number | null;
-  game_status: "SCHEDULED" | "LIVE" | "FINISHED";
-}
 
 interface GameData {
   game_date: string;

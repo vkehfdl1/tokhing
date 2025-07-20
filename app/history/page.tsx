@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { getUserByStudentId } from "@/lib/api";
 import DailyHistoryCard from "@/components/daily-history-card";
 import PredictionRatioChart from "@/components/prediction-ratio-chart"; // Import the new component
@@ -34,6 +34,7 @@ export default function HistoryPage() {
     try {
       const userData = await getUserByStudentId(studentId);
       setUser(userData);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message);
       setUser(null);
