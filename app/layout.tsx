@@ -10,8 +10,16 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "KBO Prediction Challenge",
-  description: "Predict KBO game outcomes and compete on the leaderboard!",
+  title: "토킹 승부 예측",
+  description: "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 토킹입니다.",
+  openGraph: {
+    title: "토킹 승부 예측",
+    description: "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 토킹입니다.",
+    url: defaultUrl,
+    siteName: "토킹 승부 예측",
+    locale: "ko_KR",
+    type: "website",
+  }
 };
 
 const geistSans = Geist({
