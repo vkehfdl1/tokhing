@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   getUserByStudentId,
   getTodaysGamesWithPredictions,
@@ -33,6 +34,7 @@ type SelectedPick = {
 
 // --- COMPONENT ---
 export default function HomePage() {
+  const router = useRouter();
   const [studentId, setStudentId] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [todaysGames, setTodaysGames] = useState<Game[]>([]);
@@ -121,18 +123,31 @@ export default function HomePage() {
 
       {/* --- LOGIN FORM -- */}
       {!user ? (
-        <div className="flex gap-4 mb-8">
-          <Input
-            type="text"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="학번을 입력해 주세요"
-            className="flex-grow text-black bg-white"
-          />
-          <Button onClick={handleLogin} disabled={isLoading} className="px-6">
-            {isLoading ? "로딩 중..." : "로그인"}
-          </Button>
+        <div>
+          <div className="flex gap-4 mb-8">
+            <Input
+              type="text"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="학번을 입력해 주세요"
+              className="flex-grow text-black bg-white"
+            />
+            <Button onClick={handleLogin} disabled={isLoading} className="px-6">
+              {isLoading ? "로딩 중..." : "로그인"}
+            </Button>
+          </div>
+
+          {/* Tutorial Button */}
+          <div className="text-center mb-8">
+            <Button
+              variant="secondary"
+              onClick={() => router.push("/tutorial")}
+              className="px-6 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+            >
+              toKHing이 처음이라면? 🎯
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="text-center mb-8">
