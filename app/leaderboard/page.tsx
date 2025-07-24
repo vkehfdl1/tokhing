@@ -17,7 +17,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
-      const data = await getLeaderboard("2025-07-18", "2025-08-30");
+      const data = await getLeaderboard("2025-07-24", "2025-08-17");
       setLeaderboard(data);
       setIsLoading(false);
     };
@@ -27,7 +27,7 @@ export default function LeaderboardPage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-8">
       <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
-        토킹 실시간 순위
+         실시간 순위
       </h1>
 
       {isLoading ? (
