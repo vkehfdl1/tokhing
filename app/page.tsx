@@ -116,7 +116,7 @@ export default function HomePage() {
   return (
     <div className="w-full max-w-4xl mx-auto p-8">
       <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
-        오늘의 toKHing 승부 예측
+        오늘의 to<span className="text-khuRed">KH</span>ing 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}

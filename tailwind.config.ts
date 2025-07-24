@@ -51,6 +51,7 @@ export default {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        khuRed: "rgb(164, 15, 22)",
       },
       borderRadius: {
         lg: "var(--radius)",
