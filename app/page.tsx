@@ -33,6 +33,21 @@ type SelectedPick = {
   teamName: string;
 };
 
+function translateGameStatus(status: string): string {
+  switch (status) {
+    case "SCHEDULED":
+      return "경기 전";
+    case "IN_PROGRESS":
+      return "예측 마감";
+    case "CANCELED":
+      return "경기 취소";
+    case "FINISHED":
+      return "경기 종료";
+    default:
+      return status;
+  }
+}
+
 // --- COMPONENT ---
 export default function HomePage() {
   const router = useRouter();
@@ -201,7 +216,7 @@ export default function HomePage() {
                     {/* Game Status at top center */}
                     <div className="text-center">
                       <span className="text-sm text-gray-500">
-                        {game.game_status}
+                        {translateGameStatus(game.game_status)}
                       </span>
                       {game.game_status === "CANCELED" && (
                         <div className="font-bold text-red-500 text-lg mt-1">
@@ -266,7 +281,7 @@ export default function HomePage() {
                     {/* Score/VS */}
                     <div className="flex flex-col items-center">
                       <span className="text-sm text-gray-500">
-                        {game.game_status}
+                        {translateGameStatus(game.game_status)}
                       </span>
                       {game.game_status === "IN_PROGRESS" ||
                       game.game_status === "FINISHED" ? (
