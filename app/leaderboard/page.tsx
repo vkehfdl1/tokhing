@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getLeaderboard } from "@/lib/api";
+import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
 
 type LeaderboardEntry = {
   userId: string;
@@ -11,6 +12,8 @@ type LeaderboardEntry = {
 };
 
 export default function LeaderboardPage() {
+  const isMobile = useIsMobile();
+  const isSmallMobile = useIsSmallMobile();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,9 +28,13 @@ export default function LeaderboardPage() {
   }, []);
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-8">
-      <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
-         실시간 순위
+    <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
+      <h1
+        className={`font-bold text-center text-gray-800 mb-10 ${
+          isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+        }`}
+      >
+        실시간 순위
       </h1>
 
       {isLoading ? (
@@ -40,14 +47,37 @@ export default function LeaderboardPage() {
         <div className="bg-white rounded-xl shadow-md">
           <ul className="divide-y divide-gray-200">
             {leaderboard.map((entry, index) => (
-              <li key={entry.userId} className={`flex items-center p-4`}>
-                <span className="text-lg font-bold text-gray-600 w-12">
+              <li
+                key={entry.userId}
+                className={`flex items-center ${isMobile ? "p-3" : "p-4"}`}
+              >
+                <span
+                  className={`font-bold text-gray-600 ${
+                    isMobile ? "text-base w-8" : "text-lg w-12"
+                  }`}
+                >
                   {index + 1}
                 </span>
-                <span className="text-xl font-semibold text-gray-800 flex-grow">
+                <span
+                  className={`font-semibold text-gray-800 flex-grow ${
+                    isSmallMobile
+                      ? "text-base"
+                      : isMobile
+                      ? "text-lg"
+                      : "text-xl"
+                  }`}
+                >
                   {entry.name}
                 </span>
-                <span className="text-2xl font-bold text-blue-600">
+                <span
+                  className={`font-bold text-blue-600 ${
+                    isSmallMobile
+                      ? "text-lg"
+                      : isMobile
+                      ? "text-xl"
+                      : "text-2xl"
+                  }`}
+                >
                   {entry.score}
                 </span>
               </li>

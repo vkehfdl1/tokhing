@@ -11,15 +11,18 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "toKHing 승부 예측",
-  description: "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
+  description:
+    "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
+  viewport: "width=device-width, initial-scale=1",
   openGraph: {
     title: "toKHing 승부 예측",
-    description: "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
+    description:
+      "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
     url: defaultUrl,
     siteName: "toKHing 승부 예측",
     locale: "ko_KR",
     type: "website",
-  }
+  },
 };
 
 const geistSans = Geist({
@@ -42,9 +45,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen flex flex-col items-center">
+          <main className="min-h-screen flex flex-col items-center px-4 sm:px-6 lg:px-8">
             <Navigation />
-            {children}
+            <div className="w-full max-w-4xl mx-auto">{children}</div>
           </main>
         </ThemeProvider>
       </body>

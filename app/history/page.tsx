@@ -6,6 +6,7 @@ import DailyHistoryCard from "@/components/daily-history-card";
 import PredictionRatioChart from "@/components/prediction-ratio-chart"; // Import the new component
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
 
 // --- TYPE DEFINITIONS ---
 type User = { id: string; student_number: string; name: string };
@@ -15,6 +16,8 @@ const formatDate = (date: Date) => date.toISOString().slice(0, 10);
 
 // --- COMPONENT ---
 export default function HistoryPage() {
+  const isMobile = useIsMobile();
+  const isSmallMobile = useIsSmallMobile();
   const [studentId, setStudentId] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,7 +37,7 @@ export default function HistoryPage() {
     try {
       const userData = await getUserByStudentId(studentId);
       setUser(userData);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       setError(err.message);
       setUser(null);
@@ -63,15 +66,21 @@ export default function HistoryPage() {
 
   // --- RENDER ---
   return (
-    <div className="w-full max-w-4xl mx-auto p-8">
-      <h1 className="text-4xl font-bold text-center text-gray-800 mb-10">
+    <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
+      <h1
+        className={`font-bold text-center text-gray-800 mb-10 ${
+          isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+        }`}
+      >
         예측 기록
       </h1>
 
       {/* --- LOGIN FORM -- */}
       {/* --- LOGIN FORM -- */}
       {!user ? (
-        <div className="flex gap-4 mb-8">
+        <div
+          className={`flex gap-4 mb-8 ${isMobile ? "flex-col" : "flex-row"}`}
+        >
           <Input
             type="text"
             value={studentId}
@@ -80,13 +89,21 @@ export default function HistoryPage() {
             placeholder="학번을 입력해 주세요"
             className="flex-grow text-black bg-white"
           />
-          <Button onClick={handleLogin} disabled={isLoading} className="px-6">
+          <Button
+            onClick={handleLogin}
+            disabled={isLoading}
+            className={`px-6 ${isMobile ? "w-full" : ""}`}
+          >
             {isLoading ? "로딩 중..." : "로그인"}
           </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800">
+          <h2
+            className={`font-semibold text-gray-800 ${
+              isMobile ? "text-xl" : "text-2xl"
+            }`}
+          >
             {user.name}님의 기록
           </h2>
         </div>
@@ -96,31 +113,70 @@ export default function HistoryPage() {
 
       {user && !isLoading && (
         <div className="mb-8 flex flex-col items-center">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={() => navigateDate(-1)}
-              disabled={isPreviousDisabled}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              &lt; 전 날
-            </button>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={handleDateChange}
-              min={formatDate(new Date(today.getFullYear(), 2, 1))} // March is month 2 (0-indexed)
-              max={formatDate(yesterday)}
-              className="p-2 border border-gray-300 rounded-lg text-black"
-            />
-            <button
-              onClick={() => navigateDate(1)}
-              disabled={isNextDisabled}
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              다음 날 &gt;
-            </button>
+          <div
+            className={`flex items-center mb-4 ${
+              isMobile ? "flex-col gap-3 w-full" : "gap-4"
+            }`}
+          >
+            {isMobile ? (
+              <>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  min={formatDate(new Date(today.getFullYear(), 2, 1))} // March is month 2 (0-indexed)
+                  max={formatDate(yesterday)}
+                  className="p-3 border border-gray-300 rounded-lg text-black w-full text-center"
+                />
+                <div className="flex gap-3 w-full">
+                  <button
+                    onClick={() => navigateDate(-1)}
+                    disabled={isPreviousDisabled}
+                    className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    &lt; 전 날
+                  </button>
+                  <button
+                    onClick={() => navigateDate(1)}
+                    disabled={isNextDisabled}
+                    className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    다음 날 &gt;
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => navigateDate(-1)}
+                  disabled={isPreviousDisabled}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  &lt; 전 날
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  min={formatDate(new Date(today.getFullYear(), 2, 1))} // March is month 2 (0-indexed)
+                  max={formatDate(yesterday)}
+                  className="p-2 border border-gray-300 rounded-lg text-black"
+                />
+                <button
+                  onClick={() => navigateDate(1)}
+                  disabled={isNextDisabled}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  다음 날 &gt;
+                </button>
+              </>
+            )}
           </div>
-          <h3 className="text-xl font-bold text-gray-700 mb-6">
+          <h3
+            className={`font-bold text-gray-700 mb-6 text-center ${
+              isMobile ? "text-lg" : "text-xl"
+            }`}
+          >
             {new Date(selectedDate).toLocaleDateString("ko-KR", {
               weekday: "long",
               year: "numeric",

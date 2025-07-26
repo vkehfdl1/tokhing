@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // Interface definitions
 interface Team {
@@ -327,7 +328,8 @@ function MatchManagement({
       {games.length === 0 ? (
         <Card className="p-6 text-center">
           <p className="text-muted-foreground mb-4">
-            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를 시도해 주세요.
+            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를
+            시도해 주세요.
           </p>
           <div className="space-x-2">
             <Button onClick={autoFillMatches} disabled={loading}>
@@ -338,7 +340,8 @@ function MatchManagement({
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4">
-            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지 기다려주세요.
+            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지
+            기다려주세요.
           </p>
         </Card>
       ) : (
@@ -425,7 +428,9 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`home-pitcher-${index}`}>홈 팀 선발 투수</Label>
+                  <Label htmlFor={`home-pitcher-${index}`}>
+                    홈 팀 선발 투수
+                  </Label>
                   <Input
                     id={`home-pitcher-${index}`}
                     value={game.home_pitcher}
@@ -437,7 +442,9 @@ function MatchManagement({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`away-pitcher-${index}`}>원정 팀 선발 투수</Label>
+                  <Label htmlFor={`away-pitcher-${index}`}>
+                    원정 팀 선발 투수
+                  </Label>
                   <Input
                     id={`away-pitcher-${index}`}
                     value={game.away_pitcher}
@@ -504,6 +511,7 @@ function MatchManagement({
 
 // Admin Dashboard Component
 function AdminDashboard() {
+  const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     "dashboard" | "today" | "tomorrow"
   >("dashboard");
@@ -517,7 +525,7 @@ function AdminDashboard() {
 
   if (currentView !== "dashboard") {
     return (
-      <div className="container mx-auto p-6">
+      <div className={`container mx-auto ${isMobile ? "p-4" : "p-6"}`}>
         <div className="mb-6">
           <Button
             variant="outline"
@@ -549,9 +557,15 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className={`container mx-auto ${isMobile ? "p-4" : "p-6"}`}>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-black">toKHing 관리자 대시보드</h1>
+        <h1
+          className={`font-bold mb-2 text-black ${
+            isMobile ? "text-2xl" : "text-3xl"
+          }`}
+        >
+          toKHing 관리자 대시보드
+        </h1>
         <p className="text-muted-foreground">
           toKHing 관리 대시보드에 오신 것을 환영합니다.
         </p>
@@ -560,39 +574,65 @@ function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">오늘의 경기</h3>
+      <div
+        className={`grid gap-6 ${
+          isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        }`}
+      >
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            오늘의 경기
+          </h3>
           <p className="text-muted-foreground mb-4">
             오늘 경기 정보를 관리합니다.
           </p>
-          <Button onClick={() => setCurrentView("today")}>
+          <Button
+            onClick={() => setCurrentView("today")}
+            className={isMobile ? "w-full" : ""}
+          >
             접속
           </Button>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
             내일의 경기
           </h3>
           <p className="text-muted-foreground mb-4">
             내일 경기 정보를 관리합니다.
           </p>
-          <Button onClick={() => setCurrentView("tomorrow")}>
+          <Button
+            onClick={() => setCurrentView("tomorrow")}
+            className={isMobile ? "w-full" : ""}
+          >
             접속
           </Button>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">System Settings</h3>
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            System Settings
+          </h3>
           <p className="text-muted-foreground mb-4">
             Configure system preferences
           </p>
-          <Button disabled>Settings (Coming Soon)</Button>
+          <Button disabled className={isMobile ? "w-full" : ""}>
+            Settings (Coming Soon)
+          </Button>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">User Management</h3>
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            User Management
+          </h3>
           <p className="text-muted-foreground mb-4">
             Manage user accounts and permissions
           </p>
