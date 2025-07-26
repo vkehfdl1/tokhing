@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // Interface definitions
 interface Team {
@@ -60,6 +61,7 @@ function MatchManagement({
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
+  const isMobile = useIsMobile();
 
   const targetDate = selectedDate === "today" ? getKSTDate(0) : getKSTDate(1);
 
@@ -232,18 +234,18 @@ function MatchManagement({
         )
       ).length;
 
-      let message = `Auto-fill completed! ${
+      let message = `자동 채우기 완료! ${
         newMatchesCount - updatedMatchesCount
-      } new matches added, ${updatedMatchesCount} existing matches updated.`;
+      }개의 새로운 경기가 추가되었고, ${updatedMatchesCount}개의 기존 경기가 업데이트되었습니다.`;
 
       if (unmatchedTeams.length > 0) {
         const uniqueUnmatchedTeams = [...new Set(unmatchedTeams)];
-        message += `\n\nWarning: Some teams were not found in the database and set to ID 0: ${uniqueUnmatchedTeams.join(
+        message += `\n\n경고: 일부 팀이 데이터베이스에서 찾을 수 없었고 ID 0으로 설정되었습니다: ${uniqueUnmatchedTeams.join(
           ", "
         )}`;
       }
 
-      message += "\n\nPlease review and save changes.";
+      message += "\n\n변경 사항을 검토하고 저장해 주세요.";
       alert(message);
     } catch (error) {
       console.error("Error auto-filling matches:", error);
@@ -287,7 +289,7 @@ function MatchManagement({
 
       // Refresh the games list
       await fetchGames();
-      alert("Games saved successfully!");
+      alert("성공적으로 저장되었습니다.");
     } catch (error) {
       alert("Error saving games. Please try again.");
       console.error("Save error:", error);
@@ -302,194 +304,432 @@ function MatchManagement({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">
+      <div
+        className={`${
+          isMobile ? "space-y-4" : "flex justify-between items-center"
+        }`}
+      >
+        <h2 className={`font-bold ${isMobile ? "text-xl" : "text-2xl"}`}>
           {selectedDate === "today" ? "Today's" : "Tomorrow's"} Matches (
           {targetDate})
         </h2>
-        <div className="space-x-2">
+        <div
+          className={`${
+            isMobile ? "flex flex-col space-y-2" : "flex space-x-2"
+          }`}
+        >
           <Button
             onClick={autoFillMatches}
             variant="secondary"
             disabled={loading}
+            className={isMobile ? "w-full" : ""}
           >
             {loading ? "Auto-filling..." : "자동 채우기"}
           </Button>
-          <Button onClick={addNewGame} variant="outline">
+          <Button
+            onClick={addNewGame}
+            variant="outline"
+            className={isMobile ? "w-full" : ""}
+          >
             새 경기 추가
           </Button>
-          <Button onClick={saveGames} disabled={loading}>
+          <Button
+            onClick={saveGames}
+            disabled={loading}
+            className={isMobile ? "w-full" : ""}
+          >
             {loading ? "Saving..." : "변경 사항 저장하기"}
           </Button>
         </div>
       </div>
 
       {games.length === 0 ? (
-        <Card className="p-6 text-center">
-          <p className="text-muted-foreground mb-4">
-            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를 시도해 주세요.
+        <Card className={`text-center ${isMobile ? "p-4" : "p-6"}`}>
+          <p
+            className={`text-muted-foreground mb-4 ${
+              isMobile ? "text-sm" : ""
+            }`}
+          >
+            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를
+            시도해 주세요.
           </p>
-          <div className="space-x-2">
-            <Button onClick={autoFillMatches} disabled={loading}>
+          <div
+            className={`${isMobile ? "flex flex-col space-y-2" : "space-x-2"}`}
+          >
+            <Button
+              onClick={autoFillMatches}
+              disabled={loading}
+              className={isMobile ? "w-full" : ""}
+            >
               {loading ? "Auto-filling..." : "자동 채우기"}
             </Button>
-            <Button onClick={addNewGame} variant="outline">
+            <Button
+              onClick={addNewGame}
+              variant="outline"
+              className={isMobile ? "w-full" : ""}
+            >
               수동으로 추가하기
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-4">
-            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지 기다려주세요.
+          <p
+            className={`text-xs text-muted-foreground mt-4 ${
+              isMobile ? "text-xs" : ""
+            }`}
+          >
+            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지
+            기다려주세요.
           </p>
         </Card>
       ) : (
         <div className="space-y-4">
           {games.map((game, index) => (
-            <Card key={index} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor={`time-${index}`}>경기 시작 시간</Label>
-                  <Input
-                    id={`time-${index}`}
-                    type="time"
-                    value={game.game_time}
-                    onChange={(e) =>
-                      updateGame(index, "game_time", e.target.value)
-                    }
-                  />
-                </div>
+            <Card key={index} className={isMobile ? "p-4" : "p-6"}>
+              {isMobile ? (
+                // Mobile layout: Stack all fields vertically with logical grouping
+                <div className="space-y-4">
+                  {/* Game Time and Status */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`time-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        경기 시간
+                      </Label>
+                      <Input
+                        id={`time-${index}`}
+                        type="time"
+                        value={game.game_time}
+                        onChange={(e) =>
+                          updateGame(index, "game_time", e.target.value)
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`status-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        경기 상태
+                      </Label>
+                      <Select
+                        id={`status-${index}`}
+                        value={game.game_status}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "game_status",
+                            e.target.value as
+                              | "SCHEDULED"
+                              | "IN_PROGRESS"
+                              | "FINISHED"
+                              | "CANCELED"
+                          )
+                        }
+                      >
+                        <option value="SCHEDULED">시작 전</option>
+                        <option value="IN_PROGRESS">경기 중</option>
+                        <option value="FINISHED">경기 종료</option>
+                        <option value="CANCELED">취소</option>
+                      </Select>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`home-team-${index}`}>홈 팀</Label>
-                  <Select
-                    id={`home-team-${index}`}
-                    value={game.home_team_id}
-                    onChange={(e) =>
-                      updateGame(
-                        index,
-                        "home_team_id",
-                        parseInt(e.target.value)
-                      )
-                    }
-                  >
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                  {/* Teams */}
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-team-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀
+                      </Label>
+                      <Select
+                        id={`home-team-${index}`}
+                        value={game.home_team_id}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "home_team_id",
+                            parseInt(e.target.value)
+                          )
+                        }
+                      >
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`away-team-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        원정 팀
+                      </Label>
+                      <Select
+                        id={`away-team-${index}`}
+                        value={game.away_team_id}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "away_team_id",
+                            parseInt(e.target.value)
+                          )
+                        }
+                      >
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`away-team-${index}`}>원정 팀</Label>
-                  <Select
-                    id={`away-team-${index}`}
-                    value={game.away_team_id}
-                    onChange={(e) =>
-                      updateGame(
-                        index,
-                        "away_team_id",
-                        parseInt(e.target.value)
-                      )
-                    }
-                  >
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+                  {/* Pitchers */}
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-pitcher-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀 선발 투수
+                      </Label>
+                      <Input
+                        id={`home-pitcher-${index}`}
+                        value={game.home_pitcher}
+                        onChange={(e) =>
+                          updateGame(index, "home_pitcher", e.target.value)
+                        }
+                        placeholder="투수 이름"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`away-pitcher-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        원정 팀 선발 투수
+                      </Label>
+                      <Input
+                        id={`away-pitcher-${index}`}
+                        value={game.away_pitcher}
+                        onChange={(e) =>
+                          updateGame(index, "away_pitcher", e.target.value)
+                        }
+                        placeholder="투수 이름"
+                      />
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`status-${index}`}>경기 상태</Label>
-                  <Select
-                    id={`status-${index}`}
-                    value={game.game_status}
-                    onChange={(e) =>
-                      updateGame(
-                        index,
-                        "game_status",
-                        e.target.value as
-                          | "SCHEDULED"
-                          | "IN_PROGRESS"
-                          | "FINISHED"
-                          | "CANCELED"
-                      )
-                    }
-                  >
-                    <option value="SCHEDULED">시작 전</option>
-                    <option value="IN_PROGRESS">경기 중</option>
-                    <option value="FINISHED">경기 종료</option>
-                    <option value="CANCELED">취소</option>
-                  </Select>
+                  {/* Scores */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-score-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀 점수
+                      </Label>
+                      <Input
+                        id={`home-score-${index}`}
+                        type="number"
+                        min="0"
+                        value={game.home_score || ""}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "home_score",
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        placeholder="점수"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`away-score-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        원정 팀 점수
+                      </Label>
+                      <Input
+                        id={`away-score-${index}`}
+                        type="number"
+                        min="0"
+                        value={game.away_score || ""}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "away_score",
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        placeholder="점수"
+                      />
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                // Desktop layout: Original grid layout
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={`time-${index}`}>경기 시작 시간</Label>
+                    <Input
+                      id={`time-${index}`}
+                      type="time"
+                      value={game.game_time}
+                      onChange={(e) =>
+                        updateGame(index, "game_time", e.target.value)
+                      }
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`home-pitcher-${index}`}>홈 팀 선발 투수</Label>
-                  <Input
-                    id={`home-pitcher-${index}`}
-                    value={game.home_pitcher}
-                    onChange={(e) =>
-                      updateGame(index, "home_pitcher", e.target.value)
-                    }
-                    placeholder="Home pitcher name"
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor={`home-team-${index}`}>홈 팀</Label>
+                    <Select
+                      id={`home-team-${index}`}
+                      value={game.home_team_id}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "home_team_id",
+                          parseInt(e.target.value)
+                        )
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`away-team-${index}`}>원정 팀</Label>
+                    <Select
+                      id={`away-team-${index}`}
+                      value={game.away_team_id}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "away_team_id",
+                          parseInt(e.target.value)
+                        )
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`status-${index}`}>경기 상태</Label>
+                    <Select
+                      id={`status-${index}`}
+                      value={game.game_status}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "game_status",
+                          e.target.value as
+                            | "SCHEDULED"
+                            | "IN_PROGRESS"
+                            | "FINISHED"
+                            | "CANCELED"
+                        )
+                      }
+                    >
+                      <option value="SCHEDULED">시작 전</option>
+                      <option value="IN_PROGRESS">경기 중</option>
+                      <option value="FINISHED">경기 종료</option>
+                      <option value="CANCELED">취소</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`home-pitcher-${index}`}>
+                      홈 팀 선발 투수
+                    </Label>
+                    <Input
+                      id={`home-pitcher-${index}`}
+                      value={game.home_pitcher}
+                      onChange={(e) =>
+                        updateGame(index, "home_pitcher", e.target.value)
+                      }
+                      placeholder="Home pitcher name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`away-pitcher-${index}`}>
+                      원정 팀 선발 투수
+                    </Label>
+                    <Input
+                      id={`away-pitcher-${index}`}
+                      value={game.away_pitcher}
+                      onChange={(e) =>
+                        updateGame(index, "away_pitcher", e.target.value)
+                      }
+                      placeholder="Away pitcher name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`home-score-${index}`}>홈 팀 점수</Label>
+                    <Input
+                      id={`home-score-${index}`}
+                      type="number"
+                      min="0"
+                      value={game.home_score || ""}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "home_score",
+                          e.target.value ? parseInt(e.target.value) : null
+                        )
+                      }
+                      placeholder="Score"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`away-score-${index}`}>원정 팀 점수</Label>
+                    <Input
+                      id={`away-score-${index}`}
+                      type="number"
+                      min="0"
+                      value={game.away_score || ""}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "away_score",
+                          e.target.value ? parseInt(e.target.value) : null
+                        )
+                      }
+                      placeholder="Score"
+                    />
+                  </div>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <Label htmlFor={`away-pitcher-${index}`}>원정 팀 선발 투수</Label>
-                  <Input
-                    id={`away-pitcher-${index}`}
-                    value={game.away_pitcher}
-                    onChange={(e) =>
-                      updateGame(index, "away_pitcher", e.target.value)
-                    }
-                    placeholder="Away pitcher name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`home-score-${index}`}>홈 팀 점수</Label>
-                  <Input
-                    id={`home-score-${index}`}
-                    type="number"
-                    min="0"
-                    value={game.home_score || ""}
-                    onChange={(e) =>
-                      updateGame(
-                        index,
-                        "home_score",
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
-                    }
-                    placeholder="Score"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={`away-score-${index}`}>원정 팀 점수</Label>
-                  <Input
-                    id={`away-score-${index}`}
-                    type="number"
-                    min="0"
-                    value={game.away_score || ""}
-                    onChange={(e) =>
-                      updateGame(
-                        index,
-                        "away_score",
-                        e.target.value ? parseInt(e.target.value) : null
-                      )
-                    }
-                    placeholder="Score"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-4">
+              <div
+                className={`${
+                  isMobile ? "flex justify-center" : "flex justify-end"
+                } mt-4`}
+              >
                 <Button
                   variant="destructive"
                   onClick={() => removeGame(index)}
                   size="sm"
+                  className={isMobile ? "w-full" : ""}
                 >
                   경기 삭제하기
                 </Button>
@@ -504,6 +744,7 @@ function MatchManagement({
 
 // Admin Dashboard Component
 function AdminDashboard() {
+  const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     "dashboard" | "today" | "tomorrow"
   >("dashboard");
@@ -517,12 +758,12 @@ function AdminDashboard() {
 
   if (currentView !== "dashboard") {
     return (
-      <div className="container mx-auto p-6">
+      <div className={`container mx-auto ${isMobile ? "p-4" : "p-6"}`}>
         <div className="mb-6">
           <Button
             variant="outline"
             onClick={() => setCurrentView("dashboard")}
-            className="mb-4"
+            className={`mb-4 ${isMobile ? "w-full" : ""}`}
           >
             ← 메뉴로 돌아가기
           </Button>
@@ -533,13 +774,18 @@ function AdminDashboard() {
 
         <MatchManagement selectedDate={currentView as "today" | "tomorrow"} />
 
-        <div className="mt-8 flex justify-end">
+        <div
+          className={`mt-8 ${
+            isMobile ? "flex justify-center" : "flex justify-end"
+          }`}
+        >
           <Button
             variant="outline"
             onClick={() => {
               sessionStorage.removeItem("admin_authenticated");
               window.location.reload();
             }}
+            className={isMobile ? "w-full max-w-xs" : ""}
           >
             Logout
           </Button>
@@ -549,9 +795,15 @@ function AdminDashboard() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className={`container mx-auto ${isMobile ? "p-4" : "p-6"}`}>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-black">toKHing 관리자 대시보드</h1>
+        <h1
+          className={`font-bold mb-2 text-black ${
+            isMobile ? "text-2xl" : "text-3xl"
+          }`}
+        >
+          toKHing 관리자 대시보드
+        </h1>
         <p className="text-muted-foreground">
           toKHing 관리 대시보드에 오신 것을 환영합니다.
         </p>
@@ -560,69 +812,58 @@ function AdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">오늘의 경기</h3>
+      <div
+        className={`grid gap-6 ${
+          isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        }`}
+      >
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            오늘의 경기
+          </h3>
           <p className="text-muted-foreground mb-4">
             오늘 경기 정보를 관리합니다.
           </p>
-          <Button onClick={() => setCurrentView("today")}>
+          <Button
+            onClick={() => setCurrentView("today")}
+            className={isMobile ? "w-full" : ""}
+          >
             접속
           </Button>
         </Card>
 
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
             내일의 경기
           </h3>
           <p className="text-muted-foreground mb-4">
             내일 경기 정보를 관리합니다.
           </p>
-          <Button onClick={() => setCurrentView("tomorrow")}>
+          <Button
+            onClick={() => setCurrentView("tomorrow")}
+            className={isMobile ? "w-full" : ""}
+          >
             접속
           </Button>
         </Card>
-
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">System Settings</h3>
-          <p className="text-muted-foreground mb-4">
-            Configure system preferences
-          </p>
-          <Button disabled>Settings (Coming Soon)</Button>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">User Management</h3>
-          <p className="text-muted-foreground mb-4">
-            Manage user accounts and permissions
-          </p>
-          <Button disabled>Manage Users (Coming Soon)</Button>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">Analytics</h3>
-          <p className="text-muted-foreground mb-4">
-            View system analytics and reports
-          </p>
-          <Button disabled>View Analytics (Coming Soon)</Button>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="text-xl font-semibold mb-3">Database</h3>
-          <p className="text-muted-foreground mb-4">
-            Database management tools
-          </p>
-          <Button disabled>Database Tools (Coming Soon)</Button>
-        </Card>
       </div>
 
-      <div className="mt-8 flex justify-end">
+      <div
+        className={`mt-8 ${
+          isMobile ? "flex justify-center" : "flex justify-end"
+        }`}
+      >
         <Button
           variant="outline"
           onClick={() => {
             sessionStorage.removeItem("admin_authenticated");
             window.location.reload();
           }}
+          className={isMobile ? "w-full max-w-xs" : ""}
         >
           로그아웃
         </Button>

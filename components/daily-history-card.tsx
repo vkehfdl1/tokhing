@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getHistoryForDate } from "@/lib/api";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -30,6 +31,7 @@ export default function DailyHistoryCard({
   userId,
   date,
 }: DailyHistoryCardProps) {
+  const isMobile = useIsMobile();
   const [dailyData, setDailyData] = useState<{
     games: Game[];
     totalPoints: number;
@@ -75,8 +77,14 @@ export default function DailyHistoryCard({
   }
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-md">
-      <h3 className="text-lg font-bold text-gray-800 mb-4">
+    <div
+      className={`bg-white rounded-xl shadow-md ${isMobile ? "p-4" : "p-6"}`}
+    >
+      <h3
+        className={`font-bold text-gray-800 mb-4 ${
+          isMobile ? "text-base" : "text-lg"
+        }`}
+      >
         총 획득한 점수: {dailyData.totalPoints}
       </h3>
       <div className="space-y-4">
@@ -92,7 +100,7 @@ export default function DailyHistoryCard({
           return (
             <div
               key={game.id}
-              className={`p-4 rounded-lg border-l-4 ${
+              className={`${isMobile ? "p-3" : "p-4"} rounded-lg border-l-4 ${
                 !game.prediction
                   ? "border-gray-300"
                   : game.prediction.is_correct
@@ -100,22 +108,40 @@ export default function DailyHistoryCard({
                   : "border-red-500"
               }`}
             >
-              <div className="flex justify-between items-center">
-                <div className="font-mono text-lg text-gray-800">
+              <div
+                className={`${
+                  isMobile
+                    ? "flex flex-col space-y-3"
+                    : "flex justify-between items-center"
+                }`}
+              >
+                <div
+                  className={`font-mono text-gray-800 ${
+                    isMobile ? "text-sm" : "text-lg"
+                  } ${isMobile ? "text-center" : ""}`}
+                >
                   <span>{homeTeam.name}</span>
                   <span className="mx-2 font-bold">
                     {game.home_score} - {game.away_score}
                   </span>
                   <span>{awayTeam.name}</span>
                 </div>
-                <div className="text-right">
-                  <p className="text-gray-700">
-                    당신의 예측 : {" "}
+                <div className={`${isMobile ? "text-center" : "text-right"}`}>
+                  <p
+                    className={`text-gray-700 ${
+                      isMobile ? "text-sm mb-2" : "mb-1"
+                    }`}
+                  >
+                    당신의 예측 :{" "}
                     <span className="font-bold">
                       {game.prediction?.predicted_team_name ?? "N/A"}
                     </span>
                   </p>
-                  <div className="flex flex-col">
+                  <div
+                    className={`flex ${
+                      isMobile ? "justify-center gap-4" : "flex-col"
+                    }`}
+                  >
                     <p
                       className={`text-sm font-semibold ${
                         game.prediction?.is_correct
@@ -133,7 +159,7 @@ export default function DailyHistoryCard({
                       점수: {game.prediction?.points_earned ?? 0}
                       {game.prediction &&
                         !game.prediction.is_settled &&
-                        " (pending)"}
+                        " (집계 전)"}
                     </p>
                   </div>
                 </div>
