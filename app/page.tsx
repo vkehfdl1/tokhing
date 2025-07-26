@@ -195,74 +195,104 @@ export default function HomePage() {
                     : "bg-white"
                 }`}
               >
-                <div
-                  className={`${
-                    isMobile
-                      ? "flex flex-col space-y-4"
-                      : "grid grid-cols-3 items-center"
-                  } text-center text-gray-800`}
-                >
-                  {/* Home Team */}
-                  <div className="flex flex-col">
-                    <span
-                      className={`font-bold ${
-                        isMobile ? "text-lg" : "text-2xl"
-                      }`}
-                    >
-                      {game.home_team.name}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {game.home_pitcher}
-                    </span>
-                  </div>
+                {isMobile ? (
+                  // Mobile Layout
+                  <div className="flex flex-col space-y-4 text-gray-800">
+                    {/* Game Status at top center */}
+                    <div className="text-center">
+                      <span className="text-sm text-gray-500">
+                        {game.game_status}
+                      </span>
+                      {game.game_status === "CANCELED" && (
+                        <div className="font-bold text-red-500 text-lg mt-1">
+                          경기 취소
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Score/VS */}
-                  <div className="flex flex-col items-center">
-                    <span className="text-sm text-gray-500">
-                      {game.game_status}
-                    </span>
-                    {game.game_status === "IN_PROGRESS" ||
-                    game.game_status === "FINISHED" ? (
-                      <span
-                        className={`font-extrabold ${
-                          isMobile ? "text-xl" : "text-3xl"
-                        }`}
-                      >
-                        {game.home_score} - {game.away_score}
-                      </span>
-                    ) : game.game_status === "CANCELED" ? (
-                      <span
-                        className={`font-bold text-red-500 ${
-                          isMobile ? "text-lg" : "text-xl"
-                        }`}
-                      >
-                        경기 취소
-                      </span>
-                    ) : (
-                      <span
-                        className={`font-extrabold ${
-                          isMobile ? "text-xl" : "text-3xl"
-                        }`}
-                      >
-                        VS
-                      </span>
-                    )}
-                  </div>
+                    {/* Home Team Row */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-lg">
+                          {game.home_team.name}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {game.home_pitcher}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {(game.game_status === "IN_PROGRESS" ||
+                          game.game_status === "FINISHED") && (
+                          <span className="font-extrabold text-xl">
+                            {game.home_score}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  {/* Away Team */}
-                  <div className="flex flex-col">
-                    <span
-                      className={`font-bold ${
-                        isMobile ? "text-lg" : "text-2xl"
-                      }`}
-                    >
-                      {game.away_team.name}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {game.away_pitcher}
-                    </span>
+                    {/* Away Team Row */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-lg">
+                          {game.away_team.name}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {game.away_pitcher}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        {(game.game_status === "IN_PROGRESS" ||
+                          game.game_status === "FINISHED") && (
+                          <span className="font-extrabold text-xl">
+                            {game.away_score}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  // Desktop Layout (unchanged)
+                  <div className="grid grid-cols-3 items-center text-center text-gray-800">
+                    {/* Home Team */}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-2xl">
+                        {game.home_team.name}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {game.home_pitcher}
+                      </span>
+                    </div>
+
+                    {/* Score/VS */}
+                    <div className="flex flex-col items-center">
+                      <span className="text-sm text-gray-500">
+                        {game.game_status}
+                      </span>
+                      {game.game_status === "IN_PROGRESS" ||
+                      game.game_status === "FINISHED" ? (
+                        <span className="font-extrabold text-3xl">
+                          {game.home_score} - {game.away_score}
+                        </span>
+                      ) : game.game_status === "CANCELED" ? (
+                        <span className="font-bold text-red-500 text-xl">
+                          경기 취소
+                        </span>
+                      ) : (
+                        <span className="font-extrabold text-3xl">VS</span>
+                      )}
+                    </div>
+
+                    {/* Away Team */}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-2xl">
+                        {game.away_team.name}
+                      </span>
+                      <span className="text-sm text-gray-500">
+                        {game.away_pitcher}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {game.game_status === "CANCELED" ? (
                   <div className="mt-6 text-center">
@@ -290,49 +320,80 @@ export default function HomePage() {
                     </p>
                   </div>
                 ) : game.game_status === "SCHEDULED" ? (
-                  <div
-                    className={`${
-                      isMobile
-                        ? "flex flex-col gap-3 mt-6"
-                        : "flex justify-center gap-4 mt-6"
-                    }`}
-                  >
-                    <button
-                      onClick={() =>
-                        handleSelectPick(
-                          game.id,
-                          game.home_team.id,
-                          game.home_team.name
-                        )
-                      }
-                      className={`${
-                        isMobile ? "w-full" : "w-full"
-                      } py-3 font-bold rounded-lg transition ${
-                        currentPick?.predictedTeamId === game.home_team.id
-                          ? "bg-green-600 text-white"
-                          : "bg-green-200 text-green-800"
-                      } ${isMobile ? "text-sm" : "text-base"}`}
-                    >
-                      {game.home_team.name}가 승리한다
-                    </button>
-                    <button
-                      onClick={() =>
-                        handleSelectPick(
-                          game.id,
-                          game.away_team.id,
-                          game.away_team.name
-                        )
-                      }
-                      className={`${
-                        isMobile ? "w-full" : "w-full"
-                      } py-3 font-bold rounded-lg transition ${
-                        currentPick?.predictedTeamId === game.away_team.id
-                          ? "bg-red-600 text-white"
-                          : "bg-red-200 text-red-800"
-                      } ${isMobile ? "text-sm" : "text-base"}`}
-                    >
-                      {game.away_team.name}가 승리한다
-                    </button>
+                  <div className="mt-6">
+                    {isMobile ? (
+                      // Mobile: Vertical buttons
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() =>
+                            handleSelectPick(
+                              game.id,
+                              game.home_team.id,
+                              game.home_team.name
+                            )
+                          }
+                          className={`w-full py-3 font-bold rounded-lg transition ${
+                            currentPick?.predictedTeamId === game.home_team.id
+                              ? "bg-green-600 text-white"
+                              : "bg-green-200 text-green-800"
+                          } text-sm`}
+                        >
+                          {game.home_team.name}가 승리한다
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleSelectPick(
+                              game.id,
+                              game.away_team.id,
+                              game.away_team.name
+                            )
+                          }
+                          className={`w-full py-3 font-bold rounded-lg transition ${
+                            currentPick?.predictedTeamId === game.away_team.id
+                              ? "bg-red-600 text-white"
+                              : "bg-red-200 text-red-800"
+                          } text-sm`}
+                        >
+                          {game.away_team.name}가 승리한다
+                        </button>
+                      </div>
+                    ) : (
+                      // Desktop: Horizontal buttons
+                      <div className="flex justify-center gap-4">
+                        <button
+                          onClick={() =>
+                            handleSelectPick(
+                              game.id,
+                              game.home_team.id,
+                              game.home_team.name
+                            )
+                          }
+                          className={`w-full py-3 font-bold rounded-lg transition ${
+                            currentPick?.predictedTeamId === game.home_team.id
+                              ? "bg-green-600 text-white"
+                              : "bg-green-200 text-green-800"
+                          } text-base`}
+                        >
+                          {game.home_team.name}가 승리한다
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleSelectPick(
+                              game.id,
+                              game.away_team.id,
+                              game.away_team.name
+                            )
+                          }
+                          className={`w-full py-3 font-bold rounded-lg transition ${
+                            currentPick?.predictedTeamId === game.away_team.id
+                              ? "bg-red-600 text-white"
+                              : "bg-red-200 text-red-800"
+                          } text-base`}
+                        >
+                          {game.away_team.name}가 승리한다
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-6 text-center">
