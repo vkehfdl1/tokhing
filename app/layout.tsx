@@ -22,6 +22,14 @@ export const metadata: Metadata = {
     siteName: "toKHing 승부 예측",
     locale: "ko_KR",
     type: "website",
+    images: [
+      {
+        url: `${defaultUrl}/og-image.png`,
+        width: 1536,
+        height: 1024,
+        alt: "toKHing 승부 예측",
+      },
+    ],
   },
 };
 
