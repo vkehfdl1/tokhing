@@ -159,7 +159,7 @@ export default function DailyHistoryCard({
                       점수: {game.prediction?.points_earned ?? 0}
                       {game.prediction &&
                         !game.prediction.is_settled &&
-                        " (pending)"}
+                        " (집계 전)"}
                     </p>
                   </div>
                 </div>
