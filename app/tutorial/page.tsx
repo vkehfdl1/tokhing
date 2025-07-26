@@ -1,10 +1,9 @@
 "use client";
 
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 export default function TutorialPage() {
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
 
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
@@ -14,7 +13,7 @@ export default function TutorialPage() {
         <div className="text-center mb-8">
           <h1
             className={`font-bold text-gray-800 mb-4 ${
-              isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+              isMobile ? "text-3xl" : "text-4xl"
             }`}
           >
             🎰 토킹(to<span className="text-khuRed">KH</span>ing) SEASON 3 🎰
