@@ -16,7 +16,7 @@ export default function TutorialPage() {
               isMobile ? "text-3xl" : "text-4xl"
             }`}
           >
-            🎰 토킹(to<span className="text-khuRed">KH</span>ing) SEASON 3 🎰
+            🎰 토킹(To<span className="text-khuRed">KH</span>in&apos;) SEASON 3 🎰
           </h1>
           <h2
             className={`font-semibold text-gray-600 ${
@@ -32,12 +32,12 @@ export default function TutorialPage() {
           >
             안녕하세요, 루킹 프런트입니다.
             <br />
-            토킹(toKHing) SEASON 3에 대해 안내드립니다.
+            토킹(ToKHin&apos;) SEASON 3에 대해 안내드립니다.
           </p>
         </div>
 
         <div className="space-y-8">
-          {/* Section 1: What is toKHing? */}
+          {/* Section 1: What is ToKHin'? */}
           <section
             className={`border-l-4 border-blue-500 ${
               isMobile ? "pl-4" : "pl-6"
@@ -61,7 +61,7 @@ export default function TutorialPage() {
                   isMobile ? "text-sm" : "text-base"
                 }`}
               >
-                토킹(toKHing)은 <strong>&ldquo;스포츠토토&rdquo;</strong>와
+                토킹(ToKHin&apos;)은 <strong>&ldquo;스포츠토토&rdquo;</strong>와
                 동아리명 <strong>&ldquo;루킹&rdquo;</strong>의 합성어로 경기
                 결과를 예측하는 컨텐츠입니다.
               </p>
@@ -77,7 +77,7 @@ export default function TutorialPage() {
             </div>
           </section>
 
-          {/* Section 2: How does toKHing work? */}
+          {/* Section 2: How does ToKHin' work? */}
           <section
             className={`border-l-4 border-green-500 ${
               isMobile ? "pl-4" : "pl-6"
@@ -91,7 +91,7 @@ export default function TutorialPage() {
               <span className={`mr-2 ${isMobile ? "text-2xl" : "text-3xl"}`}>
                 ✌🏻
               </span>
-              토킹(toKHing) 진행 방식은 어떻게 되나요?
+              토킹(ToKHin&apos;) 진행 방식은 어떻게 되나요?
             </h3>
             <div
               className={`bg-green-50 rounded-lg ${isMobile ? "p-3" : "p-4"}`}
@@ -208,7 +208,7 @@ export default function TutorialPage() {
           <section className="border-l-4 border-purple-500 pl-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
               <span className="text-3xl mr-2">🤟🏻</span>
-              토킹(toKHing) 홈페이지 사용 방식은 어떻게 되나요?
+              토킹(ToKHin&apos;) 홈페이지 사용 방식은 어떻게 되나요?
             </h3>
             <div className="bg-purple-50 p-4 rounded-lg">
               <p className="text-gray-700 leading-relaxed mb-4">
@@ -248,13 +248,6 @@ export default function TutorialPage() {
                   </p>
                 </div>
 
-                <div className="bg-white p-4 rounded-lg border-l-4 border-red-400">
-                  <h4 className="font-bold text-red-700 mb-2">⚙️ 관리자 탭</h4>
-                  <p className="text-gray-700 text-sm">
-                    토킹을 운영하는 루킹 프런트를 위한 공간입니다.{" "}
-                    <strong>관계자 외 출입 금지!</strong>
-                  </p>
-                </div>
               </div>
             </div>
           </section>

@@ -10,16 +10,16 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "toKHing 승부 예측",
+  title: "ToKHin' 승부 예측",
   description:
-    "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
+    "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 ToKHin'입니다.",
   viewport: "width=device-width, initial-scale=1",
   openGraph: {
-    title: "toKHing 승부 예측",
+    title: "ToKHin' 승부 예측",
     description:
-      "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 toKHing입니다.",
+      "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 ToKHin'입니다.",
     url: defaultUrl,
-    siteName: "toKHing 승부 예측",
+    siteName: "ToKHin' 승부 예측",
     locale: "ko_KR",
     type: "website",
     images: [
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
         url: `${defaultUrl}/og-image.png`,
         width: 1536,
         height: 1024,
-        alt: "toKHing 승부 예측",
+        alt: "ToKHin' 승부 예측",
       },
     ],
   },

@@ -174,7 +174,7 @@ export default function HomePage() {
           isMobile ? "text-2xl" : "text-4xl"
         }`}
       >
-        오늘의 to<span className="text-khuRed">KH</span>ing 승부 예측
+        오늘의 To<span className="text-khuRed">KH</span>in&apos; 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -207,7 +207,7 @@ export default function HomePage() {
               onClick={() => router.push("/tutorial")}
               className="px-6 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
             >
-              toKHing이 처음이라면? 🎯
+              ToKHin&apos;이 처음이라면? 🎯
             </Button>
           </div>
         </div>

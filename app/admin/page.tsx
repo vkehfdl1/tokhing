@@ -802,10 +802,10 @@ function AdminDashboard() {
             isMobile ? "text-2xl" : "text-3xl"
           }`}
         >
-          toKHing 관리자 대시보드
+          ToKHin&apos; 관리자 대시보드
         </h1>
         <p className="text-muted-foreground">
-          toKHing 관리 대시보드에 오신 것을 환영합니다.
+          ToKHin&apos; 관리 대시보드에 오신 것을 환영합니다.
         </p>
         <div className="text-sm text-muted-foreground mt-2">
           현재 시각: {getCurrentKSTTime()}
@@ -927,7 +927,7 @@ function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Card className="w-full max-w-md p-6">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">toKHing 관리</h1>
+          <h1 className="text-2xl font-bold mb-2">ToKHin&apos; 관리</h1>
           <p className="text-muted-foreground">
             프런트 인증을 위해 비밀번호를 입력하세요
           </p>
