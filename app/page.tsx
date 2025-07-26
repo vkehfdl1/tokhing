@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   getUserByStudentId,
   getTodaysGamesWithPredictions,
+  getGamesWithPredictionsForDate,
   submitMultiplePredictions,
+  getISODate,
 } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -63,6 +65,44 @@ export default function HomePage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // --- DATA FETCHING & LOGIN ---
+  const fetchAndSetGames = useCallback(async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
+    
+    // First, get today's games
+    const todayGamesData = await getTodaysGamesWithPredictions(user.id);
+    
+    // Check if all today's games are finished
+    const allTodayGamesFinished = todayGamesData.length > 0 && 
+      todayGamesData.every(game => game.game_status === "FINISHED");
+    
+    if (allTodayGamesFinished) {
+      // Get tomorrow's date
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowDateString = getISODate(tomorrow);
+      
+      // Fetch tomorrow's games
+      const tomorrowGamesData = await getGamesWithPredictionsForDate(user.id, tomorrowDateString);
+      
+      // If tomorrow has games, use tomorrow's data; otherwise use today's data
+      if (tomorrowGamesData.length > 0) {
+        // @ts-expect-error - Ignoring type mismatch for gamesData
+        setTodaysGames(tomorrowGamesData);
+      } else {
+        // @ts-expect-error - Ignoring type mismatch for gamesData
+        setTodaysGames(todayGamesData);
+      }
+    } else {
+      // Not all games finished, use today's data
+      // @ts-expect-error - Ignoring type mismatch for gamesData
+      setTodaysGames(todayGamesData);
+    }
+    
+    setIsLoading(false);
+  }, [user]);
+
   const handleLogin = async () => {
     if (!studentId) {
       setError("Please enter your student ID.");
@@ -84,17 +124,13 @@ export default function HomePage() {
   useEffect(() => {
     if (user) {
       const fetchGames = async () => {
-        setIsLoading(true);
-        const gamesData = await getTodaysGamesWithPredictions(user.id);
-        // @ts-expect-error - Ignoring type mismatch for gamesData
-        setTodaysGames(gamesData);
+        await fetchAndSetGames();
         // Clear old picks when a new user logs in
         setSelectedPicks(new Map());
-        setIsLoading(false);
       };
       fetchGames();
     }
-  }, [user]);
+  }, [user, fetchAndSetGames]);
 
   // --- UI HANDLERS ---
   const handleSelectPick = (
@@ -116,19 +152,18 @@ export default function HomePage() {
     }));
 
     setShowConfirmation(false);
-    setIsLoading(true);
 
     try {
       await submitMultiplePredictions(user.id, predictionsToSubmit);
+      
       // Refresh data from server to show the submitted picks
-      const gamesData = await getTodaysGamesWithPredictions(user.id);
-      // @ts-expect-error - Ignoring type mismatch for gamesData
-      setTodaysGames(gamesData);
+      await fetchAndSetGames();
+      
       setSelectedPicks(new Map()); // Clear selections
     } catch (err) {
       setError("Failed to save predictions. Please try again." + err);
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   // --- RENDER ---

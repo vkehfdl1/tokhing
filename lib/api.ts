@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
 
-
 interface GameData {
   game_date: string;
   game_time?: string;
@@ -454,6 +453,45 @@ export const getAllTeams = async () => {
   }
 
   return data;
+};
+
+// Fetch games for a specific date with user's predictions
+export const getGamesWithPredictionsForDate = async (
+  userId: string,
+  date: string
+) => {
+  const { data: games, error: gamesError } = await supabase
+    .from("games")
+    .select(
+      `
+      id, game_date, game_status, home_pitcher, away_pitcher, home_score, away_score,
+      home_team:teams!home_team_id(id, name),
+      away_team:teams!away_team_id(id, name)
+    `
+    )
+    .eq("game_date", date);
+
+  if (gamesError) {
+    console.error("Error fetching games for date:", gamesError);
+    return [];
+  }
+
+  const gameIds = games.map((g) => g.id);
+  const { data: predictions, error: predsError } = await supabase
+    .from("predictions")
+    .select("game_id, predicted_winner_team_id")
+    .eq("user_id", userId)
+    .in("game_id", gameIds);
+
+  if (predsError) {
+    console.error("Error fetching predictions:", predsError);
+    // Proceed with games even if predictions fail
+  }
+
+  return games.map((game) => {
+    const prediction = predictions?.find((p) => p.game_id === game.id) || null;
+    return { ...game, prediction };
+  });
 };
 
 // Fetch games for a specific date (admin)
