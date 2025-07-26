@@ -15,22 +15,16 @@ This document summarizes the comprehensive responsive design implementation usin
 
 Created custom hooks for easy responsive breakpoint detection:
 
-- `useIsMobile()`: Screens ≤ 640px
-- `useIsTablet()`: Screens 641px - 1024px
-- `useIsDesktop()`: Screens ≥ 1025px
-- `useIsSmallMobile()`: Screens ≤ 480px
-- `useResponsive()`: Combined hook returning all breakpoints
+- `useIsMobile()`: Screens ≤ 767px
+- `useIsDesktop()`: Screens ≥ 768px
+- `useResponsive()`: Combined hook returning both breakpoints
 
 ### 2. Responsive Components (`components/responsive/ResponsiveComponents.tsx`)
 
 Created wrapper components for conditional rendering:
 
-- `<Mobile>`: Renders content only on mobile
-- `<Tablet>`: Renders content only on tablet
-- `<Desktop>`: Renders content only on desktop
-- `<MobileAndTablet>`: Renders content on mobile and tablet
-- `<TabletAndDesktop>`: Renders content on tablet and desktop
-- `<SmallMobile>`: Renders content only on very small screens
+- `<Mobile>`: Renders content only on mobile (≤ 767px)
+- `<Desktop>`: Renders content only on desktop (≥ 768px)
 
 ### 3. Navigation Improvements (`components/navigation.tsx`)
 
@@ -100,10 +94,8 @@ Created wrapper components for conditional rendering:
 
 ## Breakpoints Used
 
-- **Small Mobile**: ≤ 480px
-- **Mobile**: ≤ 640px
-- **Tablet**: 641px - 1024px
-- **Desktop**: ≥ 1025px
+- **Mobile**: ≤ 767px
+- **Desktop**: ≥ 768px
 
 ## Key Design Patterns
 
@@ -122,6 +114,7 @@ className={`flex ${isMobile ? 'flex-col gap-3' : 'flex-row gap-4'}`}
 ### 3. Progressive Enhancement
 
 - Mobile-first approach with desktop enhancements
+- Single breakpoint at 768px for simplified responsive design
 - Full-width elements on mobile for better touch interaction
 - Larger tap targets on mobile devices
 

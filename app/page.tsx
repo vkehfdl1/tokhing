@@ -9,7 +9,7 @@ import {
 } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -37,7 +37,6 @@ type SelectedPick = {
 export default function HomePage() {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
   const [studentId, setStudentId] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [todaysGames, setTodaysGames] = useState<Game[]>([]);
@@ -122,7 +121,7 @@ export default function HomePage() {
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
         className={`font-bold text-center text-gray-800 mb-10 ${
-          isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+          isMobile ? "text-2xl" : "text-4xl"
         }`}
       >
         오늘의 to<span className="text-khuRed">KH</span>ing 승부 예측
@@ -207,11 +206,7 @@ export default function HomePage() {
                   <div className="flex flex-col">
                     <span
                       className={`font-bold ${
-                        isSmallMobile
-                          ? "text-lg"
-                          : isMobile
-                          ? "text-xl"
-                          : "text-2xl"
+                        isMobile ? "text-lg" : "text-2xl"
                       }`}
                     >
                       {game.home_team.name}
@@ -230,11 +225,7 @@ export default function HomePage() {
                     game.game_status === "FINISHED" ? (
                       <span
                         className={`font-extrabold ${
-                          isSmallMobile
-                            ? "text-xl"
-                            : isMobile
-                            ? "text-2xl"
-                            : "text-3xl"
+                          isMobile ? "text-xl" : "text-3xl"
                         }`}
                       >
                         {game.home_score} - {game.away_score}
@@ -250,11 +241,7 @@ export default function HomePage() {
                     ) : (
                       <span
                         className={`font-extrabold ${
-                          isSmallMobile
-                            ? "text-xl"
-                            : isMobile
-                            ? "text-2xl"
-                            : "text-3xl"
+                          isMobile ? "text-xl" : "text-3xl"
                         }`}
                       >
                         VS
@@ -266,11 +253,7 @@ export default function HomePage() {
                   <div className="flex flex-col">
                     <span
                       className={`font-bold ${
-                        isSmallMobile
-                          ? "text-lg"
-                          : isMobile
-                          ? "text-xl"
-                          : "text-2xl"
+                        isMobile ? "text-lg" : "text-2xl"
                       }`}
                     >
                       {game.away_team.name}
@@ -328,7 +311,7 @@ export default function HomePage() {
                         currentPick?.predictedTeamId === game.home_team.id
                           ? "bg-green-600 text-white"
                           : "bg-green-200 text-green-800"
-                      } ${isSmallMobile ? "text-sm" : "text-base"}`}
+                      } ${isMobile ? "text-sm" : "text-base"}`}
                     >
                       {game.home_team.name}가 승리한다
                     </button>
@@ -346,7 +329,7 @@ export default function HomePage() {
                         currentPick?.predictedTeamId === game.away_team.id
                           ? "bg-red-600 text-white"
                           : "bg-red-200 text-red-800"
-                      } ${isSmallMobile ? "text-sm" : "text-base"}`}
+                      } ${isMobile ? "text-sm" : "text-base"}`}
                     >
                       {game.away_team.name}가 승리한다
                     </button>

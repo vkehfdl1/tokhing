@@ -6,7 +6,7 @@ import DailyHistoryCard from "@/components/daily-history-card";
 import PredictionRatioChart from "@/components/prediction-ratio-chart"; // Import the new component
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // --- TYPE DEFINITIONS ---
 type User = { id: string; student_number: string; name: string };
@@ -17,7 +17,6 @@ const formatDate = (date: Date) => date.toISOString().slice(0, 10);
 // --- COMPONENT ---
 export default function HistoryPage() {
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
   const [studentId, setStudentId] = useState("");
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +68,7 @@ export default function HistoryPage() {
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
         className={`font-bold text-center text-gray-800 mb-10 ${
-          isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+          isMobile ? "text-2xl" : "text-4xl"
         }`}
       >
         예측 기록

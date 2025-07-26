@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getLeaderboard } from "@/lib/api";
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 type LeaderboardEntry = {
   userId: string;
@@ -13,7 +13,6 @@ type LeaderboardEntry = {
 
 export default function LeaderboardPage() {
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -31,7 +30,7 @@ export default function LeaderboardPage() {
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
         className={`font-bold text-center text-gray-800 mb-10 ${
-          isSmallMobile ? "text-2xl" : isMobile ? "text-3xl" : "text-4xl"
+          isMobile ? "text-2xl" : "text-4xl"
         }`}
       >
         실시간 순위
@@ -60,22 +59,14 @@ export default function LeaderboardPage() {
                 </span>
                 <span
                   className={`font-semibold text-gray-800 flex-grow ${
-                    isSmallMobile
-                      ? "text-base"
-                      : isMobile
-                      ? "text-lg"
-                      : "text-xl"
+                    isMobile ? "text-base" : "text-xl"
                   }`}
                 >
                   {entry.name}
                 </span>
                 <span
                   className={`font-bold text-blue-600 ${
-                    isSmallMobile
-                      ? "text-lg"
-                      : isMobile
-                      ? "text-xl"
-                      : "text-2xl"
+                    isMobile ? "text-lg" : "text-2xl"
                   }`}
                 >
                   {entry.score}

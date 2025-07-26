@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { getHistoryForDate } from "@/lib/api";
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -32,7 +32,6 @@ export default function DailyHistoryCard({
   date,
 }: DailyHistoryCardProps) {
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
   const [dailyData, setDailyData] = useState<{
     games: Game[];
     totalPoints: number;
@@ -118,11 +117,7 @@ export default function DailyHistoryCard({
               >
                 <div
                   className={`font-mono text-gray-800 ${
-                    isSmallMobile
-                      ? "text-sm"
-                      : isMobile
-                      ? "text-base"
-                      : "text-lg"
+                    isMobile ? "text-sm" : "text-lg"
                   } ${isMobile ? "text-center" : ""}`}
                 >
                   <span>{homeTeam.name}</span>

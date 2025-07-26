@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getPredictionRatiosForActiveGames } from "@/lib/api";
 import { PieChart } from "react-minimal-pie-chart";
-import { useIsMobile, useIsSmallMobile } from "@/lib/hooks/useResponsive";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 type PredictionRatio = {
   home_team_name: string;
@@ -20,7 +20,6 @@ export default function PredictionRatioChart({
   date,
 }: PredictionRatioChartProps) {
   const isMobile = useIsMobile();
-  const isSmallMobile = useIsSmallMobile();
   const [ratios, setRatios] = useState<PredictionRatio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,15 +88,7 @@ export default function PredictionRatioChart({
                 isMobile ? "flex-col space-y-3" : "justify-center"
               }`}
             >
-              <div
-                className={
-                  isSmallMobile
-                    ? "w-20 h-20"
-                    : isMobile
-                    ? "w-24 h-24"
-                    : "w-24 h-24"
-                }
-              >
+              <div className={isMobile ? "w-20 h-20" : "w-24 h-24"}>
                 <PieChart
                   data={[
                     {
@@ -118,7 +109,7 @@ export default function PredictionRatioChart({
                     `${Math.round(dataEntry.percentage)}%`
                   }
                   labelStyle={{
-                    fontSize: isSmallMobile ? "8px" : "10px",
+                    fontSize: isMobile ? "8px" : "10px",
                     fontFamily: "sans-serif",
                     fill: "#fff",
                   }}
@@ -130,12 +121,12 @@ export default function PredictionRatioChart({
                   isMobile ? "text-center space-y-1" : "ml-4"
                 }`}
               >
-                <p className={isSmallMobile ? "text-sm" : "text-base"}>
+                <p className={isMobile ? "text-sm" : "text-base"}>
                   <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
                   {gameRatio.home_team_name}:{" "}
                   {gameRatio.home_team_ratio.toFixed(2)}%
                 </p>
-                <p className={isSmallMobile ? "text-sm" : "text-base"}>
+                <p className={isMobile ? "text-sm" : "text-base"}>
                   <span className="inline-block w-3 h-3 rounded-full bg-red-400 mr-2"></span>
                   {gameRatio.away_team_name}:{" "}
                   {gameRatio.away_team_ratio.toFixed(2)}%
