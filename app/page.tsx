@@ -77,7 +77,7 @@ export default function HomePage() {
     const allTodayGamesFinished = todayGamesData.length > 0 && 
       todayGamesData.every(game => game.game_status === "FINISHED");
     
-    if (allTodayGamesFinished) {
+    if (allTodayGamesFinished || todayGamesData.length === 0) {
       // Get tomorrow's date
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
