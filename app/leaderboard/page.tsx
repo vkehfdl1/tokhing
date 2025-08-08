@@ -29,8 +29,8 @@ export default function LeaderboardPage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-gray-800 mb-10 ${
-          isMobile ? "text-2xl" : "text-4xl"
+        className={`font-bold text-center text-black mb-8 ${
+          isMobile ? "text-xl" : "text-4xl"
         }`}
       >
         실시간 순위
@@ -43,31 +43,51 @@ export default function LeaderboardPage() {
           아직 순위표를 볼 수 없습니다.
         </p>
       ) : (
-        <div className="bg-white rounded-xl shadow-md">
-          <ul className="divide-y divide-gray-200">
+        <div>
+          <ul className="divide-y divide-transparent">
             {leaderboard.map((entry, index) => (
               <li
                 key={entry.userId}
-                className={`flex items-center ${isMobile ? "p-3" : "p-4"}`}
+                className={`flex items-center ${
+                  isMobile ? "px-4" : "px-4"
+                } h-12 ${
+                  index === 0 ? "bg-tokhin-green" : "bg-neutral-50"
+                } rounded-lg shadow-[0px_0px_8px_0px_rgba(0,0,0,0.12)] my-2`}
               >
                 <span
-                  className={`font-bold text-gray-600 ${
-                    isMobile ? "text-base w-8" : "text-lg w-12"
+                  className={`font-base ${
+                    index === 0
+                      ? "text-white"
+                      : index === 1 || index === 2
+                      ? "text-tokhin-green"
+                      : "text-stone-500"
+                  } ${
+                    isMobile
+                      ? "text-base w-6 text-center"
+                      : "text-lg w-12 text-center"
                   }`}
                 >
                   {index + 1}
                 </span>
                 <span
-                  className={`font-semibold text-gray-800 flex-grow ${
-                    isMobile ? "text-base" : "text-xl"
-                  }`}
+                  className={`font-base ${
+                    index === 0
+                      ? "text-white"
+                      : index === 1 || index === 2
+                      ? "text-tokhin-green"
+                      : "text-stone-500"
+                  } flex-grow ${isMobile ? "text-base px-2" : "text-xl"}`}
                 >
                   {entry.name}
                 </span>
                 <span
-                  className={`font-bold text-blue-600 ${
-                    isMobile ? "text-lg" : "text-2xl"
-                  }`}
+                  className={`font-normal ${
+                    index === 0
+                      ? "text-white"
+                      : index === 1 || index === 2
+                      ? "text-tokhin-green"
+                      : "text-stone-500"
+                  } ${isMobile ? "text-base px-1" : "text-2xl"}`}
                 >
                   {entry.score}
                 </span>

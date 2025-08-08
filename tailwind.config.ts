@@ -52,6 +52,7 @@ export default {
           "5": "hsl(var(--chart-5))",
         },
         khuRed: "rgb(164, 15, 22)",
+        "tokhin-green": "#32C600",
       },
       borderRadius: {
         lg: "var(--radius)",

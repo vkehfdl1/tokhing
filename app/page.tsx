@@ -174,7 +174,7 @@ export default function HomePage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-black mb-10 ${
+        className={`font-bold text-center text-black mb-8 ${
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
