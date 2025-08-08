@@ -11,6 +11,9 @@ const defaultUrl = process.env.VERCEL_URL
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "ToKHin' 승부 예측",
+  icons: {
+    icon: '/logo.png'
+  },
   description:
     "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 ToKHin'입니다.",
   viewport: "width=device-width, initial-scale=1",
