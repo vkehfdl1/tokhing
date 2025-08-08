@@ -41,7 +41,7 @@ export default function Navigation() {
                   style={{
                     filter:
                       pathname === link.href
-                        ? "brightness(0) saturate(100%) invert(46%) sepia(97%) saturate(4466%) hue-rotate(78deg) brightness(102%) contrast(101%)"
+                        ? "brightness(0) saturate(100%) invert(67%) sepia(45%) saturate(7042%) hue-rotate(78deg) brightness(108%) contrast(101%)"
                         : undefined,
                   }}
                 />
