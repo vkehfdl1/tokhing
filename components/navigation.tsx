@@ -35,9 +35,7 @@ export default function Navigation() {
                   alt={link.label}
                   width={22}
                   height={22}
-                  className={`transition-all duration-200 ${
-                    pathname === link.href ? "" : "opacity-60"
-                  }`}
+                  className={`transition-all duration-200`}
                   style={{
                     filter:
                       pathname === link.href
