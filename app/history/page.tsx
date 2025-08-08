@@ -67,7 +67,7 @@ export default function HistoryPage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-gray-800 mb-8 ${
+        className={`font-bold text-center text-black mb-8 ${
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
