@@ -170,11 +170,11 @@ export default function HomePage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-gray-800 mb-10 ${
-          isMobile ? "text-2xl" : "text-4xl"
+        className={`font-bold text-center text-black mb-10 ${
+          isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-        오늘의 To<span className="text-khuRed">KH</span>in&apos; 승부 예측
+          오늘의 토킹 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -189,7 +189,7 @@ export default function HomePage() {
               onChange={(e) => setStudentId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               placeholder="학번을 입력해 주세요"
-              className="flex-grow text-black bg-white"
+              className="flex-grow text-black"
             />
             <Button
               onClick={handleLogin}
