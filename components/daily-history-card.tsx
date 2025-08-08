@@ -120,11 +120,14 @@ export default function DailyHistoryCard({
                     isMobile ? "text-sm" : "text-lg"
                   } ${isMobile ? "text-center" : ""}`}
                 >
-                  <span>{homeTeam.name}</span>
-                  <span className="mx-2 font-bold">
-                    {game.home_score} - {game.away_score}
-                  </span>
                   <span>{awayTeam.name}</span>
+                  <span className="mx-2 font-bold">
+                    {game.away_score} - {game.home_score}
+                  </span>
+                  <span>{homeTeam.name}</span>
+                  <span className="text-xs bg-gray-100 text-black px-1 py-1 rounded ml-2">
+                    홈
+                  </span>
                 </div>
                 <div className={`${isMobile ? "text-center" : "text-right"}`}>
                   <p

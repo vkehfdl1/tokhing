@@ -264,26 +264,6 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Home Team Row */}
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-lg">
-                          {game.home_team.name}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {game.home_pitcher}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        {(game.game_status === "IN_PROGRESS" ||
-                          game.game_status === "FINISHED") && (
-                          <span className="font-extrabold text-xl">
-                            {game.home_score}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Away Team Row */}
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col">
@@ -299,6 +279,31 @@ export default function HomePage() {
                           game.game_status === "FINISHED") && (
                           <span className="font-extrabold text-xl">
                             {game.away_score}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Home Team Row */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-lg">
+                          {game.home_team.name}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500">
+                            {game.home_pitcher}
+                          </span>
+                          <span className="text-xs bg-gray-100 text-black px-1 py-1 rounded">
+                            홈
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {(game.game_status === "IN_PROGRESS" ||
+                          game.game_status === "FINISHED") && (
+                          <span className="font-extrabold text-xl">
+                            {game.home_score}
                           </span>
                         )}
                       </div>
