@@ -67,25 +67,29 @@ export default function HomePage() {
   // --- DATA FETCHING & LOGIN ---
   const fetchAndSetGames = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
-    
+
     // First, get today's games
     const todayGamesData = await getTodaysGamesWithPredictions(user.id);
-    
+
     // Check if all today's games are finished
-    const allTodayGamesFinished = todayGamesData.length > 0 && 
-      todayGamesData.every(game => game.game_status === "FINISHED");
-    
+    const allTodayGamesFinished =
+      todayGamesData.length > 0 &&
+      todayGamesData.every((game) => game.game_status === "FINISHED");
+
     if (allTodayGamesFinished || todayGamesData.length === 0) {
       // Get tomorrow's date
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowDateString = getISODate(tomorrow);
-      
+
       // Fetch tomorrow's games
-      const tomorrowGamesData = await getGamesWithPredictionsForDate(user.id, tomorrowDateString);
-      
+      const tomorrowGamesData = await getGamesWithPredictionsForDate(
+        user.id,
+        tomorrowDateString
+      );
+
       // If tomorrow has games, use tomorrow's data; otherwise use today's data
       if (tomorrowGamesData.length > 0) {
         // @ts-expect-error - Ignoring type mismatch for gamesData
@@ -99,7 +103,7 @@ export default function HomePage() {
       // @ts-expect-error - Ignoring type mismatch for gamesData
       setTodaysGames(todayGamesData);
     }
-    
+
     setIsLoading(false);
   }, [user]);
 
@@ -155,10 +159,10 @@ export default function HomePage() {
 
     try {
       await submitMultiplePredictions(user.id, predictionsToSubmit);
-      
+
       // Refresh data from server to show the submitted picks
       await fetchAndSetGames();
-      
+
       setSelectedPicks(new Map()); // Clear selections
     } catch (err) {
       setError("Failed to save predictions. Please try again." + err);
@@ -170,11 +174,11 @@ export default function HomePage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-gray-800 mb-10 ${
-          isMobile ? "text-2xl" : "text-4xl"
+        className={`font-bold text-center text-black mb-8 ${
+          isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-        오늘의 To<span className="text-khuRed">KH</span>in&apos; 승부 예측
+        오늘의 토킹 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -189,12 +193,12 @@ export default function HomePage() {
               onChange={(e) => setStudentId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLogin()}
               placeholder="학번을 입력해 주세요"
-              className="flex-grow text-black bg-white"
+              className="flex-grow text-black"
             />
             <Button
               onClick={handleLogin}
               disabled={isLoading}
-              className={`px-6 ${isMobile ? "w-full" : ""}`}
+              className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
             >
               {isLoading ? "로딩 중..." : "로그인"}
             </Button>
@@ -203,11 +207,11 @@ export default function HomePage() {
           {/* Tutorial Button */}
           <div className="text-center mb-8">
             <Button
-              variant="secondary"
+              variant="ghost"
               onClick={() => router.push("/tutorial")}
-              className="px-6 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+              className="text-zinc-500 text-xs underline p-0 h-auto bg-transparent hover:bg-transparent"
             >
-              ToKHin&apos;이 처음이라면? 🎯
+              토킹이 처음이라면?
             </Button>
           </div>
         </div>
@@ -260,26 +264,6 @@ export default function HomePage() {
                       )}
                     </div>
 
-                    {/* Home Team Row */}
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-lg">
-                          {game.home_team.name}
-                        </span>
-                        <span className="text-sm text-gray-500">
-                          {game.home_pitcher}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        {(game.game_status === "IN_PROGRESS" ||
-                          game.game_status === "FINISHED") && (
-                          <span className="font-extrabold text-xl">
-                            {game.home_score}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Away Team Row */}
                     <div className="flex justify-between items-center">
                       <div className="flex flex-col">
@@ -295,6 +279,31 @@ export default function HomePage() {
                           game.game_status === "FINISHED") && (
                           <span className="font-extrabold text-xl">
                             {game.away_score}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Home Team Row */}
+                    <div className="flex justify-between items-center">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-lg">
+                          {game.home_team.name}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-500">
+                            {game.home_pitcher}
+                          </span>
+                          <span className="text-xs bg-gray-100 text-black px-1 py-1 rounded">
+                            홈
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {(game.game_status === "IN_PROGRESS" ||
+                          game.game_status === "FINISHED") && (
+                          <span className="font-extrabold text-xl">
+                            {game.home_score}
                           </span>
                         )}
                       </div>

@@ -67,14 +67,13 @@ export default function HistoryPage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-gray-800 mb-10 ${
-          isMobile ? "text-2xl" : "text-4xl"
+        className={`font-bold text-center text-black mb-8 ${
+          isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-        예측 기록
+        {user ? `${user.name}님의 예측 기록` : "예측 기록"}
       </h1>
 
-      {/* --- LOGIN FORM -- */}
       {/* --- LOGIN FORM -- */}
       {!user ? (
         <div
@@ -86,25 +85,18 @@ export default function HistoryPage() {
             onChange={(e) => setStudentId(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             placeholder="학번을 입력해 주세요"
-            className="flex-grow text-black bg-white"
+            className="flex-grow text-black"
           />
           <Button
             onClick={handleLogin}
             disabled={isLoading}
-            className={`px-6 ${isMobile ? "w-full" : ""}`}
+            className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
           >
             {isLoading ? "로딩 중..." : "로그인"}
           </Button>
         </div>
       ) : (
         <div className="text-center mb-8">
-          <h2
-            className={`font-semibold text-gray-800 ${
-              isMobile ? "text-xl" : "text-2xl"
-            }`}
-          >
-            {user.name}님의 기록
-          </h2>
         </div>
       )}
 

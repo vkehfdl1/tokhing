@@ -122,14 +122,14 @@ export default function PredictionRatioChart({
                 }`}
               >
                 <p className={isMobile ? "text-sm" : "text-base"}>
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
-                  {gameRatio.home_team_name}:{" "}
-                  {gameRatio.home_team_ratio.toFixed(2)}%
-                </p>
-                <p className={isMobile ? "text-sm" : "text-base"}>
                   <span className="inline-block w-3 h-3 rounded-full bg-red-400 mr-2"></span>
                   {gameRatio.away_team_name}:{" "}
                   {gameRatio.away_team_ratio.toFixed(2)}%
+                </p>
+                <p className={isMobile ? "text-sm" : "text-base"}>
+                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
+                  {gameRatio.home_team_name}:{" "}
+                  {gameRatio.home_team_ratio.toFixed(2)}%
                 </p>
               </div>
             </div>
