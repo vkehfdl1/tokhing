@@ -67,25 +67,29 @@ export default function HomePage() {
   // --- DATA FETCHING & LOGIN ---
   const fetchAndSetGames = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
-    
+
     // First, get today's games
     const todayGamesData = await getTodaysGamesWithPredictions(user.id);
-    
+
     // Check if all today's games are finished
-    const allTodayGamesFinished = todayGamesData.length > 0 && 
-      todayGamesData.every(game => game.game_status === "FINISHED");
-    
+    const allTodayGamesFinished =
+      todayGamesData.length > 0 &&
+      todayGamesData.every((game) => game.game_status === "FINISHED");
+
     if (allTodayGamesFinished || todayGamesData.length === 0) {
       // Get tomorrow's date
       const tomorrow = new Date();
       tomorrow.setDate(tomorrow.getDate() + 1);
       const tomorrowDateString = getISODate(tomorrow);
-      
+
       // Fetch tomorrow's games
-      const tomorrowGamesData = await getGamesWithPredictionsForDate(user.id, tomorrowDateString);
-      
+      const tomorrowGamesData = await getGamesWithPredictionsForDate(
+        user.id,
+        tomorrowDateString
+      );
+
       // If tomorrow has games, use tomorrow's data; otherwise use today's data
       if (tomorrowGamesData.length > 0) {
         // @ts-expect-error - Ignoring type mismatch for gamesData
@@ -99,7 +103,7 @@ export default function HomePage() {
       // @ts-expect-error - Ignoring type mismatch for gamesData
       setTodaysGames(todayGamesData);
     }
-    
+
     setIsLoading(false);
   }, [user]);
 
@@ -155,10 +159,10 @@ export default function HomePage() {
 
     try {
       await submitMultiplePredictions(user.id, predictionsToSubmit);
-      
+
       // Refresh data from server to show the submitted picks
       await fetchAndSetGames();
-      
+
       setSelectedPicks(new Map()); // Clear selections
     } catch (err) {
       setError("Failed to save predictions. Please try again." + err);
@@ -174,7 +178,7 @@ export default function HomePage() {
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-          오늘의 토킹 승부 예측
+        오늘의 토킹 승부 예측
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -194,7 +198,7 @@ export default function HomePage() {
             <Button
               onClick={handleLogin}
               disabled={isLoading}
-              className={`px-6 ${isMobile ? "w-full" : ""}`}
+              className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
             >
               {isLoading ? "로딩 중..." : "로그인"}
             </Button>
@@ -203,11 +207,11 @@ export default function HomePage() {
           {/* Tutorial Button */}
           <div className="text-center mb-8">
             <Button
-              variant="secondary"
+              variant="ghost"
               onClick={() => router.push("/tutorial")}
-              className="px-6 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+              className="text-zinc-500 text-xs underline p-0 h-auto bg-transparent hover:bg-transparent"
             >
-              ToKHin&apos;이 처음이라면? 🎯
+              토킹이 처음이라면?
             </Button>
           </div>
         </div>
