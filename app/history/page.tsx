@@ -71,7 +71,7 @@ export default function HistoryPage() {
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-        예측 기록
+        {user ? `${user.name}님의 예측 기록` : "예측 기록"}
       </h1>
 
       {/* --- LOGIN FORM -- */}
@@ -97,13 +97,6 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="text-center mb-8">
-          <h2
-            className={`font-semibold text-gray-800 ${
-              isMobile ? "text-xl" : "text-2xl"
-            }`}
-          >
-            {user.name}님의 기록
-          </h2>
         </div>
       )}
 
