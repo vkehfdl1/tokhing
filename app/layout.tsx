@@ -5,8 +5,8 @@ import Image from "next/image";
 import Navigation from "@/components/navigation"; // Import the new component
 import "./globals.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
+const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
   : "http://localhost:3000";
 
 export const viewport: Viewport = {
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: `${defaultUrl}/og-image.png`,
+        url: `${defaultUrl}/tokhing-og.png`,
         width: 1536,
         height: 1024,
         alt: "ToKHin' 승부 예측",
