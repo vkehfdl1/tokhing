@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Image from "next/image";
@@ -9,6 +9,11 @@ const defaultUrl = process.env.VERCEL_URL
   ? `https://${process.env.VERCEL_URL}`
   : "http://localhost:3000";
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
   title: "ToKHin' 승부 예측",
@@ -17,7 +22,6 @@ export const metadata: Metadata = {
   },
   description:
     "경희대학교 야구 직관 중앙 동아리 루킹의 승부 예측 활동인 ToKHin'입니다.",
-  viewport: "width=device-width, initial-scale=1",
   openGraph: {
     title: "ToKHin' 승부 예측",
     description:
