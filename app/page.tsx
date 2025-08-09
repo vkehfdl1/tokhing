@@ -387,22 +387,6 @@ export default function HomePage() {
                           onClick={() =>
                             handleSelectPick(
                               game.id,
-                              game.home_team.id,
-                              game.home_team.name
-                            )
-                          }
-                          className={`w-full py-3 font-bold rounded-lg transition ${
-                            currentPick?.predictedTeamId === game.home_team.id
-                              ? "bg-green-600 text-white"
-                              : "bg-green-200 text-green-800"
-                          } text-sm`}
-                        >
-                          {game.home_team.name}가 승리한다
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleSelectPick(
-                              game.id,
                               game.away_team.id,
                               game.away_team.name
                             )
@@ -414,6 +398,22 @@ export default function HomePage() {
                           } text-sm`}
                         >
                           {game.away_team.name}가 승리한다
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleSelectPick(
+                              game.id,
+                              game.home_team.id,
+                              game.home_team.name
+                            )
+                          }
+                          className={`w-full py-3 font-bold rounded-lg transition ${
+                            currentPick?.predictedTeamId === game.home_team.id
+                              ? "bg-green-600 text-white"
+                              : "bg-green-200 text-green-800"
+                          } text-sm`}
+                        >
+                          {game.home_team.name}가 승리한다
                         </button>
                       </div>
                     ) : (
