@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { DefaultInput } from "@/components/ui/default_input";
 
 // Interface definitions
 interface Team {
@@ -396,7 +397,7 @@ function MatchManagement({
                       >
                         경기 시간
                       </Label>
-                      <Input
+                      <DefaultInput
                         id={`time-${index}`}
                         type="time"
                         value={game.game_time}
@@ -436,32 +437,7 @@ function MatchManagement({
                   </div>
 
                   {/* Teams */}
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor={`home-team-${index}`}
-                        className="text-sm font-medium"
-                      >
-                        홈 팀
-                      </Label>
-                      <Select
-                        id={`home-team-${index}`}
-                        value={game.home_team_id}
-                        onChange={(e) =>
-                          updateGame(
-                            index,
-                            "home_team_id",
-                            parseInt(e.target.value)
-                          )
-                        }
-                      >
-                        {teams.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label
                         htmlFor={`away-team-${index}`}
@@ -487,26 +463,35 @@ function MatchManagement({
                         ))}
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-team-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀
+                      </Label>
+                      <Select
+                        id={`home-team-${index}`}
+                        value={game.home_team_id}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "home_team_id",
+                            parseInt(e.target.value)
+                          )
+                        }
+                      >
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
                   </div>
 
                   {/* Pitchers */}
-                  <div className="space-y-3">
-                    <div className="space-y-2">
-                      <Label
-                        htmlFor={`home-pitcher-${index}`}
-                        className="text-sm font-medium"
-                      >
-                        홈 팀 선발 투수
-                      </Label>
-                      <Input
-                        id={`home-pitcher-${index}`}
-                        value={game.home_pitcher}
-                        onChange={(e) =>
-                          updateGame(index, "home_pitcher", e.target.value)
-                        }
-                        placeholder="투수 이름"
-                      />
-                    </div>
+                  <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label
                         htmlFor={`away-pitcher-${index}`}
@@ -514,11 +499,27 @@ function MatchManagement({
                       >
                         원정 팀 선발 투수
                       </Label>
-                      <Input
+                      <DefaultInput
                         id={`away-pitcher-${index}`}
                         value={game.away_pitcher}
                         onChange={(e) =>
                           updateGame(index, "away_pitcher", e.target.value)
+                        }
+                        placeholder="투수 이름"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-pitcher-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀 선발 투수
+                      </Label>
+                      <DefaultInput
+                        id={`home-pitcher-${index}`}
+                        value={game.home_pitcher}
+                        onChange={(e) =>
+                          updateGame(index, "home_pitcher", e.target.value)
                         }
                         placeholder="투수 이름"
                       />
@@ -529,34 +530,12 @@ function MatchManagement({
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label
-                        htmlFor={`home-score-${index}`}
-                        className="text-sm font-medium"
-                      >
-                        홈 팀 점수
-                      </Label>
-                      <Input
-                        id={`home-score-${index}`}
-                        type="number"
-                        min="0"
-                        value={game.home_score || ""}
-                        onChange={(e) =>
-                          updateGame(
-                            index,
-                            "home_score",
-                            e.target.value ? parseInt(e.target.value) : null
-                          )
-                        }
-                        placeholder="점수"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label
                         htmlFor={`away-score-${index}`}
                         className="text-sm font-medium"
                       >
                         원정 팀 점수
                       </Label>
-                      <Input
+                      <DefaultInput
                         id={`away-score-${index}`}
                         type="number"
                         min="0"
@@ -571,6 +550,28 @@ function MatchManagement({
                         placeholder="점수"
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor={`home-score-${index}`}
+                        className="text-sm font-medium"
+                      >
+                        홈 팀 점수
+                      </Label>
+                      <DefaultInput
+                        id={`home-score-${index}`}
+                        type="number"
+                        min="0"
+                        value={game.home_score || ""}
+                        onChange={(e) =>
+                          updateGame(
+                            index,
+                            "home_score",
+                            e.target.value ? parseInt(e.target.value) : null
+                          )
+                        }
+                        placeholder="점수"
+                      />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -578,7 +579,7 @@ function MatchManagement({
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor={`time-${index}`}>경기 시작 시간</Label>
-                    <Input
+                    <DefaultInput
                       id={`time-${index}`}
                       type="time"
                       value={game.game_time}
@@ -586,27 +587,6 @@ function MatchManagement({
                         updateGame(index, "game_time", e.target.value)
                       }
                     />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`home-team-${index}`}>홈 팀</Label>
-                    <Select
-                      id={`home-team-${index}`}
-                      value={game.home_team_id}
-                      onChange={(e) =>
-                        updateGame(
-                          index,
-                          "home_team_id",
-                          parseInt(e.target.value)
-                        )
-                      }
-                    >
-                      {teams.map((team) => (
-                        <option key={team.id} value={team.id}>
-                          {team.name}
-                        </option>
-                      ))}
-                    </Select>
                   </div>
 
                   <div className="space-y-2">
@@ -628,6 +608,38 @@ function MatchManagement({
                         </option>
                       ))}
                     </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`away-pitcher-${index}`}>
+                      원정 팀 선발 투수
+                    </Label>
+                    <DefaultInput
+                      id={`away-pitcher-${index}`}
+                      value={game.away_pitcher}
+                      onChange={(e) =>
+                        updateGame(index, "away_pitcher", e.target.value)
+                      }
+                      placeholder="Away pitcher name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`away-score-${index}`}>원정 팀 점수</Label>
+                    <DefaultInput
+                      id={`away-score-${index}`}
+                      type="number"
+                      min="0"
+                      value={game.away_score || ""}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "away_score",
+                          e.target.value ? parseInt(e.target.value) : null
+                        )
+                      }
+                      placeholder="Score"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -655,10 +667,31 @@ function MatchManagement({
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor={`home-team-${index}`}>홈 팀</Label>
+                    <Select
+                      id={`home-team-${index}`}
+                      value={game.home_team_id}
+                      onChange={(e) =>
+                        updateGame(
+                          index,
+                          "home_team_id",
+                          parseInt(e.target.value)
+                        )
+                      }
+                    >
+                      {teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor={`home-pitcher-${index}`}>
                       홈 팀 선발 투수
                     </Label>
-                    <Input
+                    <DefaultInput
                       id={`home-pitcher-${index}`}
                       value={game.home_pitcher}
                       onChange={(e) =>
@@ -669,22 +702,8 @@ function MatchManagement({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`away-pitcher-${index}`}>
-                      원정 팀 선발 투수
-                    </Label>
-                    <Input
-                      id={`away-pitcher-${index}`}
-                      value={game.away_pitcher}
-                      onChange={(e) =>
-                        updateGame(index, "away_pitcher", e.target.value)
-                      }
-                      placeholder="Away pitcher name"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
                     <Label htmlFor={`home-score-${index}`}>홈 팀 점수</Label>
-                    <Input
+                    <DefaultInput
                       id={`home-score-${index}`}
                       type="number"
                       min="0"
@@ -693,24 +712,6 @@ function MatchManagement({
                         updateGame(
                           index,
                           "home_score",
-                          e.target.value ? parseInt(e.target.value) : null
-                        )
-                      }
-                      placeholder="Score"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor={`away-score-${index}`}>원정 팀 점수</Label>
-                    <Input
-                      id={`away-score-${index}`}
-                      type="number"
-                      min="0"
-                      value={game.away_score || ""}
-                      onChange={(e) =>
-                        updateGame(
-                          index,
-                          "away_score",
                           e.target.value ? parseInt(e.target.value) : null
                         )
                       }
