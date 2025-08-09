@@ -76,7 +76,7 @@ export default function HomePage() {
     // Check if all today's games are finished
     const allTodayGamesFinished =
       todayGamesData.length > 0 &&
-      todayGamesData.every((game) => game.game_status === "FINISHED");
+      todayGamesData.every((game) => game.game_status === "FINISHED" || game.game_status === "CANCELED");
 
     if (allTodayGamesFinished || todayGamesData.length === 0) {
       // Get tomorrow's date
