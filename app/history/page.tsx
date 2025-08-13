@@ -117,7 +117,7 @@ export default function HistoryPage() {
                   onChange={handleDateChange}
                   min={formatDate(new Date(today.getFullYear(), 2, 1))} // March is month 2 (0-indexed)
                   max={formatDate(yesterday)}
-                  className="p-3 border border-gray-300 rounded-lg text-black w-full text-center"
+                  className="p-3 border border-gray-300 rounded-lg text-black w-full text-center bg-white"
                 />
                 <div className="flex gap-3 w-full">
                   <button

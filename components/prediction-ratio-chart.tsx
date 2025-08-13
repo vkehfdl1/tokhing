@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { getPredictionRatiosForActiveGames } from "@/lib/api";
-import { PieChart } from "react-minimal-pie-chart";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 
 type PredictionRatio = {
@@ -14,6 +13,36 @@ type PredictionRatio = {
 
 interface PredictionRatioChartProps {
   date: string;
+}
+
+function selectTeamColor(teamName: string): {
+  backgroundColor: string;
+  textColor: string;
+} {
+  switch (teamName) {
+    case "KIA 타이거즈":
+      return { backgroundColor: "bg-kia", textColor: "text-kia" };
+    case "NC 다이노스":
+      return { backgroundColor: "bg-nc", textColor: "text-nc" };
+    case "키움 히어로즈":
+      return { backgroundColor: "bg-kiwoom", textColor: "text-kiwoom" };
+    case "두산 베어스":
+      return { backgroundColor: "bg-doosan", textColor: "text-doosan" };
+    case "KT 위즈":
+      return { backgroundColor: "bg-kt", textColor: "text-kt" };
+    case "삼성 라이온즈":
+      return { backgroundColor: "bg-samsung", textColor: "text-samsung" };
+    case "SSG 랜더스":
+      return { backgroundColor: "bg-ssg", textColor: "text-ssg" };
+    case "롯데 자이언츠":
+      return { backgroundColor: "bg-lotte", textColor: "text-lotte" };
+    case "LG 트윈스":
+      return { backgroundColor: "bg-lg-twins", textColor: "text-lg-twins" };
+    case "한화 이글스":
+      return { backgroundColor: "bg-hanhwa", textColor: "text-hanhwa" };
+    default:
+      return { backgroundColor: "bg-gray-500", textColor: "text-black" };
+  }
 }
 
 export default function PredictionRatioChart({
@@ -61,76 +90,68 @@ export default function PredictionRatioChart({
   }
 
   return (
-    <div
-      className={`bg-white rounded-xl shadow-md mb-8 ${
-        isMobile ? "p-4" : "p-6"
-      }`}
-    >
+    <div className={`bg-white rounded-xl mb-8`}>
+      <h1 className="font-bold text-center text-black mb-1 text-xl">
+        승부 예측 비율
+      </h1>
       <h3
-        className={`font-bold text-gray-800 mb-4 ${
-          isMobile ? "text-lg" : "text-xl"
-        }`}
+        className={`text-center justify-start text-zinc-500 text-xs font-normal mb-8`}
       >
-        {date} 승부 예측 비율
+        {date}
       </h3>
       <div className="space-y-4">
         {ratios.map((gameRatio, index) => (
-          <div key={index} className="border-b pb-4 last:border-b-0 last:pb-0">
-            <p
-              className={`font-semibold text-gray-700 mb-3 ${
-                isMobile ? "text-center text-sm" : "text-base"
-              }`}
-            >
-              {gameRatio.home_team_name} vs {gameRatio.away_team_name}
-            </p>
-            <div
-              className={`flex items-center my-2 ${
-                isMobile ? "flex-col space-y-3" : "justify-center"
-              }`}
-            >
-              <div className={isMobile ? "w-20 h-20" : "w-24 h-24"}>
-                <PieChart
-                  data={[
-                    {
-                      title: gameRatio.home_team_name,
-                      value: gameRatio.home_team_ratio,
-                      color: "#34D399",
-                    }, // Green
-                    {
-                      title: gameRatio.away_team_name,
-                      value: gameRatio.away_team_ratio,
-                      color: "#EF4444",
-                    }, // Red
-                  ]}
-                  lineWidth={60}
-                  paddingAngle={5}
-                  rounded
-                  label={({ dataEntry }) =>
-                    `${Math.round(dataEntry.percentage)}%`
-                  }
-                  labelStyle={{
-                    fontSize: isMobile ? "8px" : "10px",
-                    fontFamily: "sans-serif",
-                    fill: "#fff",
-                  }}
-                  labelPosition={75}
-                />
-              </div>
-              <div
-                className={`text-gray-700 ${
-                  isMobile ? "text-center space-y-1" : "ml-4"
-                }`}
-              >
-                <p className={isMobile ? "text-sm" : "text-base"}>
-                  <span className="inline-block w-3 h-3 rounded-full bg-red-400 mr-2"></span>
-                  {gameRatio.away_team_name}:{" "}
-                  {gameRatio.away_team_ratio.toFixed(2)}%
-                </p>
-                <p className={isMobile ? "text-sm" : "text-base"}>
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-400 mr-2"></span>
-                  {gameRatio.home_team_name}:{" "}
-                  {gameRatio.home_team_ratio.toFixed(2)}%
-                </p>
+          <div
+            key={index}
+            className="p-4 bg-white rounded-lg shadow-[0px_2px_16px_0px_rgba(0,0,0,0.04)]"
+          >
+            <div className="flex flex-col items-center">
+              <div className={`w-full ${isMobile ? "max-w-xs" : "max-w-md"}`}>
+                {/* Team Names and Ratios Above the Bar */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex flex-col items-start">
+                    <span
+                      className={`font-bold text-xl mb-2 ${
+                        selectTeamColor(gameRatio.away_team_name).textColor
+                      }`}
+                    >
+                      {gameRatio.away_team_name}
+                    </span>
+                    <span className={`text-zinc-500 font-normal text-xs`}>
+                      {gameRatio.away_team_ratio.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span
+                      className={`font-bold text-xl mb-2 ${
+                        selectTeamColor(gameRatio.home_team_name).textColor
+                      }`}
+                    >
+                      {gameRatio.home_team_name}
+                    </span>
+                    <span className={`text-zinc-500 font-normal text-xs`}>
+                      {gameRatio.home_team_ratio.toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Bar Chart Container */}
+                <div className="relative bg-gray-200 rounded-sm h-3 overflow-hidden">
+                  {/* Away Team Bar */}
+                  <div
+                    className={`absolute left-0 top-0 h-full ${
+                      selectTeamColor(gameRatio.away_team_name).backgroundColor
+                    } transition-all duration-300`}
+                    style={{ width: `${gameRatio.away_team_ratio}%` }}
+                  />
+                  {/* Home Team Bar */}
+                  <div
+                    className={`absolute right-0 top-0 h-full ${
+                      selectTeamColor(gameRatio.home_team_name).backgroundColor
+                    } transition-all duration-300`}
+                    style={{ width: `${gameRatio.home_team_ratio}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>

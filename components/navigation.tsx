@@ -22,7 +22,7 @@ export default function Navigation() {
 
   if (isMobile) {
     return (
-      <nav className="fixed bottom-0 left-0 right-0 px-4 pt-8 h-24 bg-white/80 rounded-tl-[40px] rounded-tr-[40px] shadow-[0px_-2px_24px_0px_rgba(0,0,0,0.12)] backdrop-blur-[1px]">
+      <nav className="fixed bottom-0 left-0 right-0 px-4 pt-8 h-24 bg-white/80 rounded-tl-[40px] rounded-tr-[40px] shadow-[0px_-2px_24px_0px_rgba(0,0,0,0.12)] backdrop-blur-[1px] z-50">
         <ul className="flex justify-around items-center gap-2">
           {mobileLinks.map((link) => (
             <li key={link.href} className="flex-1">

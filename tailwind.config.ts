@@ -53,6 +53,16 @@ export default {
         },
         khuRed: "rgb(164, 15, 22)",
         "tokhin-green": "#32C600",
+        "kia": "#E92020",
+        "nc": "#F2C398",
+        "kiwoom": "#A5085D",
+        "doosan": "#2A2378",
+        "kt": "#221E1F",
+        "samsung": "#0065B3",
+        "ssg": "#CF112E",
+        "lotte": "#60B0E3",
+        "lg-twins": "#C30137",
+        "hanhwa": "#F37321"
       },
       borderRadius: {
         lg: "var(--radius)",
