@@ -50,6 +50,36 @@ function translateGameStatus(status: string): string {
   }
 }
 
+function selectTeamColor(teamName: string): {
+  backgroundColor: string;
+  textColor: string;
+} {
+  switch (teamName) {
+    case "KIA 타이거즈":
+      return { backgroundColor: "bg-kia", textColor: "text-kia" };
+    case "NC 다이노스":
+      return { backgroundColor: "bg-nc", textColor: "text-nc" };
+    case "키움 히어로즈":
+      return { backgroundColor: "bg-kiwoom", textColor: "text-kiwoom" };
+    case "두산 베어스":
+      return { backgroundColor: "bg-doosan", textColor: "text-doosan" };
+    case "KT 위즈":
+      return { backgroundColor: "bg-kt", textColor: "text-kt" };
+    case "삼성 라이온즈":
+      return { backgroundColor: "bg-samsung", textColor: "text-samsung" };
+    case "SSG 랜더스":
+      return { backgroundColor: "bg-ssg", textColor: "text-ssg" };
+    case "롯데 자이언츠":
+      return { backgroundColor: "bg-lotte", textColor: "text-lotte" };
+    case "LG 트윈스":
+      return { backgroundColor: "bg-lg-twins", textColor: "text-lg-twins" };
+    case "한화 이글스":
+      return { backgroundColor: "bg-hanhwa", textColor: "text-hanhwa" };
+    default:
+      return { backgroundColor: "bg-gray-500", textColor: "text-black" };
+  }
+}
+
 // --- COMPONENT ---
 export default function HomePage() {
   const router = useRouter();
@@ -177,7 +207,7 @@ export default function HomePage() {
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
       <h1
-        className={`font-bold text-center text-black mb-8 ${
+        className={`font-bold text-center text-black mb-3 ${
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
@@ -222,7 +252,7 @@ export default function HomePage() {
         <div className="text-center mb-8">
           <h2
             className={`font-semibold text-gray-800 ${
-              isMobile ? "text-xl" : "text-2xl"
+              isMobile ? "text-base" : "text-2xl"
             }`}
           >
             {user.name}님 환영합니다.
@@ -271,13 +301,15 @@ export default function HomePage() {
 
                     {/* Row 2: Team Names - Away (left) vs Home (right) */}
                     <div className="flex items-center">
-                      <span className="font-bold text-xl flex-1 text-left">
+                      <span className={`font-bold text-xl flex-1 text-left ${
+                      selectTeamColor(game.away_team.name).textColor}`}>
                         {game.away_team.name}
                       </span>
                       <span className="font-light text-base text-black px-3">
                         VS
                       </span>
-                      <span className="font-bold text-xl flex-1 text-right">
+                      <span className={`font-bold text-xl flex-1 text-right ${
+                      selectTeamColor(game.home_team.name).textColor}`}>
                         {game.home_team.name}
                       </span>
                     </div>
@@ -289,7 +321,9 @@ export default function HomePage() {
                       </span>
                       <div className="flex items-center gap-2">
                         <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
-                          <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">홈</div>
+                          <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
+                            홈
+                          </div>
                         </div>
                         <span className="text-base text-neutral-700 font-medium">
                           {game.home_pitcher || "미정"}
@@ -392,10 +426,14 @@ export default function HomePage() {
                               game.away_team.name
                             )
                           }
-                          className={`flex-1 py-3 font-bold rounded-lg transition ${
+                          className={`flex-1 py-3 font-light text-base rounded-lg transition text-white ${
                             currentPick?.predictedTeamId === game.away_team.id
-                              ? "bg-red-600 text-white"
-                              : "bg-red-200 text-red-800"
+                              ? selectTeamColor(game.away_team.name)
+                                  .backgroundColor // Selected: full team color
+                              : `${
+                                  selectTeamColor(game.away_team.name)
+                                    .backgroundColor
+                                } opacity-50` // Unselected: 50% opacity
                           } text-sm`}
                         >
                           {game.away_team.name}
@@ -408,10 +446,14 @@ export default function HomePage() {
                               game.home_team.name
                             )
                           }
-                          className={`flex-1 py-3 font-bold rounded-lg transition ${
+                          className={`flex-1 py-3 font-light text-base rounded-lg transition text-white ${
                             currentPick?.predictedTeamId === game.home_team.id
-                              ? "bg-green-600 text-white"
-                              : "bg-green-200 text-green-800"
+                              ? selectTeamColor(game.home_team.name)
+                                  .backgroundColor // Selected: full team color
+                              : `${
+                                  selectTeamColor(game.home_team.name)
+                                    .backgroundColor
+                                } opacity-50` // Unselected: 50% opacity
                           } text-sm`}
                         >
                           {game.home_team.name}
