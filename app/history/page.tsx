@@ -153,7 +153,7 @@ export default function HistoryPage() {
   return (
     <div className={`w-full mx-auto`}>
       <h1
-        className={`font-bold text-center text-black mb-4 ${
+        className={`font-bold text-center text-black mt-4 ${
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
@@ -163,7 +163,7 @@ export default function HistoryPage() {
       {/* --- LOGIN FORM -- */}
       {!user ? (
         <div
-          className={`flex gap-4 mb-8 ${isMobile ? "flex-col" : "flex-row"}`}
+          className={`flex gap-4 mb-8 p-4 pt-3 ${isMobile ? "flex-col" : "flex-row"}`}
         >
           <Input
             type="text"
@@ -186,7 +186,7 @@ export default function HistoryPage() {
       {error && <p className="text-red-500 text-center mb-4">{error}</p>}
 
       {user && !isLoading && (
-        <div className="mb-8 flex flex-col items-center">
+        <div className="mb-8 mt-4 flex flex-col items-center">
           {/* Date Navigation - Single row with previous, date, next */}
           <div className="flex items-center justify-center gap-1 mb-5 relative">
             <button
