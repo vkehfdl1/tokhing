@@ -4,6 +4,7 @@ import { ThemeProvider } from "next-themes";
 import Image from "next/image";
 import Navigation from "@/components/navigation"; // Import the new component
 import "./globals.css";
+import localFont from "next/font/local";
 
 const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -47,14 +48,25 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+const pretendard = localFont({
+  src: "../public/fonts/pretendard/PretendardVariable.woff2",
+  display: "swap",
+  weight: "100 900",
+  variable: "--font-pretendard",
+});
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} bg-white antialiased`}>
+    <html
+      lang="ko"
+      suppressHydrationWarning
+      className={`${pretendard.variable}`}
+    >
+      <body className={`${pretendard.className} bg-white antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
