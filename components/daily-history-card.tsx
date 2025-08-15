@@ -4,6 +4,36 @@ import { useState, useEffect } from "react";
 import { getHistoryForDate } from "@/lib/api";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 
+function selectTeamColor(teamName: string): {
+  backgroundColor: string;
+  textColor: string;
+} {
+  switch (teamName) {
+    case "KIA 타이거즈":
+      return { backgroundColor: "bg-kia", textColor: "text-kia" };
+    case "NC 다이노스":
+      return { backgroundColor: "bg-nc", textColor: "text-nc" };
+    case "키움 히어로즈":
+      return { backgroundColor: "bg-kiwoom", textColor: "text-kiwoom" };
+    case "두산 베어스":
+      return { backgroundColor: "bg-doosan", textColor: "text-doosan" };
+    case "KT 위즈":
+      return { backgroundColor: "bg-kt", textColor: "text-kt" };
+    case "삼성 라이온즈":
+      return { backgroundColor: "bg-samsung", textColor: "text-samsung" };
+    case "SSG 랜더스":
+      return { backgroundColor: "bg-ssg", textColor: "text-ssg" };
+    case "롯데 자이언츠":
+      return { backgroundColor: "bg-lotte", textColor: "text-lotte" };
+    case "LG 트윈스":
+      return { backgroundColor: "bg-lg-twins", textColor: "text-lg-twins" };
+    case "한화 이글스":
+      return { backgroundColor: "bg-hanhwa", textColor: "text-hanhwa" };
+    default:
+      return { backgroundColor: "bg-gray-500", textColor: "text-black" };
+  }
+}
+
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
 type Game = {
@@ -77,15 +107,16 @@ export default function DailyHistoryCard({
   }
 
   return (
-    <div
-      className={`bg-white rounded-xl shadow-md ${isMobile ? "p-4" : "p-6"}`}
-    >
+    <div className={`bg-white ${isMobile ? "p-4" : "p-6"}`}>
+      <h3 className={`text-black text-base font-light text-center mb-2`}>
+        총 획득한 점수
+      </h3>
       <h3
-        className={`font-bold text-gray-800 mb-4 ${
+        className={`font-bold text-center text-black text-xl mb-10 ${
           isMobile ? "text-base" : "text-lg"
         }`}
       >
-        총 획득한 점수: {dailyData.totalPoints}
+        {dailyData.totalPoints}
       </h3>
       <div className="space-y-4">
         {dailyData.games.map((game) => {
@@ -97,76 +128,165 @@ export default function DailyHistoryCard({
             ? game.away_team[0]
             : game.away_team;
 
+          const getPredictionStatus = () => {
+            if (!game.prediction) {
+              return {
+                text: "예측 없음",
+                textColor: "text-stone-300",
+                outlineColor: "outline-stone-300",
+              };
+            }
+            return game.prediction.is_correct
+              ? {
+                  text: "예측 적중",
+                  textColor: "text-tokhin-green",
+                  outlineColor: "outline-lime-200/95",
+                }
+              : {
+                  text: "예측 실패",
+                  textColor: "text-stone-300",
+                  outlineColor: "outline-stone-300",
+                };
+          };
+
+          const predictionStatus = getPredictionStatus();
+
           return (
             <div
               key={game.id}
-              className={`${isMobile ? "p-3" : "p-4"} rounded-lg border-l-4 ${
-                !game.prediction
-                  ? "border-gray-300"
-                  : game.prediction.is_correct
-                  ? "border-green-500"
-                  : "border-red-500"
-              }`}
+              className={`px-5 pb-5 pt-4 rounded-2xl shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)] bg-white outline outline-2 ${predictionStatus.outlineColor}`}
             >
-              <div
-                className={`${
-                  isMobile
-                    ? "flex flex-col space-y-3"
-                    : "flex justify-between items-center"
-                }`}
-              >
-                <div
-                  className={`font-mono text-gray-800 ${
-                    isMobile ? "text-sm" : "text-lg"
-                  } ${isMobile ? "text-center" : ""}`}
-                >
-                  <span>{awayTeam.name}</span>
-                  <span className="mx-2 font-bold">
-                    {game.away_score} - {game.home_score}
-                  </span>
-                  <span>{homeTeam.name}</span>
-                  <span className="text-xs bg-gray-100 text-black px-1 py-1 rounded ml-2">
-                    홈
-                  </span>
-                </div>
-                <div className={`${isMobile ? "text-center" : "text-right"}`}>
-                  <p
-                    className={`text-gray-700 ${
-                      isMobile ? "text-sm mb-2" : "mb-1"
-                    }`}
-                  >
-                    당신의 예측 :{" "}
-                    <span className="font-bold">
-                      {game.prediction?.predicted_team_name ?? "N/A"}
+              {isMobile ? (
+                // Mobile Layout - 5 Rows
+                <div className="text-gray-800">
+                  {/* Row 1: Prediction Status at center */}
+                  <div className="text-center mb-4">
+                    <span
+                      className={`text-xs font-bold ${predictionStatus.textColor}`}
+                    >
+                      {predictionStatus.text}
                     </span>
-                  </p>
-                  <div
-                    className={`flex ${
-                      isMobile ? "justify-center gap-4" : "flex-col"
-                    }`}
-                  >
-                    <p
-                      className={`text-sm font-semibold ${
-                        game.prediction?.is_correct
-                          ? "text-green-600"
-                          : "text-red-600"
+                  </div>
+
+                  {/* Row 2: Team Names - Away (left) vs Home (right) */}
+                  <div className="flex items-center mb-2">
+                    <span
+                      className={`font-bold text-xl flex-1 text-left ${
+                        selectTeamColor(awayTeam.name).textColor
                       }`}
                     >
-                      {game.prediction
-                        ? game.prediction.is_correct
-                          ? "✓ 적중"
-                          : "✗ 예측 실패"
-                        : "No prediction"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      점수: {game.prediction?.points_earned ?? 0}
-                      {game.prediction &&
-                        !game.prediction.is_settled &&
-                        " (집계 전)"}
-                    </p>
+                      {awayTeam.name}
+                    </span>
+                    <span className="font-light text-base text-black px-3">
+                      VS
+                    </span>
+                    <span
+                      className={`font-bold text-xl flex-1 text-right ${
+                        selectTeamColor(homeTeam.name).textColor
+                      }`}
+                    >
+                      {homeTeam.name}
+                    </span>
+                  </div>
+
+                  {/* Row 3: Scores */}
+                  <div className="flex justify-between items-center mb-6">
+                    <span className="font-medium text-neutral-700">
+                      {game.away_score}
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
+                        <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
+                          홈
+                        </div>
+                      </div>
+                      <span className="text-base text-neutral-700 font-medium">
+                        {game.home_score}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Team selection buttons (non-clickable, showing prediction) */}
+                  <div className="flex gap-3">
+                    <div
+                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
+                        game.prediction?.predicted_team_name === awayTeam.name
+                          ? selectTeamColor(awayTeam.name).backgroundColor // Predicted team: full color
+                          : `${
+                              selectTeamColor(awayTeam.name).backgroundColor
+                            } opacity-50` // Non-predicted: 50% opacity
+                      } text-sm text-center`}
+                    >
+                      {awayTeam.name}
+                    </div>
+                    <div
+                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
+                        game.prediction?.predicted_team_name === homeTeam.name
+                          ? selectTeamColor(homeTeam.name).backgroundColor // Predicted team: full color
+                          : `${
+                              selectTeamColor(homeTeam.name).backgroundColor
+                            } opacity-50` // Non-predicted: 50% opacity
+                      } text-sm text-center`}
+                    >
+                      {homeTeam.name}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                // Desktop Layout
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 items-center text-center text-gray-800">
+                    {/* Away Team */}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-2xl">
+                        {awayTeam.name}
+                      </span>
+                    </div>
+
+                    {/* Score */}
+                    <div className="flex flex-col items-center">
+                      <span
+                        className={`text-sm font-medium ${predictionStatus.textColor}`}
+                      >
+                        {predictionStatus.text}
+                      </span>
+                      <span className="font-extrabold text-3xl">
+                        {game.away_score} - {game.home_score}
+                      </span>
+                    </div>
+
+                    {/* Home Team */}
+                    <div className="flex flex-col">
+                      <span className="font-bold text-2xl">
+                        {homeTeam.name}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Team buttons (non-clickable) */}
+                  <div className="flex justify-center gap-4">
+                    <div
+                      className={`w-full py-3 font-bold rounded-lg ${
+                        game.prediction?.predicted_team_name === awayTeam.name
+                          ? "bg-green-600 text-white"
+                          : "bg-green-200 text-green-800"
+                      } text-base text-center`}
+                    >
+                      {awayTeam.name}
+                    </div>
+                    <div
+                      className={`w-full py-3 font-bold rounded-lg ${
+                        game.prediction?.predicted_team_name === homeTeam.name
+                          ? "bg-red-600 text-white"
+                          : "bg-red-200 text-red-800"
+                      } text-base text-center`}
+                    >
+                      {homeTeam.name}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}

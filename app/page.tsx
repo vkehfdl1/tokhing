@@ -412,7 +412,13 @@ export default function HomePage() {
                       }`}
                     >
                       부원님의 예측 :{" "}
-                      <span className="font-bold">
+                      <span
+                        className={`font-bold ${
+                          submittedPick === game.home_team.id
+                            ? selectTeamColor(game.home_team.name).textColor
+                            : selectTeamColor(game.away_team.name).textColor
+                        }`}
+                      >
                         {submittedPick === game.home_team.id
                           ? game.home_team.name
                           : game.away_team.name}
@@ -545,7 +551,9 @@ export default function HomePage() {
             <h3 className={`font-bold mb-5 text-black text-center text-xl`}>
               예측을 제출하시겠습니까?
             </h3>
-            <div className={`mb-7 text-black font-light text-base text-center space-y-2`}>
+            <div
+              className={`mb-7 text-black font-light text-base text-center space-y-2`}
+            >
               {Array.from(selectedPicks.values()).map((pick) => {
                 const game = todaysGames.find((g) => g.id === pick.gameId);
                 if (!game) return null;

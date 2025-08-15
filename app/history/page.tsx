@@ -151,7 +151,7 @@ export default function HistoryPage() {
 
   // --- RENDER ---
   return (
-    <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
+    <div className={`w-full mx-auto`}>
       <h1
         className={`font-bold text-center text-black mb-4 ${
           isMobile ? "text-xl" : "text-4xl"
@@ -188,7 +188,7 @@ export default function HistoryPage() {
       {user && !isLoading && (
         <div className="mb-8 flex flex-col items-center">
           {/* Date Navigation - Single row with previous, date, next */}
-          <div className="flex items-center justify-center gap-1 mb-6 relative">
+          <div className="flex items-center justify-center gap-1 mb-5 relative">
             <button
               onClick={() => navigateDate(-1)}
               disabled={isPreviousDisabled}
