@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Image from "next/image";
 import Navigation from "@/components/navigation"; // Import the new component
@@ -41,12 +40,6 @@ export const metadata: Metadata = {
     ],
   },
 };
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  display: "swap",
-  subsets: ["latin"],
-});
 
 const pretendard = localFont({
   src: "../public/fonts/pretendard/PretendardVariable.woff2",
