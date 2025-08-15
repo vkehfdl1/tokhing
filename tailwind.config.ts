@@ -54,7 +54,7 @@ export default {
         khuRed: "rgb(164, 15, 22)",
         "tokhin-green": "#32C600",
         "kia": "#E92020",
-        "nc": "#F2C398",
+        "nc": "#284579",
         "kiwoom": "#A5085D",
         "doosan": "#2A2378",
         "kt": "#221E1F",
@@ -68,6 +68,9 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      fontFamily: {
+        pretendard: ['var(--font-pretendard)'],
       },
     },
   },

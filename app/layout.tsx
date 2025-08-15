@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Image from "next/image";
 import Navigation from "@/components/navigation"; // Import the new component
 import "./globals.css";
+import localFont from "next/font/local";
 
 const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
   ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
@@ -41,10 +41,11 @@ export const metadata: Metadata = {
   },
 };
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const pretendard = localFont({
+  src: "../public/fonts/pretendard/PretendardVariable.woff2",
   display: "swap",
-  subsets: ["latin"],
+  weight: "100 900",
+  variable: "--font-pretendard",
 });
 
 export default function RootLayout({
@@ -53,8 +54,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} bg-white antialiased`}>
+    <html
+      lang="ko"
+      suppressHydrationWarning
+      className={`${pretendard.variable}`}
+    >
+      <body className={`${pretendard.className} bg-white antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
