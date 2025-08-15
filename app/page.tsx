@@ -301,15 +301,21 @@ export default function HomePage() {
 
                     {/* Row 2: Team Names - Away (left) vs Home (right) */}
                     <div className="flex items-center">
-                      <span className={`font-bold text-xl flex-1 text-left ${
-                      selectTeamColor(game.away_team.name).textColor}`}>
+                      <span
+                        className={`font-bold text-xl flex-1 text-left ${
+                          selectTeamColor(game.away_team.name).textColor
+                        }`}
+                      >
                         {game.away_team.name}
                       </span>
                       <span className="font-light text-base text-black px-3">
                         VS
                       </span>
-                      <span className={`font-bold text-xl flex-1 text-right ${
-                      selectTeamColor(game.home_team.name).textColor}`}>
+                      <span
+                        className={`font-bold text-xl flex-1 text-right ${
+                          selectTeamColor(game.home_team.name).textColor
+                        }`}
+                      >
                         {game.home_team.name}
                       </span>
                     </div>
@@ -533,46 +539,52 @@ export default function HomePage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50">
           <div
             className={`bg-white rounded-lg shadow-2xl max-w-md w-full ${
-              isMobile ? "p-6" : "p-8"
+              isMobile ? "p-6 pr-4 pl-4 pb-3" : "p-8"
             }`}
           >
-            <h3
-              className={`font-bold mb-4 text-gray-900 ${
-                isMobile ? "text-lg" : "text-xl"
-              }`}
-            >
+            <h3 className={`font-bold mb-5 text-black text-center text-xl`}>
               예측을 제출하시겠습니까?
             </h3>
-            <ul
-              className={`list-disc list-inside mb-6 text-gray-700 ${
-                isMobile ? "text-sm" : "text-base"
-              }`}
-            >
-              {Array.from(selectedPicks.values()).map((pick) => (
-                <li key={pick.gameId}>
-                  {" "}
-                  <span className="font-bold">{pick.teamName}</span>
-                </li>
-              ))}
-            </ul>
-            <div
-              className={`flex ${
-                isMobile ? "flex-col gap-3" : "justify-center gap-4"
-              }`}
-            >
+            <div className={`mb-7 text-black font-light text-base text-center space-y-2`}>
+              {Array.from(selectedPicks.values()).map((pick) => {
+                const game = todaysGames.find((g) => g.id === pick.gameId);
+                if (!game) return null;
+
+                return (
+                  <div key={pick.gameId}>
+                    <span
+                      className={
+                        pick.predictedTeamId === game.away_team.id
+                          ? "font-bold text-blue-600"
+                          : ""
+                      }
+                    >
+                      {game.away_team.name}
+                    </span>
+                    {" vs "}
+                    <span
+                      className={
+                        pick.predictedTeamId === game.home_team.id
+                          ? "font-bold text-blue-600"
+                          : ""
+                      }
+                    >
+                      {game.home_team.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex gap-2">
               <button
                 onClick={() => setShowConfirmation(false)}
-                className={`px-6 py-2 bg-gray-300 text-gray-800 rounded-lg ${
-                  isMobile ? "w-full" : ""
-                }`}
+                className="flex-1 px-6 py-2 bg-gray-300 text-gray-800 rounded-lg"
               >
                 취소
               </button>
               <button
                 onClick={handleConfirmSubmission}
-                className={`px-6 py-2 bg-blue-600 text-white rounded-lg ${
-                  isMobile ? "w-full" : ""
-                }`}
+                className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg"
               >
                 제출
               </button>
