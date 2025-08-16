@@ -320,35 +320,43 @@ export default function HomePage() {
                       </span>
                     </div>
 
-                    {/* Row 3: Pitchers - Away (left) vs Home (right with 홈 badge) */}
+                    {/* Row 3: Pitchers or Scores - Away (left) vs Home (right with 홈 badge) */}
                     <div className="flex justify-between items-center">
-                      <span className="text-base text-neutral-700 font-medium">
-                        {game.away_pitcher || "미정"}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
-                          <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
-                            홈
+                      {game.game_status === "IN_PROGRESS" ||
+                      game.game_status === "FINISHED" ? (
+                        <>
+                          <span className="text-base text-neutral-700 font-medium">
+                            {game.away_score}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
+                              <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
+                                홈
+                              </div>
+                            </div>
+                            <span className="text-base text-neutral-700 font-medium">
+                              {game.home_score}
+                            </span>
                           </div>
-                        </div>
-                        <span className="text-base text-neutral-700 font-medium">
-                          {game.home_pitcher || "미정"}
-                        </span>
-                      </div>
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-base text-neutral-700 font-medium">
+                            {game.away_pitcher || "미정"}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
+                              <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
+                                홈
+                              </div>
+                            </div>
+                            <span className="text-base text-neutral-700 font-medium">
+                              {game.home_pitcher || "미정"}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
-
-                    {/* Row 4: Scores (if game is in progress or finished) */}
-                    {(game.game_status === "IN_PROGRESS" ||
-                      game.game_status === "FINISHED") && (
-                      <div className="flex justify-between items-center">
-                        <span className="font-extrabold text-xl">
-                          {game.away_score}
-                        </span>
-                        <span className="font-extrabold text-xl">
-                          {game.home_score}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   // Desktop Layout (unchanged)
@@ -411,7 +419,8 @@ export default function HomePage() {
                         submittedPick === game.away_team.id
                           ? selectTeamColor(game.away_team.name).backgroundColor // Predicted team: full color
                           : `${
-                              selectTeamColor(game.away_team.name).backgroundColor
+                              selectTeamColor(game.away_team.name)
+                                .backgroundColor
                             } opacity-50` // Non-predicted: 50% opacity
                       } text-sm text-center`}
                     >
@@ -422,7 +431,8 @@ export default function HomePage() {
                         submittedPick === game.home_team.id
                           ? selectTeamColor(game.home_team.name).backgroundColor // Predicted team: full color
                           : `${
-                              selectTeamColor(game.home_team.name).backgroundColor
+                              selectTeamColor(game.home_team.name)
+                                .backgroundColor
                             } opacity-50` // Non-predicted: 50% opacity
                       } text-sm text-center`}
                     >
