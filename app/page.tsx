@@ -286,7 +286,7 @@ export default function HomePage() {
               >
                 {isMobile ? (
                   // Mobile Layout - 4 Rows
-                  <div className="flex flex-col space-y-2 text-gray-800">
+                  <div className="flex flex-col space-y-2 text-gray-800 mb-5">
                     {/* Row 1: Game Status at center */}
                     <div className="text-center mb-2">
                       <span className="text-xs text-zinc-500">
@@ -405,25 +405,29 @@ export default function HomePage() {
                     </p>
                   </div>
                 ) : hasSubmitted ? (
-                  <div className="mt-6 text-center">
-                    <p
-                      className={`text-gray-800 ${
-                        isMobile ? "text-base" : "text-lg"
-                      }`}
+                  <div className="flex gap-3">
+                    <div
+                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
+                        submittedPick === game.away_team.id
+                          ? selectTeamColor(game.away_team.name).backgroundColor // Predicted team: full color
+                          : `${
+                              selectTeamColor(game.away_team.name).backgroundColor
+                            } opacity-50` // Non-predicted: 50% opacity
+                      } text-sm text-center`}
                     >
-                      부원님의 예측 :{" "}
-                      <span
-                        className={`font-bold ${
-                          submittedPick === game.home_team.id
-                            ? selectTeamColor(game.home_team.name).textColor
-                            : selectTeamColor(game.away_team.name).textColor
-                        }`}
-                      >
-                        {submittedPick === game.home_team.id
-                          ? game.home_team.name
-                          : game.away_team.name}
-                      </span>
-                    </p>
+                      {game.away_team.name}
+                    </div>
+                    <div
+                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
+                        submittedPick === game.home_team.id
+                          ? selectTeamColor(game.home_team.name).backgroundColor // Predicted team: full color
+                          : `${
+                              selectTeamColor(game.home_team.name).backgroundColor
+                            } opacity-50` // Non-predicted: 50% opacity
+                      } text-sm text-center`}
+                    >
+                      {game.home_team.name}
+                    </div>
                   </div>
                 ) : game.game_status === "SCHEDULED" ? (
                   <div className="mt-6">
