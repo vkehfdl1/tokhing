@@ -19,7 +19,7 @@ export default function LeaderboardPage() {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
-      const data = await getLeaderboard("2025-07-24", "2025-08-17");
+      const data = await getLeaderboard("2025-08-18", "2025-12-31");
       setLeaderboard(data);
       setIsLoading(false);
     };
