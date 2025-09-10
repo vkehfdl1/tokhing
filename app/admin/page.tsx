@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -749,11 +749,137 @@ function MatchManagement({
   );
 }
 
+// Simple Modal Component
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}
+
+function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-black">{title}</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </Button>
+          </div>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Forced Calculation Component
+function ForcedCalculation() {
+  const [selectedDate, setSelectedDate] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState("");
+  const supabase = createClient();
+  const isMobile = useIsMobile();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedDate) return;
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.rpc("calculate_daily_matches", {
+        calc_date: selectedDate,
+      });
+
+      if (error) {
+        console.error("Error calling calculate_daily_matches:", error);
+        setModalMessage(`오류가 발생했습니다: ${error.message}`);
+      } else {
+        setModalMessage("완료되었습니다!");
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setModalMessage("예상치 못한 오류가 발생했습니다.");
+    } finally {
+      setIsLoading(false);
+      setIsModalOpen(true);
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setModalMessage("");
+  };
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2
+          className={`font-bold text-black ${
+            isMobile ? "text-xl" : "text-2xl"
+          }`}
+        >
+          특정 날짜 매치 강제 계산
+        </h2>
+        <p className="text-muted-foreground mt-2">
+          특정 날짜의 매치를 강제로 계산합니다.
+        </p>
+      </div>
+
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="date-picker" className="block mb-2">
+              날짜 선택
+            </Label>
+            <Input
+              id="date-picker"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              required
+              className="w-full text-black"
+              disabled={isLoading}
+            />
+          </div>
+
+          <Button
+            type="submit"
+            disabled={!selectedDate || isLoading}
+            className={`${isMobile ? "w-full" : ""}`}
+          >
+            {isLoading ? "계산 중..." : "매치 계산 실행"}
+          </Button>
+        </form>
+      </Card>
+
+      <Modal isOpen={isModalOpen} onClose={closeModal} title="계산 결과">
+        <div className="text-center">
+          <p className="text-gray-700 mb-4">{modalMessage}</p>
+          <Button onClick={closeModal} className="w-full">
+            확인
+          </Button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
 // Admin Dashboard Component
 function AdminDashboard() {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
-    "dashboard" | "today" | "tomorrow" | "yesterday"
+    "dashboard" | "today" | "tomorrow" | "yesterday" | "calculate"
   >("dashboard");
 
   const getCurrentKSTTime = () => {
@@ -779,9 +905,13 @@ function AdminDashboard() {
           </div>
         </div>
 
-        <MatchManagement
-          selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
-        />
+        {currentView === "calculate" ? (
+          <ForcedCalculation />
+        ) : (
+          <MatchManagement
+            selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
+          />
+        )}
 
         <div
           className={`mt-8 ${
@@ -823,7 +953,9 @@ function AdminDashboard() {
 
       <div
         className={`grid gap-6 ${
-          isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+          isMobile
+            ? "grid-cols-1"
+            : "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
         }`}
       >
         <Card className={isMobile ? "p-4" : "p-6"}>
@@ -871,6 +1003,23 @@ function AdminDashboard() {
           </p>
           <Button
             onClick={() => setCurrentView("tomorrow")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            특정 날짜 매치 강제 계산
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            특정 날짜의 매치를 강제로 계산합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("calculate")}
             className={isMobile ? "w-full" : ""}
           >
             접속
