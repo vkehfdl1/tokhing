@@ -56,7 +56,7 @@ const getKSTDate = (offsetDays = 0): string => {
 function MatchManagement({
   selectedDate,
 }: {
-  selectedDate: "today" | "tomorrow";
+  selectedDate: "today" | "tomorrow" | "yesterday";
 }) {
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -64,7 +64,13 @@ function MatchManagement({
   const supabase = createClient();
   const isMobile = useIsMobile();
 
-  const targetDate = selectedDate === "today" ? getKSTDate(0) : getKSTDate(1);
+  // Calculate target date based on selected period
+  const targetDate =
+    selectedDate === "yesterday"
+      ? getKSTDate(-1)
+      : selectedDate === "tomorrow"
+      ? getKSTDate(1)
+      : getKSTDate(0);
 
   const fetchTeams = async () => {
     const { data, error } = await supabase
@@ -747,7 +753,7 @@ function MatchManagement({
 function AdminDashboard() {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
-    "dashboard" | "today" | "tomorrow"
+    "dashboard" | "today" | "tomorrow" | "yesterday"
   >("dashboard");
 
   const getCurrentKSTTime = () => {
@@ -773,7 +779,9 @@ function AdminDashboard() {
           </div>
         </div>
 
-        <MatchManagement selectedDate={currentView as "today" | "tomorrow"} />
+        <MatchManagement
+          selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
+        />
 
         <div
           className={`mt-8 ${
@@ -818,6 +826,23 @@ function AdminDashboard() {
           isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
         }`}
       >
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            어제의 경기
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            어제 경기 정보를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("yesterday")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
