@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getGame, Game as CrawledGame } from "kbo-game";
+import { Game as CrawledGame } from "kbo-game";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
+import { getGameData } from "@/lib/api";
 
 // Interface definitions
 interface Team {
@@ -129,13 +130,14 @@ function MatchManagement({
     try {
       setLoading(true);
 
-
       console.log(new Date(targetDate));
-      // Call the edge function
-      const crawledData: CrawledGame[] | null = await getGame(new Date(targetDate));
+      // Call the API function to get game data
+      const crawledData: CrawledGame[] | null = await getGameData(
+        new Date(targetDate)
+      );
 
       if (!crawledData) {
-        console.error("Error calling crawl_kbo function");
+        console.error("Error calling getGameData function");
         alert("Error fetching match data. Please try again.");
         return;
       }
@@ -167,7 +169,7 @@ function MatchManagement({
 
         if (!homeTeamId) {
           unmatchedTeams.push(match.homeTeam);
-        } 
+        }
         if (!awayTeamId) {
           unmatchedTeams.push(match.awayTeam);
         }

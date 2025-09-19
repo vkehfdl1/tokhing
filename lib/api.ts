@@ -557,3 +557,33 @@ export const deleteGame = async (gameId: number) => {
 
   return data;
 };
+
+// Fetch game data from external source via API route to avoid CORS issues
+export const getGameData = async (date: Date) => {
+  try {
+    const response = await fetch("/api/crawl-games", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        date: date.toISOString(),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || "Failed to fetch game data");
+    }
+
+    return result.data;
+  } catch (error) {
+    console.error("Error fetching game data:", error);
+    return null;
+  }
+};

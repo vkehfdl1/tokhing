@@ -18,6 +18,6 @@ export const config = {
      * - admin (admin page)
      * Feel free to modify this pattern to include more paths.
      */
-    "/((?!_next/static|_next/image|favicon.ico|history|leaderboard|admin|tutorial|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|history|leaderboard|admin|tutorial|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
