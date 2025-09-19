@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { Game as CrawledGame } from "kbo-game";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
+import { getGameData } from "@/lib/api";
 
 // Interface definitions
 interface Team {
@@ -28,19 +30,6 @@ interface Game {
   home_score: number | null;
   away_score: number | null;
   game_status: "SCHEDULED" | "IN_PROGRESS" | "FINISHED" | "CANCELED";
-}
-
-interface CrawledMatch {
-  result: {
-    home_team: string;
-    away_team: string;
-    home_pitcher: string;
-    away_pitcher: string;
-    home_score: number | null;
-    away_score: number | null;
-  };
-  is_finished: boolean;
-  start_time: string;
 }
 
 // Utility function to get KST date
@@ -141,19 +130,15 @@ function MatchManagement({
     try {
       setLoading(true);
 
-      // Call the edge function
-      const { data, error } = await supabase.functions.invoke("crawl_kbo", {
-        body: { date: targetDate },
-      });
+      console.log(new Date(targetDate));
+      // Call the API function to get game data
+      const crawledData: CrawledGame[] | null = await getGameData(
+        new Date(targetDate)
+      );
 
-      if (error) {
-        console.error("Error calling crawl_kbo function:", error);
+      if (!crawledData) {
+        console.error("Error calling getGameData function");
         alert("Error fetching match data. Please try again.");
-        return;
-      }
-
-      if (!data.success) {
-        alert("Failed to fetch match data from KBO.");
         return;
       }
 
@@ -178,27 +163,27 @@ function MatchManagement({
       const crawledGames: Game[] = [];
       const unmatchedTeams: string[] = [];
 
-      data.data.forEach((match: CrawledMatch) => {
-        const homeTeamId = teamNameToId.get(match.result.home_team);
-        const awayTeamId = teamNameToId.get(match.result.away_team);
+      crawledData.forEach((match: CrawledGame) => {
+        const homeTeamId = teamNameToId.get(match.homeTeam);
+        const awayTeamId = teamNameToId.get(match.awayTeam);
 
         if (!homeTeamId) {
-          unmatchedTeams.push(match.result.home_team);
+          unmatchedTeams.push(match.homeTeam);
         }
         if (!awayTeamId) {
-          unmatchedTeams.push(match.result.away_team);
+          unmatchedTeams.push(match.awayTeam);
         }
 
         crawledGames.push({
           game_date: targetDate,
-          game_time: match.start_time,
+          game_time: match.startTime,
           home_team_id: homeTeamId || 0,
           away_team_id: awayTeamId || 0,
-          home_pitcher: match.result.home_pitcher || "",
-          away_pitcher: match.result.away_pitcher || "",
-          home_score: match.result.home_score,
-          away_score: match.result.away_score,
-          game_status: match.is_finished ? "FINISHED" : "SCHEDULED",
+          home_pitcher: match.homePitcher || "",
+          away_pitcher: match.awayPitcher || "",
+          home_score: match.score ? match.score.home || 0 : 0,
+          away_score: match.score ? match.score.away || 0 : 0,
+          game_status: match.status,
         });
       });
 
