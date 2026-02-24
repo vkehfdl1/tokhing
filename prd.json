@@ -124,7 +124,7 @@
       "id": "US-008",
       "title": "\ub9ac\ub354\ubcf4\ub4dc \u2014 \ucf54\uc778 \uc794\uace0 + \uc218\uc775\ub960 \ubcf5\ud569 \ub7ad\ud0b9",
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "description": "\ub9ac\ub354\ubcf4\ub4dc\ub97c \ucf54\uc778 \uc794\uace0 \uc21c\uc704\uc640 \uc218\uc775\ub960 \uc21c\uc704 \ub450 \uac00\uc9c0 \ud0ed\uc73c\ub85c \uc81c\uacf5\ud55c\ub2e4. \ub514\uc790\uc778\uc740 prd.md\uc758 W-07 \uc640\uc774\uc5b4\ud504\ub808\uc784 \ucc38\uc870.",
       "acceptanceCriteria": [
         "REQ-053 get_leaderboard_balance() RETURNS TABLE(...) RPC \ud568\uc218. \ucf54\uc778 \uc794\uace0 \uae30\uc900 \ub0b4\ub9bc\ucc28\uc21c \uc815\ub82c. \ubc18\ud658: rank, user_id, username, balance.",

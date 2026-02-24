@@ -170,6 +170,22 @@ interface GameForHistoryContextRow {
   away_team: TeamRelation;
 }
 
+interface LeaderboardBalanceRpcRow {
+  rank: number | string;
+  user_id: string;
+  username: string;
+  balance: number | string;
+}
+
+interface LeaderboardRoiRpcRow {
+  rank: number | string;
+  user_id: string;
+  username: string;
+  roi_percent: number | string;
+  current_balance: number | string;
+  total_granted: number | string;
+}
+
 export interface MarketListItem {
   id: number;
   gameId: number;
@@ -267,6 +283,22 @@ export interface SettlementHistoryItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+}
+
+export interface LeaderboardBalanceItem {
+  rank: number;
+  userId: string;
+  username: string;
+  balance: number;
+}
+
+export interface LeaderboardRoiItem {
+  rank: number;
+  userId: string;
+  username: string;
+  roiPercent: number;
+  currentBalance: number;
+  totalGranted: number;
 }
 
 const normalizeTeamRelation = (team: TeamRelation): TeamWithShortName | null => {
@@ -780,31 +812,45 @@ export const getHistoryForDate = async (userId: string, date: string) => {
   return { games: combinedData, totalPoints };
 };
 
-// 5. Fetch Leaderboard
-export const getLeaderboard = async (startDate?: string, endDate?: string) => {
-  const { data, error } = await supabase.rpc("get_leaderboard", {
-    start_date: startDate,
-    end_date: endDate,
-  });
+// 5. Fetch Leaderboard (US-008)
+export const getLeaderboardBalance = async (): Promise<
+  LeaderboardBalanceItem[]
+> => {
+  const { data, error } = await supabase.rpc("get_leaderboard_balance");
 
   if (error) {
-    console.error("Error fetching leaderboard:", error);
-    return [];
+    console.error("Error calling get_leaderboard_balance RPC:", error);
+    throw new Error("리더보드 잔고 순위 조회 중 오류가 발생했습니다");
   }
 
-  return data.map(
-    (entry: {
-      user_id: string;
-      username: string;
-      student_number: string;
-      total_score: number;
-    }) => ({
-      userId: entry.user_id,
-      name: entry.username,
-      student_number: entry.student_number,
-      score: entry.total_score,
-    })
-  );
+  const rows = (data ?? []) as LeaderboardBalanceRpcRow[];
+
+  return rows.map((entry) => ({
+    rank: Math.trunc(toNumberOrNull(entry.rank) ?? 0),
+    userId: entry.user_id,
+    username: entry.username,
+    balance: toNumberOrNull(entry.balance) ?? 0,
+  }));
+};
+
+export const getLeaderboardRoi = async (): Promise<LeaderboardRoiItem[]> => {
+  const { data, error } = await supabase.rpc("get_leaderboard_roi");
+
+  if (error) {
+    console.error("Error calling get_leaderboard_roi RPC:", error);
+    throw new Error("리더보드 수익률 순위 조회 중 오류가 발생했습니다");
+  }
+
+  const rows = (data ?? []) as LeaderboardRoiRpcRow[];
+
+  return rows.map((entry) => ({
+    rank: Math.trunc(toNumberOrNull(entry.rank) ?? 0),
+    userId: entry.user_id,
+    username: entry.username,
+    roiPercent: toNumberOrNull(entry.roi_percent) ?? 0,
+    currentBalance: toNumberOrNull(entry.current_balance) ?? 0,
+    totalGranted: toNumberOrNull(entry.total_granted) ?? 0,
+  }));
 };
 
 // 6. Fetch Prediction Ratios for a specific date
