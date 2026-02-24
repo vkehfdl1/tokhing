@@ -7,7 +7,6 @@ import {
   type LeaderboardBalanceItem,
   type LeaderboardRoiItem,
 } from "@/lib/api";
-import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { useUserSession } from "@/lib/hooks/useUserSession";
 
 type LeaderboardTab = "BALANCE" | "ROI";
@@ -50,7 +49,6 @@ const getRankBackgroundClass = (rank: number) => {
 };
 
 export default function LeaderboardPage() {
-  const isMobile = useIsMobile();
   const { session, isLoading: isSessionLoading } = useUserSession({
     requireAuth: true,
   });
@@ -139,14 +137,8 @@ export default function LeaderboardPage() {
   }
 
   return (
-    <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
-      <h1
-        className={`font-bold text-center text-black mb-8 ${
-          isMobile ? "text-xl" : "text-4xl"
-        }`}
-      >
-        리더보드
-      </h1>
+    <div className="w-full pt-1">
+      <h1 className="mb-6 text-center text-xl font-bold text-black">리더보드</h1>
 
       <div className="mb-5 border-b border-zinc-200">
         <div className="grid grid-cols-2">
@@ -182,32 +174,28 @@ export default function LeaderboardPage() {
             {displayRows.map((entry) => (
               <li
                 key={entry.key}
-                className={`flex items-center ${
-                  isMobile ? "px-4" : "px-4"
-                } h-12 ${getRankBackgroundClass(
+                className={`my-2 flex h-12 items-center rounded-lg px-4 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.12)] ${getRankBackgroundClass(
                   entry.rank
-                )} rounded-lg shadow-[0px_0px_8px_0px_rgba(0,0,0,0.12)] my-2`}
+                )}`}
               >
                 <span
-                  className={`font-base ${getRankTextClass(entry.rank)} ${
-                    isMobile
-                      ? "text-base w-6 text-center"
-                      : "text-lg w-12 text-center"
-                  }`}
+                  className={`w-6 text-center text-base font-medium ${getRankTextClass(
+                    entry.rank
+                  )}`}
                 >
                   {entry.rank}
                 </span>
                 <span
-                  className={`font-base ${getRankTextClass(
+                  className={`flex-grow px-2 text-base font-medium ${getRankTextClass(
                     entry.rank
-                  )} flex-grow ${isMobile ? "text-base px-2" : "text-xl"}`}
+                  )}`}
                 >
                   {entry.username}
                 </span>
                 <span
-                  className={`font-normal ${getRankTextClass(entry.rank)} ${
-                    isMobile ? "text-base px-1" : "text-2xl"
-                  }`}
+                  className={`px-1 text-base font-normal ${getRankTextClass(
+                    entry.rank
+                  )}`}
                 >
                   {entry.valueText}
                 </span>

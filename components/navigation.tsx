@@ -1,21 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { LogOut } from "lucide-react";
-import { clearAllAuthState } from "@/lib/auth";
+
+const navLinks = [
+  { href: "/", label: "마켓", icon: "/search-icon.svg" },
+  { href: "/history", label: "포지션", icon: "/history-icon.svg" },
+  { href: "/leaderboard", label: "리더보드", icon: "/leaderboard-icon.svg" },
+  { href: "/tutorial", label: "도움말", icon: "/info-icon.svg" },
+];
+
+const isActivePath = (pathname: string, href: string) => {
+  if (href === "/") {
+    return pathname === href;
+  }
+
+  return pathname === href || pathname.startsWith(`${href}/`);
+};
 
 export default function Navigation() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const navLinks = [
-    { href: "/", label: "오늘의 예측", icon: "/search-icon.svg" },
-    { href: "/history", label: "기록", icon: "/history-icon.svg" },
-    { href: "/leaderboard", label: "순위", icon: "/leaderboard-icon.svg" },
-    { href: "/tutorial", label: "튜토리얼", icon: "/info-icon.svg" },
-  ];
 
   const shouldHide =
     pathname === "/login" ||
@@ -26,47 +31,42 @@ export default function Navigation() {
     return null;
   }
 
-  const handleLogout = () => {
-    clearAllAuthState();
-    router.replace("/login");
-  };
-
   return (
-    <nav className="fixed bottom-0 left-1/2 z-50 h-24 w-full max-w-[430px] -translate-x-1/2 rounded-tl-[40px] rounded-tr-[40px] bg-white/80 px-4 pt-8 shadow-[0px_-2px_24px_0px_rgba(0,0,0,0.12)] backdrop-blur-[1px]">
-      <ul className="flex items-center justify-around gap-1">
-        {navLinks.map((link) => (
-          <li key={link.href} className="flex-1">
-            <Link
-              href={link.href}
-              className="flex items-center justify-center py-2 transition-all duration-200"
-              aria-label={link.label}
-            >
-              <Image
-                src={link.icon}
-                alt={link.label}
-                width={22}
-                height={22}
-                style={{
-                  filter:
-                    pathname === link.href
-                      ? "brightness(0) saturate(100%) invert(67%) sepia(45%) saturate(7042%) hue-rotate(78deg) brightness(108%) contrast(101%)"
-                      : undefined,
-                }}
-              />
-            </Link>
-          </li>
-        ))}
+    <nav className="fixed bottom-0 left-1/2 z-50 h-24 w-full max-w-[430px] -translate-x-1/2 rounded-tl-[40px] rounded-tr-[40px] bg-white/80 px-3 pb-4 pt-3 shadow-[0px_-2px_24px_0px_rgba(0,0,0,0.12)] backdrop-blur-[1px]">
+      <ul className="grid h-full grid-cols-4 gap-1">
+        {navLinks.map((link) => {
+          const isActive = isActivePath(pathname, link.href);
 
-        <li className="flex-1">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex w-full items-center justify-center py-2 text-zinc-500"
-            aria-label="로그아웃"
-          >
-            <LogOut size={20} />
-          </button>
-        </li>
+          return (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="flex h-full flex-col items-center justify-center gap-1 rounded-lg py-1 transition-all duration-200"
+                aria-label={link.label}
+              >
+                <Image
+                  src={link.icon}
+                  alt={link.label}
+                  width={20}
+                  height={20}
+                  style={{
+                    filter:
+                      isActive
+                        ? "brightness(0) saturate(100%) invert(67%) sepia(45%) saturate(7042%) hue-rotate(78deg) brightness(108%) contrast(101%)"
+                        : undefined,
+                  }}
+                />
+                <span
+                  className={`text-[11px] font-medium leading-none ${
+                    isActive ? "text-tokhin-green" : "text-zinc-500"
+                  }`}
+                >
+                  {link.label}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </nav>
   );

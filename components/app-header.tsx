@@ -1,9 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { LogOut } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { getWalletBalance } from "@/lib/api";
+import { clearAllAuthState } from "@/lib/auth";
 import { WALLET_BALANCE_REFRESH_EVENT } from "@/lib/events";
 import { useUserSession } from "@/lib/hooks/useUserSession";
 
@@ -13,6 +15,7 @@ const numberFormatter = new Intl.NumberFormat("ko-KR", {
 
 export default function AppHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { session } = useUserSession();
   const [balance, setBalance] = useState<number | null>(null);
 
@@ -37,6 +40,11 @@ export default function AppHeader() {
       console.error("Failed to refresh wallet balance:", error);
     }
   }, [session?.user_id]);
+
+  const handleLogout = useCallback(() => {
+    clearAllAuthState();
+    router.replace("/login");
+  }, [router]);
 
   useEffect(() => {
     if (!canShowBalance) {
@@ -86,11 +94,21 @@ export default function AppHeader() {
       />
 
       {canShowBalance ? (
-        <div className="flex h-10 items-center rounded-lg bg-zinc-100 px-3 shadow-[0px_2px_10px_0px_rgba(0,0,0,0.10)]">
-          <span className="mr-1.5 text-base leading-none">🪙</span>
-          <span className="text-sm font-semibold tabular-nums text-black">
-            {numberFormatter.format(Math.max(0, balance ?? 0))}
-          </span>
+        <div className="flex items-center gap-2">
+          <div className="flex h-10 items-center rounded-lg bg-zinc-100 px-3 shadow-[0px_2px_10px_0px_rgba(0,0,0,0.10)]">
+            <span className="mr-1.5 text-base leading-none">🪙</span>
+            <span className="text-sm font-semibold tabular-nums text-black">
+              {numberFormatter.format(Math.max(0, balance ?? 0))}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 shadow-[0px_2px_10px_0px_rgba(0,0,0,0.10)] transition-colors duration-200 hover:bg-zinc-200"
+            aria-label="로그아웃"
+          >
+            <LogOut size={18} />
+          </button>
         </div>
       ) : null}
     </div>
