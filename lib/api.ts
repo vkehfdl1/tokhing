@@ -43,6 +43,39 @@ interface AdminGrantCoinsRpcResponse {
   error?: string;
 }
 
+interface SettleMarketRpcResponse {
+  success: boolean;
+  total_users_settled?: number | string;
+  total_coins_distributed?: number | string;
+  error?: string;
+}
+
+interface MarketStatusRpcResponse {
+  success: boolean;
+  market_id?: number | string;
+  status?: string;
+  total_users_refunded?: number | string;
+  total_refunded?: number | string;
+  error?: string;
+}
+
+interface LiquiditySettingRpcResponse {
+  success: boolean;
+  previous_b?: number | string;
+  current_b?: number | string;
+  error?: string;
+}
+
+interface WeeklyCoinCronStatusRpcResponse {
+  success: boolean;
+  cron_enabled?: boolean;
+  job_name?: string | null;
+  last_run_at?: string | null;
+  last_status?: string | null;
+  message?: string | null;
+  error?: string;
+}
+
 export interface AdminUser {
   id: string;
   student_number: number | string;
@@ -301,6 +334,43 @@ export interface LeaderboardRoiItem {
   totalGranted: number;
 }
 
+export interface AdminInitialPricesInput {
+  HOME: number;
+  AWAY: number;
+  DRAW: number;
+}
+
+export interface AdminMarketEnsureResult {
+  createdCount: number;
+  skippedCount: number;
+  createdMarketIds: number[];
+}
+
+export interface MarketSettlementResult {
+  totalUsersSettled: number;
+  totalCoinsDistributed: number;
+}
+
+export interface MarketStatusUpdateResult {
+  marketId: number;
+  status: string;
+  totalUsersRefunded?: number;
+  totalRefunded?: number;
+}
+
+export interface LiquiditySettingResult {
+  previousB: number;
+  currentB: number;
+}
+
+export interface WeeklyCoinCronStatusResult {
+  cronEnabled: boolean;
+  jobName: string | null;
+  lastRunAt: string | null;
+  lastStatus: string | null;
+  message: string | null;
+}
+
 const normalizeTeamRelation = (team: TeamRelation): TeamWithShortName | null => {
   if (Array.isArray(team)) {
     return team[0] ?? null;
@@ -318,6 +388,27 @@ const toNumberOrNull = (
 
   const converted = Number(value);
   return Number.isFinite(converted) ? converted : null;
+};
+
+const parseNumericJsonValue = (value: unknown): number | null => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (value && typeof value === "object" && "value" in value) {
+    const nested = (value as { value?: unknown }).value;
+    const parsed = Number(nested);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
 };
 
 const isMarketOutcome = (value: string): value is MarketOutcome => {
@@ -1725,6 +1816,299 @@ export const getGameData = async (date: Date) => {
     return null;
   }
 };
+
+export const ensureMarketsForGames = async (
+  gameIds: number[],
+  initialPrices: AdminInitialPricesInput
+): Promise<AdminMarketEnsureResult> => {
+  const uniqueGameIds = Array.from(
+    new Set(
+      gameIds.filter(
+        (gameId): gameId is number => Number.isFinite(gameId) && gameId > 0
+      )
+    )
+  );
+
+  if (uniqueGameIds.length === 0) {
+    return {
+      createdCount: 0,
+      skippedCount: 0,
+      createdMarketIds: [],
+    };
+  }
+
+  const homePrice = Number(initialPrices.HOME);
+  const awayPrice = Number(initialPrices.AWAY);
+  const drawPrice = Number(initialPrices.DRAW);
+
+  if (
+    !Number.isFinite(homePrice) ||
+    !Number.isFinite(awayPrice) ||
+    !Number.isFinite(drawPrice) ||
+    homePrice <= 0 ||
+    awayPrice <= 0 ||
+    drawPrice <= 0
+  ) {
+    throw new Error("초기 가격은 모두 0보다 큰 숫자여야 합니다");
+  }
+
+  const total = homePrice + awayPrice + drawPrice;
+  if (Math.abs(total - 100) > 0.000001) {
+    throw new Error("초기 가격의 합은 100이어야 합니다");
+  }
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("markets")
+    .select("game_id")
+    .in("game_id", uniqueGameIds);
+
+  if (existingError) {
+    console.error("Error checking existing markets:", existingError);
+    throw new Error("기존 마켓 조회 중 오류가 발생했습니다");
+  }
+
+  const existingGameIds = new Set<number>(
+    (existingRows ?? [])
+      .map((row) => Number((row as { game_id: number | string }).game_id))
+      .filter((gameId): gameId is number => Number.isFinite(gameId) && gameId > 0)
+  );
+
+  const missingGameIds = uniqueGameIds.filter(
+    (gameId) => !existingGameIds.has(gameId)
+  );
+
+  if (missingGameIds.length === 0) {
+    return {
+      createdCount: 0,
+      skippedCount: uniqueGameIds.length,
+      createdMarketIds: [],
+    };
+  }
+
+  const createdMarketIds: number[] = [];
+  for (const gameId of missingGameIds) {
+    const { data, error } = await supabase.rpc("create_market", {
+      p_game_id: gameId,
+      p_initial_home: homePrice,
+      p_initial_away: awayPrice,
+      p_initial_draw: drawPrice,
+    });
+
+    if (error) {
+      const loweredMessage = error.message.toLowerCase();
+      const isDuplicateError =
+        loweredMessage.includes("duplicate") || loweredMessage.includes("unique");
+
+      if (isDuplicateError) {
+        continue;
+      }
+
+      console.error("Error creating market for game:", { gameId, error });
+      throw new Error("마켓 자동 생성 중 오류가 발생했습니다");
+    }
+
+    const marketId = Number(data);
+    if (!Number.isFinite(marketId) || marketId <= 0) {
+      throw new Error("마켓 생성 응답이 올바르지 않습니다");
+    }
+
+    createdMarketIds.push(marketId);
+  }
+
+  return {
+    createdCount: createdMarketIds.length,
+    skippedCount: uniqueGameIds.length - createdMarketIds.length,
+    createdMarketIds,
+  };
+};
+
+export const settleMarket = async (
+  marketId: number,
+  result: MarketOutcome
+): Promise<MarketSettlementResult> => {
+  if (!Number.isFinite(marketId) || marketId <= 0) {
+    throw new Error("유효하지 않은 마켓 ID입니다");
+  }
+
+  if (!isMarketOutcome(result)) {
+    throw new Error("정산 결과는 HOME, AWAY, DRAW 중 하나여야 합니다");
+  }
+
+  const { data, error } = await supabase.rpc("settle_market", {
+    p_market_id: marketId,
+    p_result: result,
+  });
+
+  if (error) {
+    console.error("Error calling settle_market RPC:", error);
+    throw new Error("마켓 정산 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as SettleMarketRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "마켓 정산에 실패했습니다");
+  }
+
+  const totalUsersSettled = Number(rpcResult.total_users_settled ?? 0);
+  const totalCoinsDistributed = Number(rpcResult.total_coins_distributed ?? 0);
+
+  if (
+    !Number.isFinite(totalUsersSettled) ||
+    !Number.isFinite(totalCoinsDistributed)
+  ) {
+    throw new Error("마켓 정산 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    totalUsersSettled,
+    totalCoinsDistributed,
+  };
+};
+
+export const closeMarket = async (
+  marketId: number
+): Promise<MarketStatusUpdateResult> => {
+  if (!Number.isFinite(marketId) || marketId <= 0) {
+    throw new Error("유효하지 않은 마켓 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("close_market", {
+    p_market_id: marketId,
+  });
+
+  if (error) {
+    console.error("Error calling close_market RPC:", error);
+    throw new Error("마켓 종료 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as MarketStatusRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "마켓 종료에 실패했습니다");
+  }
+
+  const parsedMarketId = Number(rpcResult.market_id ?? marketId);
+  if (!Number.isFinite(parsedMarketId) || parsedMarketId <= 0) {
+    throw new Error("마켓 종료 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    marketId: parsedMarketId,
+    status: rpcResult.status ?? "CLOSED",
+  };
+};
+
+export const cancelMarket = async (
+  marketId: number
+): Promise<MarketStatusUpdateResult> => {
+  if (!Number.isFinite(marketId) || marketId <= 0) {
+    throw new Error("유효하지 않은 마켓 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("cancel_market", {
+    p_market_id: marketId,
+  });
+
+  if (error) {
+    console.error("Error calling cancel_market RPC:", error);
+    throw new Error("마켓 취소 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as MarketStatusRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "마켓 취소에 실패했습니다");
+  }
+
+  const parsedMarketId = Number(rpcResult.market_id ?? marketId);
+  if (!Number.isFinite(parsedMarketId) || parsedMarketId <= 0) {
+    throw new Error("마켓 취소 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    marketId: parsedMarketId,
+    status: rpcResult.status ?? "CANCELED",
+    totalUsersRefunded: Number(rpcResult.total_users_refunded ?? 0),
+    totalRefunded: Number(rpcResult.total_refunded ?? 0),
+  };
+};
+
+export const getLiquidityB = async (): Promise<number> => {
+  const { data, error } = await supabase
+    .from("settings")
+    .select("value")
+    .eq("key", "liquidity_b")
+    .maybeSingle();
+
+  if (error) {
+    console.error("Error fetching liquidity_b setting:", error);
+    throw new Error("현재 b값 조회 중 오류가 발생했습니다");
+  }
+
+  const parsed = parseNumericJsonValue(data?.value);
+  if (parsed === null || parsed <= 0) {
+    throw new Error("현재 b값이 올바르지 않습니다");
+  }
+
+  return parsed;
+};
+
+export const updateLiquidityB = async (
+  nextB: number
+): Promise<LiquiditySettingResult> => {
+  if (!Number.isFinite(nextB) || nextB <= 0) {
+    throw new Error("b값은 0보다 큰 숫자여야 합니다");
+  }
+
+  const { data, error } = await supabase.rpc("set_liquidity_b", {
+    p_b: nextB,
+  });
+
+  if (error) {
+    console.error("Error calling set_liquidity_b RPC:", error);
+    throw new Error("b값 변경 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as LiquiditySettingRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "b값 변경에 실패했습니다");
+  }
+
+  const previousB = Number(rpcResult.previous_b ?? nextB);
+  const currentB = Number(rpcResult.current_b ?? nextB);
+
+  if (!Number.isFinite(previousB) || !Number.isFinite(currentB) || currentB <= 0) {
+    throw new Error("b값 변경 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    previousB,
+    currentB,
+  };
+};
+
+export const getWeeklyCoinCronStatus =
+  async (): Promise<WeeklyCoinCronStatusResult> => {
+    const { data, error } = await supabase.rpc("get_weekly_coin_cron_status");
+
+    if (error) {
+      console.error("Error calling get_weekly_coin_cron_status RPC:", error);
+      throw new Error("자동 지급 상태 조회 중 오류가 발생했습니다");
+    }
+
+    const rpcResult = data as WeeklyCoinCronStatusRpcResponse | null;
+    if (!rpcResult?.success) {
+      throw new Error(rpcResult?.error || "자동 지급 상태 조회에 실패했습니다");
+    }
+
+    return {
+      cronEnabled: Boolean(rpcResult.cron_enabled),
+      jobName: typeof rpcResult.job_name === "string" ? rpcResult.job_name : null,
+      lastRunAt:
+        typeof rpcResult.last_run_at === "string" ? rpcResult.last_run_at : null,
+      lastStatus:
+        typeof rpcResult.last_status === "string" ? rpcResult.last_status : null,
+      message: typeof rpcResult.message === "string" ? rpcResult.message : null,
+    };
+  };
 
 export const getWalletBalance = async (userId: string): Promise<number> => {
   const { data, error } = await supabase.rpc("get_wallet_balance", {
