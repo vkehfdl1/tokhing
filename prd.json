@@ -151,7 +151,7 @@
       "id": "US-010",
       "title": "\uae30\uc874 \ucf54\ub4dc \uc815\ub9ac \ubc0f \ub9c8\uc774\uadf8\ub808\uc774\uc158",
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "description": "\uae30\uc874 \uc2b9\ubd80\uc608\uce21 \uad00\ub828 \ucf54\ub4dc\ub97c \uc815\ub9ac\ud558\uace0, \uc0c8\ub85c\uc6b4 LMSR \uc2dc\uc2a4\ud15c\uc73c\ub85c \uc804\ud658\ud55c\ub2e4.",
       "acceptanceCriteria": [
         "REQ-062 \uae30\uc874 predictions \uad00\ub828 API \ud568\uc218 (submitMultiplePredictions, getTodaysGamesWithPredictions \ub4f1)\ub97c \uc0c8\ub85c\uc6b4 \ub9c8\ucf13/\uc8fc\ubb38 API\ub85c \uad50\uccb4.",

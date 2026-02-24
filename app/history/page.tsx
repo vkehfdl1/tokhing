@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  getOpenPositionsHistory,
-  getOrderHistoryByDate,
+  getOrderHistory,
+  getPositions,
   getSettlementHistory,
   type OpenPositionHistoryItem,
   type OrderHistoryItem,
@@ -261,7 +261,7 @@ export default function HistoryPage() {
       setPositionsError(null);
 
       try {
-        const data = await getOpenPositionsHistory(session.user_id);
+        const data = await getPositions(session.user_id);
 
         if (!isCancelled) {
           setOpenPositions(data);
@@ -300,7 +300,7 @@ export default function HistoryPage() {
       setOrdersError(null);
 
       try {
-        const data = await getOrderHistoryByDate(session.user_id, selectedDate);
+        const data = await getOrderHistory(session.user_id, selectedDate);
 
         if (!isCancelled) {
           setOrderHistory(data);

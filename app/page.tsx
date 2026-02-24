@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   getISODate,
-  getMarketListForDate,
+  getMarkets,
   type MarketListItem,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -163,7 +163,7 @@ export default function HomePage() {
 
     try {
       const today = getISODate();
-      const todayMarkets = await getMarketListForDate(today);
+      const todayMarkets = await getMarkets(today);
 
       const allTodayGamesEnded =
         todayMarkets.length > 0 &&
@@ -173,7 +173,7 @@ export default function HomePage() {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowDate = getISODate(tomorrow);
-        const tomorrowMarkets = await getMarketListForDate(tomorrowDate);
+        const tomorrowMarkets = await getMarkets(tomorrowDate);
 
         if (tomorrowMarkets.length > 0) {
           setMarkets(tomorrowMarkets);
