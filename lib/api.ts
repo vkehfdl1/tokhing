@@ -49,6 +49,75 @@ export interface AdminUser {
   username: string;
 }
 
+type MarketOutcome = "HOME" | "AWAY" | "DRAW";
+
+interface TeamWithShortName {
+  id: number;
+  name: string;
+  short_name?: string | null;
+}
+
+type TeamRelation = TeamWithShortName | TeamWithShortName[] | null;
+
+interface GameForMarketListRow {
+  id: number;
+  game_date: string;
+  game_time: string | null;
+  game_status: string;
+  home_team: TeamRelation;
+  away_team: TeamRelation;
+}
+
+interface MarketForListRow {
+  id: number;
+  game_id: number;
+  status: string;
+  result: string | null;
+  initial_home_price: number | string | null;
+  initial_away_price: number | string | null;
+  initial_draw_price: number | string | null;
+}
+
+interface LmsrPriceRow {
+  outcome: string;
+  price: number | string;
+}
+
+export interface MarketListItem {
+  id: number;
+  gameId: number;
+  gameDate: string;
+  gameTime: string | null;
+  gameStatus: string;
+  marketStatus: string;
+  result: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamShortName: string | null;
+  prices: Record<MarketOutcome, number>;
+  initialPrices: Record<MarketOutcome, number | null>;
+}
+
+const normalizeTeamRelation = (team: TeamRelation): TeamWithShortName | null => {
+  if (Array.isArray(team)) {
+    return team[0] ?? null;
+  }
+
+  return team ?? null;
+};
+
+const toNumberOrNull = (
+  value: number | string | null | undefined
+): number | null => {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const converted = Number(value);
+  return Number.isFinite(converted) ? converted : null;
+};
+
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
   const offset = date.getTimezoneOffset() * 60 * 1000; // Convert minutes to milliseconds
@@ -573,6 +642,141 @@ export const getGamesWithPredictionsForDate = async (
   return games.map((game) => {
     const prediction = predictions?.find((p) => p.game_id === game.id) || null;
     return { ...game, prediction };
+  });
+};
+
+export const getMarketListForDate = async (
+  date: string
+): Promise<MarketListItem[]> => {
+  const { data: gameRows, error: gamesError } = await supabase
+    .from("games")
+    .select(
+      `
+      id,
+      game_date,
+      game_time,
+      game_status,
+      home_team:teams!home_team_id(id, name, short_name),
+      away_team:teams!away_team_id(id, name, short_name)
+    `
+    )
+    .eq("game_date", date)
+    .order("game_time", { ascending: true });
+
+  if (gamesError) {
+    console.error("Error fetching market games for date:", gamesError);
+    throw new Error("마켓 경기 목록 조회 중 오류가 발생했습니다");
+  }
+
+  const games = (gameRows ?? []) as GameForMarketListRow[];
+  if (games.length === 0) {
+    return [];
+  }
+
+  const gameIds = games.map((game) => game.id);
+  const { data: marketRows, error: marketsError } = await supabase
+    .from("markets")
+    .select(
+      "id, game_id, status, result, initial_home_price, initial_away_price, initial_draw_price"
+    )
+    .in("game_id", gameIds);
+
+  if (marketsError) {
+    console.error("Error fetching markets for date:", marketsError);
+    throw new Error("마켓 목록 조회 중 오류가 발생했습니다");
+  }
+
+  const markets = (marketRows ?? []) as MarketForListRow[];
+  if (markets.length === 0) {
+    return [];
+  }
+
+  const gamesById = new Map<number, GameForMarketListRow>(
+    games.map((game) => [game.id, game])
+  );
+
+  const pricedMarkets = await Promise.all(
+    markets.map(async (market) => {
+      const { data: rawPrices, error: priceError } = await supabase.rpc(
+        "lmsr_prices",
+        {
+          p_market_id: market.id,
+        }
+      );
+
+      if (priceError) {
+        console.error("Error fetching lmsr prices:", priceError);
+        throw new Error("마켓 가격 조회 중 오류가 발생했습니다");
+      }
+
+      const prices: Record<MarketOutcome, number> = {
+        HOME: 0,
+        AWAY: 0,
+        DRAW: 0,
+      };
+
+      ((rawPrices ?? []) as LmsrPriceRow[]).forEach((row) => {
+        const outcome = row.outcome.toUpperCase();
+        const numericPrice = Number(row.price);
+
+        if (!Number.isFinite(numericPrice)) {
+          return;
+        }
+
+        if (outcome === "HOME" || outcome === "AWAY" || outcome === "DRAW") {
+          prices[outcome] = numericPrice;
+        }
+      });
+
+      return { market, prices };
+    })
+  );
+
+  const marketList = pricedMarkets.flatMap(({ market, prices }) => {
+    const game = gamesById.get(market.game_id);
+
+    if (!game) {
+      return [];
+    }
+
+    const homeTeam = normalizeTeamRelation(game.home_team);
+    const awayTeam = normalizeTeamRelation(game.away_team);
+
+    if (!homeTeam || !awayTeam) {
+      return [];
+    }
+
+    return [
+      {
+        id: market.id,
+        gameId: market.game_id,
+        gameDate: game.game_date,
+        gameTime: game.game_time ?? null,
+        gameStatus: game.game_status,
+        marketStatus: market.status,
+        result: market.result,
+        homeTeamName: homeTeam.name,
+        awayTeamName: awayTeam.name,
+        homeTeamShortName: homeTeam.short_name ?? null,
+        awayTeamShortName: awayTeam.short_name ?? null,
+        prices,
+        initialPrices: {
+          HOME: toNumberOrNull(market.initial_home_price),
+          AWAY: toNumberOrNull(market.initial_away_price),
+          DRAW: toNumberOrNull(market.initial_draw_price),
+        },
+      },
+    ];
+  });
+
+  return marketList.sort((a, b) => {
+    const timeA = a.gameTime ?? "";
+    const timeB = b.gameTime ?? "";
+    if (timeA !== timeB) {
+      return timeA.localeCompare(timeB);
+    }
+
+    return a.id - b.id;
   });
 };
 
