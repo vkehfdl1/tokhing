@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
-import Image from "next/image";
 import Navigation from "@/components/navigation"; // Import the new component
+import AppHeader from "@/components/app-header";
 import "./globals.css";
 import localFont from "next/font/local";
 
@@ -68,16 +68,7 @@ export default function RootLayout({
         >
           <main className="min-h-screen bg-[#111111]">
             <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white px-4 pb-28">
-              <div className="w-full flex justify-center py-4">
-                <Image
-                  src="/toKHin.svg"
-                  alt="ToKHin' Logo"
-                  width={120}
-                  height={60}
-                  priority
-                  className="h-auto"
-                />
-              </div>
+              <AppHeader />
               <div className="w-full flex-1">{children}</div>
             </div>
             <Navigation />

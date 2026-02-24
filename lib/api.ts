@@ -22,6 +22,33 @@ interface LoginRpcResponse {
   error?: string;
 }
 
+interface WalletBalanceRpcResponse {
+  success: boolean;
+  balance?: number | string;
+  error?: string;
+}
+
+interface WeeklyCoinsRpcResponse {
+  success: boolean;
+  users_count?: number | string;
+  total_distributed?: number | string;
+  error?: string;
+}
+
+interface AdminGrantCoinsRpcResponse {
+  success: boolean;
+  user_id?: string;
+  granted_amount?: number | string;
+  new_balance?: number | string;
+  error?: string;
+}
+
+export interface AdminUser {
+  id: string;
+  student_number: number | string;
+  username: string;
+}
+
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
   const offset = date.getTimezoneOffset() * 60 * 1000; // Convert minutes to milliseconds
@@ -631,7 +658,7 @@ export const getGameData = async (date: Date) => {
     }
 
     const result = await response.json();
-    
+
     if (!result.success) {
       throw new Error(result.error || "Failed to fetch game data");
     }
@@ -641,4 +668,82 @@ export const getGameData = async (date: Date) => {
     console.error("Error fetching game data:", error);
     return null;
   }
+};
+
+export const getWalletBalance = async (userId: string): Promise<number> => {
+  const { data, error } = await supabase.rpc("get_wallet_balance", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error calling get_wallet_balance RPC:", error);
+    throw new Error("지갑 잔고 조회 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as WalletBalanceRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "지갑 잔고 조회에 실패했습니다");
+  }
+
+  return Number(rpcResult.balance ?? 0);
+};
+
+export const distributeWeeklyCoins = async (amount = 1000) => {
+  const { data, error } = await supabase.rpc("distribute_weekly_coins", {
+    p_amount: amount,
+  });
+
+  if (error) {
+    console.error("Error calling distribute_weekly_coins RPC:", error);
+    throw new Error("전체 코인 지급 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as WeeklyCoinsRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "전체 코인 지급에 실패했습니다");
+  }
+
+  return {
+    success: true,
+    users_count: Number(rpcResult.users_count ?? 0),
+    total_distributed: Number(rpcResult.total_distributed ?? 0),
+  };
+};
+
+export const adminGrantCoins = async (userId: string, amount: number) => {
+  const { data, error } = await supabase.rpc("admin_grant_coins", {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+
+  if (error) {
+    console.error("Error calling admin_grant_coins RPC:", error);
+    throw new Error("코인 지급 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as AdminGrantCoinsRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "코인 지급에 실패했습니다");
+  }
+
+  return {
+    success: true,
+    user_id: rpcResult.user_id || userId,
+    granted_amount: Number(rpcResult.granted_amount ?? amount),
+    new_balance: Number(rpcResult.new_balance ?? 0),
+  };
+};
+
+export const getUsersForAdmin = async (): Promise<AdminUser[]> => {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, student_number, username")
+    .order("student_number", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching users for admin:", error);
+    throw new Error("유저 목록 조회 중 오류가 발생했습니다");
+  }
+
+  return (data ?? []) as AdminUser[];
 };

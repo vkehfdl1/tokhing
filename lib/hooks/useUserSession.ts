@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getUserSession, type UserSession } from "@/lib/auth";
+import {
+  getUserSession,
+  type UserSession,
+  USER_SESSION_CHANGED_EVENT,
+  USER_SESSION_KEY,
+} from "@/lib/auth";
 
 interface UseUserSessionOptions {
   requireAuth?: boolean;
@@ -16,14 +21,33 @@ export const useUserSession = ({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedSession = getUserSession();
-    setSession(storedSession);
+    const syncSession = () => {
+      setSession(getUserSession());
+    };
+
+    syncSession();
     setIsLoading(false);
 
-    if (requireAuth && !storedSession) {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === null || event.key === USER_SESSION_KEY) {
+        syncSession();
+      }
+    };
+
+    window.addEventListener("storage", handleStorage);
+    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
+
+    return () => {
+      window.removeEventListener("storage", handleStorage);
+      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && requireAuth && !session) {
       router.replace("/login");
     }
-  }, [requireAuth, router]);
+  }, [isLoading, requireAuth, router, session]);
 
   return { session, isLoading };
 };

@@ -4,10 +4,16 @@ export interface UserSession {
   student_number: string;
 }
 
-const USER_SESSION_KEY = "tokhin_user_session";
+export const USER_SESSION_KEY = "tokhin_user_session";
 const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
+export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
 
 const isBrowser = () => typeof window !== "undefined";
+
+const dispatchSessionChangedEvent = () => {
+  if (!isBrowser()) return;
+  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
+};
 
 const parseSession = (value: string | null): UserSession | null => {
   if (!value) return null;
@@ -41,11 +47,13 @@ export const getUserSession = (): UserSession | null => {
 export const setUserSession = (session: UserSession) => {
   if (!isBrowser()) return;
   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
+  dispatchSessionChangedEvent();
 };
 
 export const clearUserSession = () => {
   if (!isBrowser()) return;
   window.localStorage.removeItem(USER_SESSION_KEY);
+  dispatchSessionChangedEvent();
 };
 
 export const getPendingPasswordChangeSession = (): UserSession | null => {

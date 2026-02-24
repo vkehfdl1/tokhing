@@ -10,7 +10,13 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
-import { getGameData } from "@/lib/api";
+import {
+  adminGrantCoins,
+  distributeWeeklyCoins,
+  getGameData,
+  getUsersForAdmin,
+  type AdminUser,
+} from "@/lib/api";
 
 // Interface definitions
 interface Team {
@@ -860,11 +866,251 @@ function ForcedCalculation() {
   );
 }
 
+function CoinGrantManagement() {
+  const isMobile = useIsMobile();
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [allAmount, setAllAmount] = useState("1000");
+  const [singleAmount, setSingleAmount] = useState("1000");
+  const [allLoading, setAllLoading] = useState(false);
+  const [singleLoading, setSingleLoading] = useState(false);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setUsersLoading(true);
+        const userList = await getUsersForAdmin();
+        setUsers(userList);
+        if (userList.length > 0) {
+          setSelectedUserId((prev) => prev || userList[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch users for coin grant:", error);
+        setMessage({
+          type: "error",
+          text: "유저 목록 조회에 실패했습니다.",
+        });
+      } finally {
+        setUsersLoading(false);
+      }
+    };
+
+    void fetchUsers();
+  }, []);
+
+  const parseAmount = (raw: string) => {
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return null;
+    }
+    return amount;
+  };
+
+  const handleGrantAll = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+
+    const amount = parseAmount(allAmount);
+    if (amount === null) {
+      setMessage({
+        type: "error",
+        text: "전체 지급 금액은 0보다 큰 숫자여야 합니다.",
+      });
+      return;
+    }
+
+    setAllLoading(true);
+    try {
+      const result = await distributeWeeklyCoins(amount);
+      setMessage({
+        type: "success",
+        text: `전체 지급 완료: ${result.users_count.toLocaleString()}명에게 총 ${result.total_distributed.toLocaleString()} 코인 지급`,
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "전체 코인 지급 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setAllLoading(false);
+    }
+  };
+
+  const handleGrantSingleUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!selectedUserId) {
+      setMessage({
+        type: "error",
+        text: "지급할 유저를 선택해주세요.",
+      });
+      return;
+    }
+
+    const amount = parseAmount(singleAmount);
+    if (amount === null) {
+      setMessage({
+        type: "error",
+        text: "개별 지급 금액은 0보다 큰 숫자여야 합니다.",
+      });
+      return;
+    }
+
+    setSingleLoading(true);
+    try {
+      const result = await adminGrantCoins(selectedUserId, amount);
+      const selectedUser = users.find((user) => user.id === selectedUserId);
+      setMessage({
+        type: "success",
+        text: `${selectedUser?.username || "선택한 유저"}에게 ${result.granted_amount.toLocaleString()} 코인 지급 완료 (현재 잔고 ${result.new_balance.toLocaleString()})`,
+      });
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "개별 코인 지급 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setSingleLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-2">
+        <h2
+          className={`font-bold text-black ${
+            isMobile ? "text-xl" : "text-2xl"
+          }`}
+        >
+          코인 지급 관리
+        </h2>
+        <p className="text-muted-foreground mt-2">
+          자동 지급(매주 월요일 00:00 KST, cron 설정 시)과 수동 지급을 관리합니다.
+        </p>
+      </div>
+
+      {message ? (
+        <div
+          className={`rounded-lg p-3 text-sm ${
+            message.type === "success"
+              ? "bg-green-50 text-green-700"
+              : "bg-red-50 text-red-600"
+          }`}
+        >
+          {message.text}
+        </div>
+      ) : null}
+
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className="font-semibold text-black mb-2">전체 유저 코인 지급</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          distribute_weekly_coins(p_amount) RPC를 즉시 실행합니다.
+        </p>
+        <form
+          onSubmit={handleGrantAll}
+          className={`${isMobile ? "space-y-3" : "flex items-end gap-3"}`}
+        >
+          <div className="flex-1">
+            <Label htmlFor="all-amount" className="block mb-2">
+              지급 금액
+            </Label>
+            <Input
+              id="all-amount"
+              type="number"
+              min="1"
+              value={allAmount}
+              onChange={(event) => setAllAmount(event.target.value)}
+              disabled={allLoading}
+              className="text-black"
+            />
+          </div>
+          <Button type="submit" disabled={allLoading} className="h-12 rounded-lg">
+            {allLoading ? "지급 중..." : "전체 지급 실행"}
+          </Button>
+        </form>
+      </Card>
+
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className="font-semibold text-black mb-2">특정 유저 코인 지급</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          admin_grant_coins(p_user_id, p_amount) RPC를 실행합니다.
+        </p>
+
+        <form
+          onSubmit={handleGrantSingleUser}
+          className={`${isMobile ? "space-y-3" : "grid grid-cols-3 gap-3"}`}
+        >
+          <div>
+            <Label htmlFor="grant-user" className="block mb-2">
+              대상 유저
+            </Label>
+            <Select
+              id="grant-user"
+              value={selectedUserId}
+              onChange={(event) => setSelectedUserId(event.target.value)}
+              disabled={usersLoading || singleLoading || users.length === 0}
+            >
+              {users.length === 0 ? (
+                <option value="">
+                  {usersLoading ? "유저 목록 로딩 중..." : "유저 없음"}
+                </option>
+              ) : (
+                users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {String(user.student_number)} - {user.username}
+                  </option>
+                ))
+              )}
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="single-amount" className="block mb-2">
+              지급 금액
+            </Label>
+            <Input
+              id="single-amount"
+              type="number"
+              min="1"
+              value={singleAmount}
+              onChange={(event) => setSingleAmount(event.target.value)}
+              disabled={singleLoading}
+              className="text-black"
+            />
+          </div>
+
+          <div className={`${isMobile ? "" : "self-end"}`}>
+            <Button
+              type="submit"
+              disabled={singleLoading || usersLoading || users.length === 0}
+              className="h-12 w-full rounded-lg"
+            >
+              {singleLoading ? "지급 중..." : "개별 지급 실행"}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 // Admin Dashboard Component
 function AdminDashboard() {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
-    "dashboard" | "today" | "tomorrow" | "yesterday" | "calculate"
+    "dashboard" | "today" | "tomorrow" | "yesterday" | "calculate" | "coins"
   >("dashboard");
 
   const getCurrentKSTTime = () => {
@@ -892,6 +1138,8 @@ function AdminDashboard() {
 
         {currentView === "calculate" ? (
           <ForcedCalculation />
+        ) : currentView === "coins" ? (
+          <CoinGrantManagement />
         ) : (
           <MatchManagement
             selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
@@ -1005,6 +1253,23 @@ function AdminDashboard() {
           </p>
           <Button
             onClick={() => setCurrentView("calculate")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            코인 지급 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            전체/개별 유저 코인 수동 지급을 실행합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("coins")}
             className={isMobile ? "w-full" : ""}
           >
             접속
