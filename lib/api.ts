@@ -125,6 +125,51 @@ interface OrderRpcResponse {
   error?: string;
 }
 
+interface UserOpenPositionRpcRow {
+  market_id: number | string;
+  outcome: string;
+  quantity: number | string;
+  avg_entry_price: number | string;
+  updated_at: string;
+}
+
+interface UserOrderByDateRpcRow {
+  order_id: number | string;
+  market_id: number | string;
+  outcome: string;
+  side: string;
+  quantity: number | string;
+  total_cost: number | string;
+  avg_price: number | string;
+  created_at: string;
+}
+
+interface UserSettlementHistoryRpcRow {
+  market_id: number | string;
+  settled_at: string;
+  settlement_amount: number | string;
+  net_invested: number | string;
+  final_pnl: number | string;
+  home_quantity: number | string;
+  away_quantity: number | string;
+  draw_quantity: number | string;
+}
+
+interface MarketForHistoryContextRow {
+  id: number;
+  game_id: number;
+  status: string;
+  result: string | null;
+}
+
+interface GameForHistoryContextRow {
+  id: number;
+  game_date: string;
+  game_time: string | null;
+  home_team: TeamRelation;
+  away_team: TeamRelation;
+}
+
 export interface MarketListItem {
   id: number;
   gameId: number;
@@ -175,6 +220,55 @@ export interface MarketOrderExecutionResult {
   newBalance: number;
 }
 
+export interface OpenPositionHistoryItem {
+  marketId: number;
+  outcome: MarketOutcome;
+  quantity: number;
+  avgEntryPrice: number;
+  currentPrice: number;
+  unrealizedPnl: number;
+  updatedAt: string;
+  gameDate: string;
+  gameTime: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamShortName: string | null;
+}
+
+export interface OrderHistoryItem {
+  orderId: number;
+  marketId: number;
+  outcome: MarketOutcome;
+  side: "BUY" | "SELL";
+  quantity: number;
+  totalAmount: number;
+  avgPrice: number;
+  createdAt: string;
+  gameDate: string;
+  gameTime: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamShortName: string | null;
+}
+
+export interface SettlementHistoryItem {
+  marketId: number;
+  settledAt: string;
+  settlementAmount: number;
+  netInvested: number;
+  finalPnl: number;
+  result: MarketOutcome | null;
+  positions: Record<MarketOutcome, number>;
+  gameDate: string;
+  gameTime: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamShortName: string | null;
+}
+
 const normalizeTeamRelation = (team: TeamRelation): TeamWithShortName | null => {
   if (Array.isArray(team)) {
     return team[0] ?? null;
@@ -198,6 +292,10 @@ const isMarketOutcome = (value: string): value is MarketOutcome => {
   return value === "HOME" || value === "AWAY" || value === "DRAW";
 };
 
+const isOrderSide = (value: string): value is "BUY" | "SELL" => {
+  return value === "BUY" || value === "SELL";
+};
+
 const createEmptyPriceMap = (): Record<MarketOutcome, number> => ({
   HOME: 0,
   AWAY: 0,
@@ -209,6 +307,133 @@ const createEmptyPositionsByOutcome = (): MarketPositionsByOutcome => ({
   AWAY: { quantity: 0, avgEntryPrice: 0 },
   DRAW: { quantity: 0, avgEntryPrice: 0 },
 });
+
+const getUniqueMarketIds = (values: Array<number | string>): number[] => {
+  return Array.from(
+    new Set(
+      values
+        .map((value) => Number(value))
+        .filter((id): id is number => Number.isFinite(id) && id > 0)
+    )
+  );
+};
+
+const getMarketGameContextByMarketIds = async (marketIds: number[]) => {
+  const uniqueMarketIds = getUniqueMarketIds(marketIds);
+
+  if (uniqueMarketIds.length === 0) {
+    return {
+      marketsById: new Map<number, MarketForHistoryContextRow>(),
+      gamesById: new Map<number, GameForHistoryContextRow>(),
+    };
+  }
+
+  const { data: marketRows, error: marketsError } = await supabase
+    .from("markets")
+    .select("id, game_id, status, result")
+    .in("id", uniqueMarketIds);
+
+  if (marketsError) {
+    console.error("Error fetching markets for history context:", marketsError);
+    throw new Error("히스토리 마켓 정보 조회 중 오류가 발생했습니다");
+  }
+
+  const markets = (marketRows ?? []) as MarketForHistoryContextRow[];
+  if (markets.length === 0) {
+    return {
+      marketsById: new Map<number, MarketForHistoryContextRow>(),
+      gamesById: new Map<number, GameForHistoryContextRow>(),
+    };
+  }
+
+  const marketsById = new Map<number, MarketForHistoryContextRow>(
+    markets.map((market) => [market.id, market])
+  );
+  const gameIds = Array.from(new Set(markets.map((market) => market.game_id)));
+
+  if (gameIds.length === 0) {
+    return {
+      marketsById,
+      gamesById: new Map<number, GameForHistoryContextRow>(),
+    };
+  }
+
+  const { data: gameRows, error: gamesError } = await supabase
+    .from("games")
+    .select(
+      `
+      id,
+      game_date,
+      game_time,
+      home_team:teams!home_team_id(id, name, short_name),
+      away_team:teams!away_team_id(id, name, short_name)
+    `
+    )
+    .in("id", gameIds);
+
+  if (gamesError) {
+    console.error("Error fetching games for history context:", gamesError);
+    throw new Error("히스토리 경기 정보 조회 중 오류가 발생했습니다");
+  }
+
+  const games = (gameRows ?? []) as GameForHistoryContextRow[];
+  const gamesById = new Map<number, GameForHistoryContextRow>(
+    games.map((game) => [game.id, game])
+  );
+
+  return { marketsById, gamesById };
+};
+
+const getPriceMapByMarketIds = async (
+  marketIds: number[]
+): Promise<Map<number, Record<MarketOutcome, number>>> => {
+  const uniqueMarketIds = getUniqueMarketIds(marketIds);
+  const priceEntries = await Promise.all(
+    uniqueMarketIds.map(async (marketId) => {
+      const { data: rawPrices, error } = await supabase.rpc("lmsr_prices", {
+        p_market_id: marketId,
+      });
+
+      if (error) {
+        console.error("Error fetching lmsr prices for history:", error);
+        throw new Error("현재가 조회 중 오류가 발생했습니다");
+      }
+
+      const prices = createEmptyPriceMap();
+      ((rawPrices ?? []) as LmsrPriceRow[]).forEach((row) => {
+        const outcome = row.outcome.toUpperCase();
+        const price = Number(row.price);
+
+        if (!isMarketOutcome(outcome) || !Number.isFinite(price)) {
+          return;
+        }
+
+        prices[outcome] = price;
+      });
+
+      return [marketId, prices] as const;
+    })
+  );
+
+  return new Map<number, Record<MarketOutcome, number>>(priceEntries);
+};
+
+const getKstDayRangeAsUtcIso = (date: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error("조회 날짜 형식이 올바르지 않습니다");
+  }
+
+  const startAt = new Date(`${date}T00:00:00+09:00`);
+  if (Number.isNaN(startAt.getTime())) {
+    throw new Error("조회 날짜 형식이 올바르지 않습니다");
+  }
+
+  const endAt = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
+  return {
+    startAtIso: startAt.toISOString(),
+    endAtIso: endAt.toISOString(),
+  };
+};
 
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
@@ -1040,6 +1265,262 @@ export const getMarketPositions = async (
   });
 
   return defaultPositions;
+};
+
+export const getOpenPositionsHistory = async (
+  userId: string
+): Promise<OpenPositionHistoryItem[]> => {
+  if (!userId) {
+    throw new Error("사용자 정보가 올바르지 않습니다");
+  }
+
+  const { data, error } = await supabase.rpc("get_user_open_positions", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error calling get_user_open_positions RPC:", error);
+    throw new Error("진행 중 포지션 조회 중 오류가 발생했습니다");
+  }
+
+  const rows = (data ?? []) as UserOpenPositionRpcRow[];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const marketIds = getUniqueMarketIds(rows.map((row) => row.market_id));
+  if (marketIds.length === 0) {
+    return [];
+  }
+
+  const [context, pricesByMarket] = await Promise.all([
+    getMarketGameContextByMarketIds(marketIds),
+    getPriceMapByMarketIds(marketIds),
+  ]);
+
+  const items: OpenPositionHistoryItem[] = [];
+  rows.forEach((row) => {
+    const marketId = Number(row.market_id);
+    const outcome = row.outcome.toUpperCase();
+    const quantity = toNumberOrNull(row.quantity) ?? 0;
+    const avgEntryPrice = toNumberOrNull(row.avg_entry_price) ?? 0;
+
+    if (!Number.isFinite(marketId) || !isMarketOutcome(outcome) || quantity <= 0) {
+      return;
+    }
+
+    const market = context.marketsById.get(marketId);
+    if (!market) {
+      return;
+    }
+
+    const game = context.gamesById.get(market.game_id);
+    if (!game) {
+      return;
+    }
+
+    const homeTeam = normalizeTeamRelation(game.home_team);
+    const awayTeam = normalizeTeamRelation(game.away_team);
+
+    if (!homeTeam || !awayTeam) {
+      return;
+    }
+
+    const currentPrice = pricesByMarket.get(marketId)?.[outcome] ?? 0;
+    const unrealizedPnl = (currentPrice - avgEntryPrice) * quantity;
+
+    items.push({
+      marketId,
+      outcome,
+      quantity,
+      avgEntryPrice,
+      currentPrice,
+      unrealizedPnl,
+      updatedAt: row.updated_at,
+      gameDate: game.game_date,
+      gameTime: game.game_time ?? null,
+      homeTeamName: homeTeam.name,
+      awayTeamName: awayTeam.name,
+      homeTeamShortName: homeTeam.short_name ?? null,
+      awayTeamShortName: awayTeam.short_name ?? null,
+    });
+  });
+
+  return items.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
+};
+
+export const getOrderHistoryByDate = async (
+  userId: string,
+  date: string
+): Promise<OrderHistoryItem[]> => {
+  if (!userId) {
+    throw new Error("사용자 정보가 올바르지 않습니다");
+  }
+
+  const { startAtIso, endAtIso } = getKstDayRangeAsUtcIso(date);
+  const { data, error } = await supabase.rpc("get_user_orders_by_date", {
+    p_user_id: userId,
+    p_start_at: startAtIso,
+    p_end_at: endAtIso,
+  });
+
+  if (error) {
+    console.error("Error calling get_user_orders_by_date RPC:", error);
+    throw new Error("거래 내역 조회 중 오류가 발생했습니다");
+  }
+
+  const rows = (data ?? []) as UserOrderByDateRpcRow[];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const marketIds = getUniqueMarketIds(rows.map((row) => row.market_id));
+  if (marketIds.length === 0) {
+    return [];
+  }
+
+  const context = await getMarketGameContextByMarketIds(marketIds);
+  const items: OrderHistoryItem[] = [];
+
+  rows.forEach((row) => {
+    const orderId = Number(row.order_id);
+    const marketId = Number(row.market_id);
+    const outcome = row.outcome.toUpperCase();
+    const side = row.side.toUpperCase();
+
+    if (
+      !Number.isFinite(orderId) ||
+      !Number.isFinite(marketId) ||
+      !isMarketOutcome(outcome) ||
+      !isOrderSide(side)
+    ) {
+      return;
+    }
+
+    const market = context.marketsById.get(marketId);
+    if (!market) {
+      return;
+    }
+
+    const game = context.gamesById.get(market.game_id);
+    if (!game) {
+      return;
+    }
+
+    const homeTeam = normalizeTeamRelation(game.home_team);
+    const awayTeam = normalizeTeamRelation(game.away_team);
+
+    if (!homeTeam || !awayTeam) {
+      return;
+    }
+
+    items.push({
+      orderId,
+      marketId,
+      outcome,
+      side,
+      quantity: toNumberOrNull(row.quantity) ?? 0,
+      totalAmount: toNumberOrNull(row.total_cost) ?? 0,
+      avgPrice: toNumberOrNull(row.avg_price) ?? 0,
+      createdAt: row.created_at,
+      gameDate: game.game_date,
+      gameTime: game.game_time ?? null,
+      homeTeamName: homeTeam.name,
+      awayTeamName: awayTeam.name,
+      homeTeamShortName: homeTeam.short_name ?? null,
+      awayTeamShortName: awayTeam.short_name ?? null,
+    });
+  });
+
+  return items.sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+};
+
+export const getSettlementHistory = async (
+  userId: string
+): Promise<SettlementHistoryItem[]> => {
+  if (!userId) {
+    throw new Error("사용자 정보가 올바르지 않습니다");
+  }
+
+  const { data, error } = await supabase.rpc("get_user_settlement_history", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    console.error("Error calling get_user_settlement_history RPC:", error);
+    throw new Error("정산 내역 조회 중 오류가 발생했습니다");
+  }
+
+  const rows = (data ?? []) as UserSettlementHistoryRpcRow[];
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const marketIds = getUniqueMarketIds(rows.map((row) => row.market_id));
+  if (marketIds.length === 0) {
+    return [];
+  }
+
+  const context = await getMarketGameContextByMarketIds(marketIds);
+  const items: SettlementHistoryItem[] = [];
+
+  rows.forEach((row) => {
+    const marketId = Number(row.market_id);
+
+    if (!Number.isFinite(marketId)) {
+      return;
+    }
+
+    const market = context.marketsById.get(marketId);
+    if (!market) {
+      return;
+    }
+
+    const game = context.gamesById.get(market.game_id);
+    if (!game) {
+      return;
+    }
+
+    const homeTeam = normalizeTeamRelation(game.home_team);
+    const awayTeam = normalizeTeamRelation(game.away_team);
+
+    if (!homeTeam || !awayTeam) {
+      return;
+    }
+
+    const marketResult = market.result?.toUpperCase();
+    const result = marketResult && isMarketOutcome(marketResult)
+      ? marketResult
+      : null;
+
+    items.push({
+      marketId,
+      settledAt: row.settled_at,
+      settlementAmount: toNumberOrNull(row.settlement_amount) ?? 0,
+      netInvested: toNumberOrNull(row.net_invested) ?? 0,
+      finalPnl: toNumberOrNull(row.final_pnl) ?? 0,
+      result,
+      positions: {
+        HOME: toNumberOrNull(row.home_quantity) ?? 0,
+        AWAY: toNumberOrNull(row.away_quantity) ?? 0,
+        DRAW: toNumberOrNull(row.draw_quantity) ?? 0,
+      },
+      gameDate: game.game_date,
+      gameTime: game.game_time ?? null,
+      homeTeamName: homeTeam.name,
+      awayTeamName: awayTeam.name,
+      homeTeamShortName: homeTeam.short_name ?? null,
+      awayTeamShortName: awayTeam.short_name ?? null,
+    });
+  });
+
+  return items.sort(
+    (a, b) => new Date(b.settledAt).getTime() - new Date(a.settledAt).getTime()
+  );
 };
 
 export const executeBuyOrder = async (
