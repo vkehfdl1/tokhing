@@ -1,9 +1,19 @@
 "use client";
 
 import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { useUserSession } from "@/lib/hooks/useUserSession";
 
 export default function TutorialPage() {
   const isMobile = useIsMobile();
+  const { session, isLoading } = useUserSession({ requireAuth: true });
+
+  if (isLoading) {
+    return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
+  }
+
+  if (!session) {
+    return null;
+  }
 
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>

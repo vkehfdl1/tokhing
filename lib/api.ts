@@ -14,12 +14,67 @@ interface GameData {
   game_status?: "SCHEDULED" | "LIVE" | "FINISHED";
 }
 
+interface LoginRpcResponse {
+  success: boolean;
+  user_id?: string;
+  username?: string;
+  password_changed?: boolean;
+  error?: string;
+}
+
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
   const offset = date.getTimezoneOffset() * 60 * 1000; // Convert minutes to milliseconds
   const kstOffset = 9 * 60 * 60 * 1000; // KST is UTC+9
   const kstDate = new Date(date.getTime() + kstOffset + offset);
   return kstDate.toISOString().slice(0, 10);
+};
+
+export const login = async (
+  studentNumber: string,
+  password: string
+): Promise<LoginRpcResponse> => {
+  const { data, error } = await supabase.rpc("login", {
+    p_student_number: Number(studentNumber),
+    p_password: password,
+  });
+
+  if (error) {
+    console.error("Error calling login RPC:", error);
+    throw new Error("로그인 중 오류가 발생했습니다");
+  }
+
+  if (!data?.success) {
+    return {
+      success: false,
+      error: data?.error || "학번 또는 비밀번호가 올바르지 않습니다",
+    };
+  }
+
+  return {
+    success: true,
+    user_id: data.user_id,
+    username: data.username,
+    password_changed: data.password_changed,
+  };
+};
+
+export const changePassword = async (userId: string, newPassword: string) => {
+  const { data, error } = await supabase.rpc("change_password", {
+    p_user_id: userId,
+    p_new_password: newPassword,
+  });
+
+  if (error) {
+    console.error("Error calling change_password RPC:", error);
+    throw new Error("비밀번호 변경 중 오류가 발생했습니다");
+  }
+
+  if (!data?.success) {
+    throw new Error(data?.error || "비밀번호 변경에 실패했습니다");
+  }
+
+  return data;
 };
 
 // 1. Fetch User by Student ID

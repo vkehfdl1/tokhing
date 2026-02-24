@@ -59,27 +59,28 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${pretendard.variable}`}
     >
-      <body className={`${pretendard.className} bg-white antialiased`}>
+      <body className={`${pretendard.className} bg-[#111111] antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen flex flex-col items-center px-4 sm:px-6 lg:px-8 pb-20 sm:pb-0">
-            {/* Logo at the top center */}
-            <div className="w-full flex justify-center py-4">
-              <Image
-                src="/toKHin.svg"
-                alt="ToKHin' Logo"
-                width={120}
-                height={60}
-                priority
-                className="h-auto"
-              />
+          <main className="min-h-screen bg-[#111111]">
+            <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white px-4 pb-28">
+              <div className="w-full flex justify-center py-4">
+                <Image
+                  src="/toKHin.svg"
+                  alt="ToKHin' Logo"
+                  width={120}
+                  height={60}
+                  priority
+                  className="h-auto"
+                />
+              </div>
+              <div className="w-full flex-1">{children}</div>
             </div>
             <Navigation />
-            <div className="w-full max-w-4xl mx-auto">{children}</div>
           </main>
         </ThemeProvider>
       </body>

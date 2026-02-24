@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { getUserByStudentId } from "@/lib/api";
 import DailyHistoryCard from "@/components/daily-history-card";
 import PredictionRatioChart from "@/components/prediction-ratio-chart"; // Import the new component
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { useUserSession } from "@/lib/hooks/useUserSession";
 
 // --- TYPE DEFINITIONS ---
 type User = { id: string; student_number: string; name: string };
@@ -43,10 +41,9 @@ const formatDateWithWeekday = (date: Date) => {
 // --- COMPONENT ---
 export default function HistoryPage() {
   const isMobile = useIsMobile();
-  const [studentId, setStudentId] = useState("");
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { session, isLoading: isSessionLoading } = useUserSession({
+    requireAuth: true,
+  });
   const [selectedDate, setSelectedDate] = useState(() => {
     const kstToday = getKSTDate();
     const kstYesterday = new Date(kstToday);
@@ -55,6 +52,13 @@ export default function HistoryPage() {
   }); // Default to yesterday in KST
   const [showCalendar, setShowCalendar] = useState(false);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const user: User | null = session
+    ? {
+        id: session.user_id,
+        student_number: session.student_number,
+        name: session.username,
+      }
+    : null;
 
   // Close calendar when clicking outside
   useEffect(() => {
@@ -75,25 +79,6 @@ export default function HistoryPage() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [showCalendar]);
-
-  // --- DATA FETCHING & LOGIN ---
-  const handleLogin = async () => {
-    if (!studentId) {
-      setError("Please enter your student ID.");
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const userData = await getUserByStudentId(studentId);
-      setUser(userData);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setError(err.message);
-      setUser(null);
-    }
-    setIsLoading(false);
-  };
 
   // --- DATE NAVIGATION ---
   const navigateDate = (days: number) => {
@@ -149,6 +134,14 @@ export default function HistoryPage() {
     setShowCalendar(false);
   };
 
+  if (isSessionLoading) {
+    return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
   // --- RENDER ---
   return (
     <div className={`w-full mx-auto`}>
@@ -157,135 +150,108 @@ export default function HistoryPage() {
           isMobile ? "text-xl" : "text-4xl"
         }`}
       >
-        {user ? `${user.name} 님의 예측 기록` : "예측 기록"}
+        {`${user.name} 님의 예측 기록`}
       </h1>
 
-      {/* --- LOGIN FORM -- */}
-      {!user ? (
-        <div
-          className={`flex gap-4 mb-8 p-4 pt-3 ${isMobile ? "flex-col" : "flex-row"}`}
-        >
-          <Input
-            type="text"
-            value={studentId}
-            onChange={(e) => setStudentId(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="학번을 입력해 주세요"
-            className="flex-grow text-black"
-          />
-          <Button
-            onClick={handleLogin}
-            disabled={isLoading}
-            className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
+      <div className="mb-8 mt-4 flex flex-col items-center">
+        {/* Date Navigation - Single row with previous, date, next */}
+        <div className="flex items-center justify-center gap-1 mb-5 relative">
+          <button
+            onClick={() => navigateDate(-1)}
+            disabled={isPreviousDisabled}
+            className="w-10 h-10 flex items-center justify-center bg-transparent text-bold text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? "로딩 중..." : "로그인"}
-          </Button>
-        </div>
-      ) : (<></>)}
+            &lt;
+          </button>
 
-      {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-
-      {user && !isLoading && (
-        <div className="mb-8 mt-4 flex flex-col items-center">
-          {/* Date Navigation - Single row with previous, date, next */}
-          <div className="flex items-center justify-center gap-1 mb-5 relative">
+          <div className="relative">
             <button
-              onClick={() => navigateDate(-1)}
-              disabled={isPreviousDisabled}
-              className="w-10 h-10 flex items-center justify-center bg-transparent text-bold text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setShowCalendar(!showCalendar)}
+              className="font-bold text-xl text-black cursor-pointer hover:text-gray-700 transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
             >
-              &lt;
+              {formatDateWithWeekday(new Date(selectedDate))}
             </button>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowCalendar(!showCalendar)}
-                className="font-bold text-xl text-black cursor-pointer hover:text-gray-700 transition-colors px-4 py-2 rounded-lg hover:bg-gray-100"
+            {/* Calendar Popup */}
+            {showCalendar && (
+              <div
+                ref={calendarRef}
+                className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 min-w-[280px]"
               >
-                {formatDateWithWeekday(new Date(selectedDate))}
-              </button>
-
-              {/* Calendar Popup */}
-              {showCalendar && (
-                <div
-                  ref={calendarRef}
-                  className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 bg-white border border-gray-300 rounded-lg shadow-lg p-4 z-50 min-w-[280px]"
-                >
-                  <div className="text-center font-semibold mb-3 text-gray-800">
-                    {new Date(selectedDate).toLocaleDateString("ko-KR", {
-                      year: "numeric",
-                      month: "long",
-                    })}
-                  </div>
-
-                  {/* Calendar Header */}
-                  <div className="grid grid-cols-7 gap-1 mb-2">
-                    {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
-                      <div
-                        key={day}
-                        className="text-center text-sm font-medium text-gray-600 py-1"
-                      >
-                        {day}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Calendar Grid */}
-                  <div className="grid grid-cols-7 gap-1">
-                    {generateCalendarDays().map((dayData, index) => (
-                      <div
-                        key={index}
-                        className="h-8 flex items-center justify-center"
-                      >
-                        {dayData ? (
-                          <button
-                            onClick={() =>
-                              handleCalendarDateSelect(dayData.date)
-                            }
-                            disabled={!dayData.isInRange}
-                            className={`w-8 h-8 rounded text-sm transition-colors ${
-                              formatDate(dayData.date) === selectedDate
-                                ? "bg-blue-500 text-white"
-                                : dayData.isInRange
-                                ? "hover:bg-gray-200 text-gray-800"
-                                : "text-gray-300 cursor-not-allowed"
-                            }`}
-                          >
-                            {dayData.day}
-                          </button>
-                        ) : (
-                          <div className="w-8 h-8"></div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                <div className="text-center font-semibold mb-3 text-gray-800">
+                  {new Date(selectedDate).toLocaleDateString("ko-KR", {
+                    year: "numeric",
+                    month: "long",
+                  })}
                 </div>
-              )}
-            </div>
 
-            <button
-              onClick={() => navigateDate(1)}
-              disabled={isNextDisabled}
-              className="w-10 h-10 flex items-center justify-center bg-transparent text-bold text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              &gt;
-            </button>
+                {/* Calendar Header */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {["일", "월", "화", "수", "목", "금", "토"].map((day) => (
+                    <div
+                      key={day}
+                      className="text-center text-sm font-medium text-gray-600 py-1"
+                    >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {generateCalendarDays().map((dayData, index) => (
+                    <div
+                      key={index}
+                      className="h-8 flex items-center justify-center"
+                    >
+                      {dayData ? (
+                        <button
+                          onClick={() =>
+                            handleCalendarDateSelect(dayData.date)
+                          }
+                          disabled={!dayData.isInRange}
+                          className={`w-8 h-8 rounded text-sm transition-colors ${
+                            formatDate(dayData.date) === selectedDate
+                              ? "bg-blue-500 text-white"
+                              : dayData.isInRange
+                              ? "hover:bg-gray-200 text-gray-800"
+                              : "text-gray-300 cursor-not-allowed"
+                          }`}
+                        >
+                          {dayData.day}
+                        </button>
+                      ) : (
+                        <div className="w-8 h-8"></div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Vertical layout for all screen sizes */}
-          <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
-            {/* Daily History Card - appears first */}
-            <div>
-              <DailyHistoryCard userId={user.id} date={selectedDate} />
-            </div>
+          <button
+            onClick={() => navigateDate(1)}
+            disabled={isNextDisabled}
+            className="w-10 h-10 flex items-center justify-center bg-transparent text-bold text-zinc-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            &gt;
+          </button>
+        </div>
 
-            {/* Prediction Ratio Chart - appears second */}
-            <div>
-              <PredictionRatioChart date={selectedDate} />
-            </div>
+        {/* Vertical layout for all screen sizes */}
+        <div className="flex flex-col gap-6 w-full max-w-2xl mx-auto">
+          {/* Daily History Card - appears first */}
+          <div>
+            <DailyHistoryCard userId={user.id} date={selectedDate} />
+          </div>
+
+          {/* Prediction Ratio Chart - appears second */}
+          <div>
+            <PredictionRatioChart date={selectedDate} />
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

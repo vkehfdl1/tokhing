@@ -4,14 +4,14 @@
     "branch": "Feature/stock-market",
     "description": "기존 승부예측(팀 선택 + 점수제)을 LMSR 기반 예측시장으로 완전 전환. 유저가 HOME/AWAY/DRAW 토큰을 매수/매도하여 경기 결과에 베팅하고, 만기 시 정답 토큰은 100코인, 오답 토큰은 0코인으로 정산되는 시스템. Supabase DB + RPC 기반으로 LMSR 엔진을 구현하고, 모바일 퍼스트 UI로 거래 인터페이스를 제공한다. 디자인 철학, 디자인 토큰, 와이어프레임(W-01~W-08)은 prd.md를 반드시 참조할 것."
   },
-  "stories": [
+  "userStories": [
     {
       "id": "US-001",
       "title": "인증 시스템 — 학번 로그인 + 비밀번호 (Supabase 직접 구현)",
       "priority": 1,
-      "status": "pending",
+      "passes": true,
       "description": "학번을 ID로, 전화번호를 초기 비밀번호로 사용하는 간단한 인증 시스템을 구현한다. Supabase Auth는 사용하지 않고, users 테이블에 password_hash 컬럼을 추가하여 직접 관리한다. 최초 로그인 시 비밀번호 변경을 강제한다. 로그인하지 않으면 모든 화면에 접근 불가. UI 와이어프레임은 prd.md의 W-01, W-02 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-001 users 테이블에 password_hash (TEXT) 컬럼 추가. 초기값은 해당 유저의 phone_number를 SHA-256 해시한 값.",
         "REQ-002 users 테이블에 password_changed (BOOLEAN DEFAULT FALSE) 컬럼 추가. 최초 로그인 후 비밀번호 변경 시 TRUE로 설정.",
         "REQ-003 login(p_student_number BIGINT, p_password TEXT) RETURNS JSONB RPC 함수 구현. (1) student_number로 유저 조회, (2) SHA-256(p_password)와 password_hash 비교, (3) 일치 시 {success: true, user_id, username, password_changed} 반환, 불일치 시 {success: false, error: '학번 또는 비밀번호가 올바르지 않습니다'} 반환.",
@@ -27,9 +27,9 @@
       "id": "US-002",
       "title": "DB 스키마 마이그레이션 — 새 테이블 생성 및 기존 테이블 정리",
       "priority": 2,
-      "status": "pending",
+      "passes": false,
       "description": "LMSR 예측시장에 필요한 새로운 DB 테이블을 생성하고 기존 predictions 테이블 사용을 중단한다. Supabase SQL Editor 또는 migration 파일을 통해 실행한다.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-010 wallets 테이블 생성: id (UUID PK), user_id (FK → users.id, UNIQUE), balance (NUMERIC DEFAULT 0), created_at, updated_at. balance는 0 이상이어야 함 (CHECK constraint).",
         "REQ-011 settings 테이블 생성: id (SERIAL PK), key (VARCHAR UNIQUE), value (JSONB), updated_at. 초기 데이터로 liquidity_b 키에 기본값 {\"value\": 10} 삽입.",
         "REQ-012 markets 테이블 생성: id (SERIAL PK), game_id (FK → games.id, UNIQUE), q_home (NUMERIC DEFAULT 0), q_away (NUMERIC DEFAULT 0), q_draw (NUMERIC DEFAULT 0), b (NUMERIC NOT NULL), status (VARCHAR DEFAULT 'OPEN'), result (VARCHAR NULLABLE) — result는 'HOME'/'AWAY'/'DRAW' 중 하나, initial_home_price (NUMERIC), initial_away_price (NUMERIC), initial_draw_price (NUMERIC), created_at, updated_at.",
@@ -45,9 +45,9 @@
       "id": "US-003",
       "title": "LMSR 엔진 — Supabase RPC 함수 구현",
       "priority": 3,
-      "status": "pending",
+      "passes": false,
       "description": "LMSR 비용함수, 가격 계산, 주문 체결, 정산 로직을 Supabase PostgreSQL 함수(RPC)로 구현한다. 모든 거래는 DB 트랜잭션 내에서 atomic하게 처리한다.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-019 lmsr_cost(q_home NUMERIC, q_away NUMERIC, q_draw NUMERIC, b NUMERIC) RETURNS NUMERIC 함수 구현. C = b * ln(exp(q_home/b) + exp(q_away/b) + exp(q_draw/b)) 공식 사용. 수치 오버플로우 방지를 위해 max-shift 기법 적용 (모든 q에서 max(q)를 빼서 계산).",
         "REQ-020 lmsr_prices(market_id INTEGER) RETURNS TABLE(outcome TEXT, price NUMERIC) 함수 구현. softmax 공식으로 각 결과의 현재 가격(0~100 범위) 반환. 3개 가격의 합은 항상 100.",
         "REQ-021 execute_buy_order(p_user_id UUID, p_market_id INTEGER, p_outcome TEXT, p_quantity NUMERIC) RETURNS JSONB 함수 구현. (1) 마켓 OPEN 상태 확인, (2) LMSR 비용 계산 (cost = 100 * (C_after - C_before)), (3) 유저 잔고 확인 및 차감, (4) q값 업데이트, (5) position 업데이트 (upsert), (6) order 기록, (7) transaction 기록. 실패 시 전체 롤백. 반환값: {success, order_id, quantity, total_cost, avg_price, new_balance}.",
@@ -62,9 +62,9 @@
       "id": "US-004",
       "title": "지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급",
       "priority": 4,
-      "status": "pending",
+      "passes": false,
       "description": "유저별 코인 지갑을 관리하고, 매주 자동으로 코인을 지급하는 시스템을 구현한다.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-027 유저가 처음 로그인할 때 wallet이 없으면 자동 생성 (balance = 0).",
         "REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC 함수 구현. 모든 유저에게 p_amount 코인 지급 + transaction 기록. 반환값: {success, users_count, total_distributed}.",
         "REQ-029 Supabase pg_cron 확장을 사용하여 매주 월요일 00:00 KST에 distribute_weekly_coins() 자동 실행. 또는 pg_cron이 불가능할 경우 Admin에서 수동 트리거 버튼 제공.",
@@ -76,9 +76,9 @@
       "id": "US-005",
       "title": "메인 화면 — 마켓 카드 목록 UI",
       "priority": 5,
-      "status": "pending",
+      "passes": false,
       "description": "기존 경기 카드(팀 선택 UI)를 LMSR 마켓 카드로 교체한다. 각 마켓 카드에 실시간 가격이 표시되고, 터치하면 거래 화면으로 이동한다. 디자인은 prd.md의 W-03 와이어프레임 및 디자인 철학/토큰 섹션 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-032 메인 화면에 오늘 경기 마켓 목록을 표시. 각 카드에는: 홈팀/원정팀 이름, 경기시간, HOME/AWAY/DRAW 현재 가격 (0~100), 마켓 상태 (OPEN/CLOSED/SETTLED). 디자인은 prd.md W-03 와이어프레임 따름.",
         "REQ-033 가격 표시는 소수점 1자리까지 (예: 47.5). 가격 색상은 prd.md 디자인 토큰의 금융 UI 색상 따름 (상승=초록, 하락=빨강).",
         "REQ-034 경기 상태에 따른 마켓 카드 표시: SCHEDULED → OPEN (거래 가능), IN_PROGRESS → OPEN (거래 가능), FINISHED → CLOSED (거래 불가, 결과 대기), CANCELED → CANCELED.",
@@ -92,9 +92,9 @@
       "id": "US-006",
       "title": "마켓 상세 & 거래 화면 — 매수/매도 인터페이스",
       "priority": 6,
-      "status": "pending",
+      "passes": false,
       "description": "개별 마켓의 상세 정보와 매수/매도 주문 인터페이스를 제공하는 화면을 구현한다. 디자인은 prd.md의 W-04, W-05 와이어프레임 및 디자인 철학/토큰 섹션 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-039 마켓 상세 화면 (/market/[id]) 상단: 홈팀 vs 원정팀, 경기시간, 마켓 상태, 현재 가격 3개 (HOME/AWAY/DRAW) 큰 글씨로 표시. 팀 컬러 활용.",
         "REQ-040 내 포지션 섹션: 해당 마켓에서 내가 보유한 HOME/AWAY/DRAW 토큰 수량 + 현재 평가금액 (수량 × 현재가) 표시. 포지션이 없으면 '보유 포지션 없음' 표시.",
         "REQ-041 주문 패널: 탭으로 '매수(BUY)' / '매도(SELL)' 전환. 매수 탭: bg-green-500, 매도 탭: bg-red-500. 선택한 탭에 따라 주문 패널 색상 톤 변경.",
@@ -110,9 +110,9 @@
       "id": "US-007",
       "title": "거래 히스토리 & 포지션 관리 화면",
       "priority": 7,
-      "status": "pending",
+      "passes": false,
       "description": "기존 예측 히스토리 화면을 거래 내역 + 포지션 관리 화면으로 교체한다. 디자인은 prd.md의 W-06 와이어프레임 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-048 히스토리 탭 구성: '진행 중 포지션' / '거래 내역' / '정산 내역' 탭. 탭 UI는 기존 디자인 톤 (underline 활성 표시).",
         "REQ-049 '진행 중 포지션' 탭: 현재 보유 중인 모든 마켓의 포지션 목록. 각 항목: 경기 정보, outcome, 보유수량, 평균매수가, 현재가, 미실현 손익 (현재가 - 평균매수가) × 수량. 손익 양수=초록▲, 음수=빨강▼.",
         "REQ-050 '거래 내역' 탭: 최근 주문 목록 (날짜별 그룹핑). 각 항목: 날짜/시간, 경기 정보, BUY(초록)/SELL(빨강), outcome, 수량, 체결금액.",
@@ -124,9 +124,9 @@
       "id": "US-008",
       "title": "리더보드 — 코인 잔고 + 수익률 복합 랭킹",
       "priority": 8,
-      "status": "pending",
+      "passes": false,
       "description": "리더보드를 코인 잔고 순위와 수익률 순위 두 가지 탭으로 제공한다. 디자인은 prd.md의 W-07 와이어프레임 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-053 get_leaderboard_balance() RETURNS TABLE(...) RPC 함수. 코인 잔고 기준 내림차순 정렬. 반환: rank, user_id, username, balance.",
         "REQ-054 get_leaderboard_roi() RETURNS TABLE(...) RPC 함수. 수익률 = (현재잔고 - 누적지급코인) / 누적지급코인 × 100. 반환: rank, user_id, username, roi_percent, current_balance, total_granted.",
         "REQ-055 리더보드 UI에 '잔고 순위' / '수익률 순위' 탭 전환.",
@@ -137,9 +137,9 @@
       "id": "US-009",
       "title": "Admin 패널 — 마켓 관리, 정산, 설정",
       "priority": 9,
-      "status": "pending",
+      "passes": false,
       "description": "Admin 페이지에 마켓 관리, 정산 실행, b값(유동성) 설정, 코인 지급 기능을 추가한다. 디자인은 prd.md의 W-08 와이어프레임 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-057 경기 등록(저장) 시 해당 경기의 마켓이 자동으로 생성됨. 초기 가격: HOME 47.5, AWAY 47.5, DRAW 5.0 (기본값). Admin에서 초기 가격을 커스텀 설정 가능.",
         "REQ-058 '정산 실행' 버튼: 경기 결과(HOME/AWAY/DRAW)를 선택하고 정산을 실행. settle_market RPC 호출. 정산 결과(정산 유저 수, 총 배분 코인) 표시.",
         "REQ-059 '유동성(b값) 설정' 섹션: 현재 전역 b값 표시 + 변경 입력. 변경 시 이후 생성되는 마켓에 적용 (기존 마켓은 그대로).",
@@ -151,9 +151,9 @@
       "id": "US-010",
       "title": "기존 코드 정리 및 마이그레이션",
       "priority": 10,
-      "status": "pending",
+      "passes": false,
       "description": "기존 승부예측 관련 코드를 정리하고, 새로운 LMSR 시스템으로 전환한다.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-062 기존 predictions 관련 API 함수 (submitMultiplePredictions, getTodaysGamesWithPredictions 등)를 새로운 마켓/주문 API로 교체.",
         "REQ-063 기존 calculate_daily_matches RPC를 settle_market으로 교체.",
         "REQ-064 기존 get_prediction_ratios_by_date_grouped RPC를 마켓 가격 표시로 교체.",
@@ -165,9 +165,9 @@
       "id": "US-011",
       "title": "모바일 UI 스타일 통일 및 반응형 고정",
       "priority": 11,
-      "status": "pending",
+      "passes": false,
       "description": "전체 앱을 모바일 인터페이스 크기로 고정하고 (PC에서도), 기존 스타일 톤을 유지한다. 디자인 철학과 토큰은 prd.md 참조.",
-      "acceptance_criteria": [
+      "acceptanceCriteria": [
         "REQ-067 전체 레이아웃 max-width를 430px로 고정. PC에서도 화면 중앙에 모바일 크기로 표시. 외부 배경 #111111 (어두운색).",
         "REQ-068 기존 tokhin-green (#32C600) 브랜딩 컬러, Pretendard 폰트, 하단 네비게이션 패턴 유지.",
         "REQ-069 새로 추가되는 UI 컴포넌트 (주문 패널, 가격 표시, 포지션 카드 등)는 기존 shadcn/ui + Tailwind 패턴을 따름. prd.md 디자인 철학 섹션의 토큰 참조.",

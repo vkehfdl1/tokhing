@@ -1,17 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  getUserByStudentId,
   getTodaysGamesWithPredictions,
   getGamesWithPredictionsForDate,
   submitMultiplePredictions,
   getISODate,
 } from "@/lib/api";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { useUserSession } from "@/lib/hooks/useUserSession";
 
 // --- TYPE DEFINITIONS ---
 type Team = { id: number; name: string };
@@ -82,10 +79,10 @@ function selectTeamColor(teamName: string): {
 
 // --- COMPONENT ---
 export default function HomePage() {
-  const router = useRouter();
   const isMobile = useIsMobile();
-  const [studentId, setStudentId] = useState("");
-  const [user, setUser] = useState<User | null>(null);
+  const { session, isLoading: isSessionLoading } = useUserSession({
+    requireAuth: true,
+  });
   const [todaysGames, setTodaysGames] = useState<Game[]>([]);
   const [selectedPicks, setSelectedPicks] = useState<Map<number, SelectedPick>>(
     new Map()
@@ -93,10 +90,21 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const user: User | null = useMemo(
+    () =>
+      session
+        ? {
+            id: session.user_id,
+            student_number: session.student_number,
+            name: session.username,
+          }
+        : null,
+    [session]
+  );
 
-  // --- DATA FETCHING & LOGIN ---
+  // --- DATA FETCHING ---
   const fetchAndSetGames = useCallback(async () => {
-    if (!user) return;
+    if (!user?.id) return;
 
     setIsLoading(true);
 
@@ -138,36 +146,18 @@ export default function HomePage() {
     }
 
     setIsLoading(false);
-  }, [user]);
-
-  const handleLogin = async () => {
-    if (!studentId) {
-      setError("Please enter your student ID.");
-      return;
-    }
-    setIsLoading(true);
-    setError(null);
-    try {
-      const userData = await getUserByStudentId(studentId);
-      setUser(userData);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setError(err.message);
-      setUser(null);
-    }
-    setIsLoading(false);
-  };
+  }, [user?.id]);
 
   useEffect(() => {
-    if (user) {
-      const fetchGames = async () => {
-        await fetchAndSetGames();
-        // Clear old picks when a new user logs in
-        setSelectedPicks(new Map());
-      };
-      fetchGames();
-    }
-  }, [user, fetchAndSetGames]);
+    if (!session?.user_id) return;
+
+    const fetchGames = async () => {
+      await fetchAndSetGames();
+      // Clear old picks when a new user logs in
+      setSelectedPicks(new Map());
+    };
+    fetchGames();
+  }, [session?.user_id, fetchAndSetGames]);
 
   // --- UI HANDLERS ---
   const handleSelectPick = (
@@ -203,6 +193,14 @@ export default function HomePage() {
     }
   };
 
+  if (isSessionLoading) {
+    return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
   // --- RENDER ---
   return (
     <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
@@ -214,59 +212,21 @@ export default function HomePage() {
         오늘의 토킹 승부 예측
       </h1>
 
-      {/* --- LOGIN FORM -- */}
-      {!user ? (
-        <div>
-          <div
-            className={`flex gap-4 mb-8 ${isMobile ? "flex-col" : "flex-row"}`}
-          >
-            <Input
-              type="text"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="학번을 입력해 주세요"
-              className="flex-grow text-black"
-            />
-            <Button
-              onClick={handleLogin}
-              disabled={isLoading}
-              className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
-            >
-              {isLoading ? "로딩 중..." : "로그인"}
-            </Button>
-          </div>
-
-          {/* Tutorial Button */}
-          <div className="text-center mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/tutorial")}
-              className="text-zinc-500 text-xs underline p-0 h-auto bg-transparent hover:bg-transparent"
-            >
-              토킹이 처음이라면?
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="text-center mb-8">
-          <h2
-            className={`font-semibold text-gray-800 ${
-              isMobile ? "text-base" : "text-2xl"
-            }`}
-          >
-            {user.name}님 환영합니다.
-          </h2>
-        </div>
-      )}
+      <div className="text-center mb-8">
+        <h2
+          className={`font-semibold text-gray-800 ${
+            isMobile ? "text-base" : "text-2xl"
+          }`}
+        >
+          {user.name}님 환영합니다.
+        </h2>
+      </div>
 
       {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-      {user && isLoading && (
-        <p className="text-center text-gray-800">Loading games...</p>
-      )}
+      {isLoading && <p className="text-center text-gray-800">Loading games...</p>}
 
       {/* --- GAMES LIST -- */}
-      {user && !isLoading && (
+      {!isLoading && (
         <div className="space-y-6">
           {todaysGames.map((game) => {
             const hasSubmitted = !!game.prediction;
