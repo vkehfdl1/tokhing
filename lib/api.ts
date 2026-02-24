@@ -49,7 +49,7 @@ export interface AdminUser {
   username: string;
 }
 
-type MarketOutcome = "HOME" | "AWAY" | "DRAW";
+export type MarketOutcome = "HOME" | "AWAY" | "DRAW";
 
 interface TeamWithShortName {
   id: number;
@@ -83,6 +83,48 @@ interface LmsrPriceRow {
   price: number | string;
 }
 
+interface MarketDetailRpcPayload {
+  market?: {
+    id: number | string;
+    game_id: number | string;
+    q_home: number | string;
+    q_away: number | string;
+    q_draw: number | string;
+    b: number | string;
+    status: string;
+    result: string | null;
+    initial_home_price: number | string | null;
+    initial_away_price: number | string | null;
+    initial_draw_price: number | string | null;
+  };
+  prices?: LmsrPriceRow[] | null;
+  game?: {
+    id: number | string;
+    game_date: string;
+    game_time: string | null;
+    game_status: string;
+    home_team: TeamWithShortName | null;
+    away_team: TeamWithShortName | null;
+  };
+}
+
+interface MarketPositionRow {
+  outcome: string;
+  quantity: number | string;
+  avg_entry_price: number | string;
+}
+
+interface OrderRpcResponse {
+  success: boolean;
+  order_id?: number | string;
+  quantity?: number | string;
+  total_cost?: number | string;
+  total_refund?: number | string;
+  avg_price?: number | string;
+  new_balance?: number | string;
+  error?: string;
+}
+
 export interface MarketListItem {
   id: number;
   gameId: number;
@@ -97,6 +139,40 @@ export interface MarketListItem {
   awayTeamShortName: string | null;
   prices: Record<MarketOutcome, number>;
   initialPrices: Record<MarketOutcome, number | null>;
+}
+
+export interface MarketDetailItem {
+  id: number;
+  gameId: number;
+  status: string;
+  result: string | null;
+  b: number;
+  qValues: Record<MarketOutcome, number>;
+  prices: Record<MarketOutcome, number>;
+  initialPrices: Record<MarketOutcome, number | null>;
+  gameDate: string;
+  gameTime: string | null;
+  gameStatus: string;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeTeamShortName: string | null;
+  awayTeamShortName: string | null;
+}
+
+export interface MarketPosition {
+  quantity: number;
+  avgEntryPrice: number;
+}
+
+export type MarketPositionsByOutcome = Record<MarketOutcome, MarketPosition>;
+
+export interface MarketOrderExecutionResult {
+  orderId: number;
+  side: "BUY" | "SELL";
+  quantity: number;
+  totalAmount: number;
+  avgPrice: number;
+  newBalance: number;
 }
 
 const normalizeTeamRelation = (team: TeamRelation): TeamWithShortName | null => {
@@ -117,6 +193,22 @@ const toNumberOrNull = (
   const converted = Number(value);
   return Number.isFinite(converted) ? converted : null;
 };
+
+const isMarketOutcome = (value: string): value is MarketOutcome => {
+  return value === "HOME" || value === "AWAY" || value === "DRAW";
+};
+
+const createEmptyPriceMap = (): Record<MarketOutcome, number> => ({
+  HOME: 0,
+  AWAY: 0,
+  DRAW: 0,
+});
+
+const createEmptyPositionsByOutcome = (): MarketPositionsByOutcome => ({
+  HOME: { quantity: 0, avgEntryPrice: 0 },
+  AWAY: { quantity: 0, avgEntryPrice: 0 },
+  DRAW: { quantity: 0, avgEntryPrice: 0 },
+});
 
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
@@ -778,6 +870,239 @@ export const getMarketListForDate = async (
 
     return a.id - b.id;
   });
+};
+
+const parseOrderResult = (
+  rpcResult: OrderRpcResponse | null,
+  side: "BUY" | "SELL"
+): MarketOrderExecutionResult => {
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "주문 처리에 실패했습니다");
+  }
+
+  const orderId = Number(rpcResult.order_id);
+  const quantity = Number(rpcResult.quantity);
+  const totalAmount = Number(
+    side === "BUY" ? rpcResult.total_cost : rpcResult.total_refund
+  );
+  const avgPrice = Number(rpcResult.avg_price);
+  const newBalance = Number(rpcResult.new_balance);
+
+  if (
+    !Number.isFinite(orderId) ||
+    !Number.isFinite(quantity) ||
+    !Number.isFinite(totalAmount) ||
+    !Number.isFinite(avgPrice) ||
+    !Number.isFinite(newBalance)
+  ) {
+    throw new Error("주문 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    orderId,
+    side,
+    quantity,
+    totalAmount,
+    avgPrice,
+    newBalance,
+  };
+};
+
+export const getMarketDetail = async (
+  marketId: number
+): Promise<MarketDetailItem> => {
+  if (!Number.isFinite(marketId) || marketId <= 0) {
+    throw new Error("유효하지 않은 마켓 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("get_market_detail", {
+    p_market_id: marketId,
+  });
+
+  if (error) {
+    console.error("Error calling get_market_detail RPC:", error);
+    throw new Error("마켓 상세 조회 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as MarketDetailRpcPayload | null;
+  const market = rpcResult?.market;
+  const game = rpcResult?.game;
+
+  if (!market || !game) {
+    throw new Error("마켓 상세 정보가 올바르지 않습니다");
+  }
+
+  const prices = createEmptyPriceMap();
+  (rpcResult.prices ?? []).forEach((row) => {
+    const outcome = row.outcome.toUpperCase();
+    if (!isMarketOutcome(outcome)) {
+      return;
+    }
+
+    const price = Number(row.price);
+    if (Number.isFinite(price)) {
+      prices[outcome] = price;
+    }
+  });
+
+  const homeTeam = normalizeTeamRelation(game.home_team);
+  const awayTeam = normalizeTeamRelation(game.away_team);
+
+  if (!homeTeam || !awayTeam) {
+    throw new Error("팀 정보를 불러오지 못했습니다");
+  }
+
+  const parsedMarketId = Number(market.id);
+  const parsedGameId = Number(market.game_id);
+  const parsedB = Number(market.b);
+
+  if (
+    !Number.isFinite(parsedMarketId) ||
+    !Number.isFinite(parsedGameId) ||
+    !Number.isFinite(parsedB) ||
+    parsedB <= 0
+  ) {
+    throw new Error("마켓 데이터 형식이 올바르지 않습니다");
+  }
+
+  return {
+    id: parsedMarketId,
+    gameId: parsedGameId,
+    status: market.status,
+    result: market.result,
+    b: parsedB,
+    qValues: {
+      HOME: toNumberOrNull(market.q_home) ?? 0,
+      AWAY: toNumberOrNull(market.q_away) ?? 0,
+      DRAW: toNumberOrNull(market.q_draw) ?? 0,
+    },
+    prices,
+    initialPrices: {
+      HOME: toNumberOrNull(market.initial_home_price),
+      AWAY: toNumberOrNull(market.initial_away_price),
+      DRAW: toNumberOrNull(market.initial_draw_price),
+    },
+    gameDate: game.game_date,
+    gameTime: game.game_time ?? null,
+    gameStatus: game.game_status,
+    homeTeamName: homeTeam.name,
+    awayTeamName: awayTeam.name,
+    homeTeamShortName: homeTeam.short_name ?? null,
+    awayTeamShortName: awayTeam.short_name ?? null,
+  };
+};
+
+export const getMarketPositions = async (
+  userId: string,
+  marketId: number
+): Promise<MarketPositionsByOutcome> => {
+  if (!userId) {
+    throw new Error("사용자 정보가 올바르지 않습니다");
+  }
+
+  const defaultPositions = createEmptyPositionsByOutcome();
+  let rows: MarketPositionRow[] = [];
+
+  const { data, error } = await supabase.rpc("get_market_positions", {
+    p_user_id: userId,
+    p_market_id: marketId,
+  });
+
+  if (error) {
+    console.error("Error calling get_market_positions RPC:", error);
+
+    const { data: fallbackRows, error: fallbackError } = await supabase
+      .from("positions")
+      .select("outcome, quantity, avg_entry_price")
+      .eq("user_id", userId)
+      .eq("market_id", marketId);
+
+    if (fallbackError) {
+      console.error("Fallback query failed for market positions:", fallbackError);
+      throw new Error("포지션 조회 중 오류가 발생했습니다");
+    }
+
+    rows = (fallbackRows ?? []) as MarketPositionRow[];
+  } else {
+    rows = (data ?? []) as MarketPositionRow[];
+  }
+
+  rows.forEach((row) => {
+    const outcome = row.outcome.toUpperCase();
+    if (!isMarketOutcome(outcome)) {
+      return;
+    }
+
+    defaultPositions[outcome] = {
+      quantity: toNumberOrNull(row.quantity) ?? 0,
+      avgEntryPrice: toNumberOrNull(row.avg_entry_price) ?? 0,
+    };
+  });
+
+  return defaultPositions;
+};
+
+export const executeBuyOrder = async (
+  userId: string,
+  marketId: number,
+  outcome: MarketOutcome,
+  quantity: number
+): Promise<MarketOrderExecutionResult> => {
+  const { data, error } = await supabase.rpc("execute_buy_order", {
+    p_user_id: userId,
+    p_market_id: marketId,
+    p_outcome: outcome,
+    p_quantity: quantity,
+  });
+
+  if (error) {
+    console.error("Error calling execute_buy_order RPC:", error);
+    throw new Error("매수 주문 처리 중 오류가 발생했습니다");
+  }
+
+  return parseOrderResult(data as OrderRpcResponse | null, "BUY");
+};
+
+export const executeBuyByAmount = async (
+  userId: string,
+  marketId: number,
+  outcome: MarketOutcome,
+  amount: number
+): Promise<MarketOrderExecutionResult> => {
+  const { data, error } = await supabase.rpc("execute_buy_by_amount", {
+    p_user_id: userId,
+    p_market_id: marketId,
+    p_outcome: outcome,
+    p_amount: amount,
+  });
+
+  if (error) {
+    console.error("Error calling execute_buy_by_amount RPC:", error);
+    throw new Error("금액 매수 주문 처리 중 오류가 발생했습니다");
+  }
+
+  return parseOrderResult(data as OrderRpcResponse | null, "BUY");
+};
+
+export const executeSellOrder = async (
+  userId: string,
+  marketId: number,
+  outcome: MarketOutcome,
+  quantity: number
+): Promise<MarketOrderExecutionResult> => {
+  const { data, error } = await supabase.rpc("execute_sell_order", {
+    p_user_id: userId,
+    p_market_id: marketId,
+    p_outcome: outcome,
+    p_quantity: quantity,
+  });
+
+  if (error) {
+    console.error("Error calling execute_sell_order RPC:", error);
+    throw new Error("매도 주문 처리 중 오류가 발생했습니다");
+  }
+
+  return parseOrderResult(data as OrderRpcResponse | null, "SELL");
 };
 
 // Fetch games for a specific date (admin)

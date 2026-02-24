@@ -4,6 +4,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { getWalletBalance } from "@/lib/api";
+import { WALLET_BALANCE_REFRESH_EVENT } from "@/lib/events";
 import { useUserSession } from "@/lib/hooks/useUserSession";
 
 const numberFormatter = new Intl.NumberFormat("ko-KR", {
@@ -53,10 +54,19 @@ export default function AppHeader() {
       void refreshBalance();
     };
 
+    const handleWalletRefresh = () => {
+      void refreshBalance();
+    };
+
     window.addEventListener("focus", handleFocus);
+    window.addEventListener(WALLET_BALANCE_REFRESH_EVENT, handleWalletRefresh);
     return () => {
       window.clearInterval(intervalId);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener(
+        WALLET_BALANCE_REFRESH_EVENT,
+        handleWalletRefresh
+      );
     };
   }, [canShowBalance, refreshBalance]);
 
