@@ -198,10 +198,7 @@ export default function HistoryPage() {
 
   const [activeTab, setActiveTab] = useState<HistoryTab>("OPEN_POSITIONS");
   const [selectedDate, setSelectedDate] = useState(() => {
-    const kstToday = getKSTDate();
-    const kstYesterday = new Date(kstToday);
-    kstYesterday.setDate(kstToday.getDate() - 1);
-    return formatDate(kstYesterday);
+    return formatDate(getKSTDate());
   });
   const [showCalendar, setShowCalendar] = useState(false);
 

@@ -1,4 +1,6 @@
 -- US-007: 거래 히스토리 & 포지션 관리 화면 지원 RPC
+-- CONVENTION: VARCHAR 컬럼을 TEXT RETURNS TABLE에 매핑할 때 반드시 ::TEXT 캐스트 사용
+--             (PostgreSQL은 RETURNS TABLE에서 VARCHAR ≠ TEXT로 취급 → 42804 에러)
 
 -- REQ-049 지원: 진행 중 포지션 조회
 CREATE OR REPLACE FUNCTION public.get_user_open_positions(
@@ -23,7 +25,7 @@ BEGIN
   RETURN QUERY
   SELECT
     p.market_id,
-    p.outcome,
+    p.outcome::TEXT,
     p.quantity,
     p.avg_entry_price,
     p.updated_at
@@ -67,8 +69,8 @@ BEGIN
   SELECT
     o.id,
     o.market_id,
-    o.outcome,
-    o.side,
+    o.outcome::TEXT,
+    o.side::TEXT,
     o.quantity,
     o.total_cost,
     o.avg_price,

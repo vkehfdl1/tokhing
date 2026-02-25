@@ -1,4 +1,5 @@
 -- US-006: 마켓 상세 & 거래 화면 지원 RPC
+-- CONVENTION: VARCHAR 컬럼을 TEXT RETURNS TABLE에 매핑할 때 반드시 ::TEXT 캐스트 사용
 
 -- REQ-040 지원: 특정 유저의 마켓 포지션 조회
 CREATE OR REPLACE FUNCTION public.get_market_positions(
@@ -29,7 +30,7 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    p.outcome,
+    p.outcome::TEXT,
     p.quantity,
     p.avg_entry_price
   FROM public.positions p

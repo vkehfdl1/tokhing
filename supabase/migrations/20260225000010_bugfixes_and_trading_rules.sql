@@ -21,7 +21,9 @@ ALTER TABLE public.positions
 
 -- ============================================================
 -- 3) get_market_positions: purchased_at 반환 추가
+--    리턴 타입 변경이므로 DROP 후 재생성 필요
 -- ============================================================
+DROP FUNCTION IF EXISTS public.get_market_positions(UUID, INTEGER);
 CREATE OR REPLACE FUNCTION public.get_market_positions(
   p_user_id UUID,
   p_market_id INTEGER
@@ -51,7 +53,7 @@ BEGIN
 
   RETURN QUERY
   SELECT
-    p.outcome,
+    p.outcome::TEXT,
     p.quantity,
     p.avg_entry_price,
     p.purchased_at
@@ -623,3 +625,151 @@ EXCEPTION
     );
 END;
 $$;
+
+-- ============================================================
+-- 7) DROP 후 재생성된 get_market_positions에 대한 GRANT 복원
+-- ============================================================
+GRANT EXECUTE ON FUNCTION public.get_market_positions(UUID, INTEGER) TO anon, authenticated;
+
+-- ============================================================
+-- 8) VARCHAR→TEXT 타입 불일치 수정
+--    positions.outcome, orders.outcome, orders.side 컬럼은 VARCHAR인데
+--    RPC RETURNS TABLE에서 TEXT로 선언하여 42804 에러 발생
+--    → SELECT에서 ::TEXT 캐스트 추가
+-- ============================================================
+
+-- 8-a) get_market_positions: outcome VARCHAR → TEXT 캐스트
+DROP FUNCTION IF EXISTS public.get_market_positions(UUID, INTEGER);
+CREATE OR REPLACE FUNCTION public.get_market_positions(
+  p_user_id UUID,
+  p_market_id INTEGER
+)
+RETURNS TABLE(
+  outcome TEXT,
+  quantity NUMERIC,
+  avg_entry_price NUMERIC,
+  purchased_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION '사용자 정보가 올바르지 않습니다';
+  END IF;
+
+  IF p_market_id IS NULL THEN
+    RAISE EXCEPTION '마켓 정보가 올바르지 않습니다';
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM public.markets WHERE id = p_market_id) THEN
+    RAISE EXCEPTION '마켓을 찾을 수 없습니다';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    p.outcome::TEXT,
+    p.quantity,
+    p.avg_entry_price,
+    p.purchased_at
+  FROM public.positions p
+  WHERE p.user_id = p_user_id
+    AND p.market_id = p_market_id
+    AND p.quantity > 0
+  ORDER BY CASE p.outcome
+    WHEN 'HOME' THEN 1
+    WHEN 'AWAY' THEN 2
+    ELSE 3
+  END;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_market_positions(UUID, INTEGER) TO anon, authenticated;
+
+-- 8-b) get_user_open_positions: outcome VARCHAR → TEXT 캐스트
+DROP FUNCTION IF EXISTS public.get_user_open_positions(UUID);
+CREATE OR REPLACE FUNCTION public.get_user_open_positions(
+  p_user_id UUID
+)
+RETURNS TABLE(
+  market_id INTEGER,
+  outcome TEXT,
+  quantity NUMERIC,
+  avg_entry_price NUMERIC,
+  updated_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION '사용자 정보가 올바르지 않습니다';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    p.market_id,
+    p.outcome::TEXT,
+    p.quantity,
+    p.avg_entry_price,
+    p.updated_at
+  FROM public.positions p
+  WHERE p.user_id = p_user_id
+    AND p.quantity > 0
+  ORDER BY p.updated_at DESC, p.market_id DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_user_open_positions(UUID) TO anon, authenticated;
+
+-- 8-c) get_user_orders_by_date: outcome/side VARCHAR → TEXT 캐스트
+DROP FUNCTION IF EXISTS public.get_user_orders_by_date(UUID, TIMESTAMPTZ, TIMESTAMPTZ);
+CREATE OR REPLACE FUNCTION public.get_user_orders_by_date(
+  p_user_id UUID,
+  p_start_at TIMESTAMPTZ,
+  p_end_at TIMESTAMPTZ
+)
+RETURNS TABLE(
+  order_id INTEGER,
+  market_id INTEGER,
+  outcome TEXT,
+  side TEXT,
+  quantity NUMERIC,
+  total_cost NUMERIC,
+  avg_price NUMERIC,
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF p_user_id IS NULL THEN
+    RAISE EXCEPTION '사용자 정보가 올바르지 않습니다';
+  END IF;
+
+  IF p_start_at IS NULL OR p_end_at IS NULL OR p_start_at >= p_end_at THEN
+    RAISE EXCEPTION '조회 기간이 올바르지 않습니다';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    o.id,
+    o.market_id,
+    o.outcome::TEXT,
+    o.side::TEXT,
+    o.quantity,
+    o.total_cost,
+    o.avg_price,
+    o.created_at
+  FROM public.orders o
+  WHERE o.user_id = p_user_id
+    AND o.created_at >= p_start_at
+    AND o.created_at < p_end_at
+  ORDER BY o.created_at DESC, o.id DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_user_orders_by_date(UUID, TIMESTAMPTZ, TIMESTAMPTZ) TO anon, authenticated;

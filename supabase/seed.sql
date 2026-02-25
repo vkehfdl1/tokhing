@@ -18,16 +18,7 @@ DELETE FROM public.predictions;
 DELETE FROM public.games;
 DELETE FROM public.users;
 
-INSERT INTO public.users (id, student_number, username, phone_number, department, type, favorite_team_id, password_hash, password_changed, created_at, updated_at)
-VALUES
-  ('a1111111-1111-1111-1111-111111111111', 2024001, '김테스트', '01012345678', '컴퓨터공학과', 'member', 1,
-   encode(digest('01012345678', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
-  ('a2222222-2222-2222-2222-222222222222', 2024002, '박예측', '01087654321', '경영학과', 'member', 9,
-   encode(digest('01087654321', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
-  ('a3333333-3333-3333-3333-333333333333', 2024003, '이마켓', '01011112222', '통계학과', 'member', 2,
-   encode(digest('01011112222', 'sha256'), 'hex'), FALSE, NOW(), NOW());
-
--- 2) 팀 데이터 (기존 것 유지하되 없으면 삽입)
+-- 1) 팀 데이터 (users FK 참조 대상이므로 먼저 삽입)
 INSERT INTO public.teams (id, name, short_name, created_at)
 VALUES
   (1, 'KIA 타이거즈', 'KIA', NOW()),
@@ -41,6 +32,16 @@ VALUES
   (9, 'LG 트윈스', 'LG', NOW()),
   (10, '한화 이글스', '한화', NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- 2) 테스트 유저 3명
+INSERT INTO public.users (id, student_number, username, phone_number, department, type, favorite_team_id, password_hash, password_changed, created_at, updated_at)
+VALUES
+  ('a1111111-1111-1111-1111-111111111111', 2024001, '김테스트', '01012345678', '컴퓨터공학과', 'member', 1,
+   encode(digest('01012345678', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
+  ('a2222222-2222-2222-2222-222222222222', 2024002, '박예측', '01087654321', '경영학과', 'member', 9,
+   encode(digest('01087654321', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
+  ('a3333333-3333-3333-3333-333333333333', 2024003, '이마켓', '01011112222', '통계학과', 'member', 2,
+   encode(digest('01011112222', 'sha256'), 'hex'), FALSE, NOW(), NOW());
 
 -- 3) 오늘 경기 5개 (다양한 상태)
 INSERT INTO public.games (id, game_date, game_time, home_team_id, away_team_id, home_pitcher, away_pitcher, home_score, away_score, game_status, created_at, updated_at)
