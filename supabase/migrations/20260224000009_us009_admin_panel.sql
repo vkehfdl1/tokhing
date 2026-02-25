@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.set_liquidity_b(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_previous_b NUMERIC;
@@ -52,7 +52,7 @@ CREATE OR REPLACE FUNCTION public.close_market(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_market public.markets%ROWTYPE;
@@ -108,7 +108,7 @@ CREATE OR REPLACE FUNCTION public.cancel_market(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_market public.markets%ROWTYPE;
@@ -226,7 +226,7 @@ CREATE OR REPLACE FUNCTION public.get_weekly_coin_cron_status()
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_has_pg_cron BOOLEAN := FALSE;

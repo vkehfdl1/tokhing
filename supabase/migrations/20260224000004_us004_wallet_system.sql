@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.login(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, extensions
+SET search_path = public, extensions, extensions
 AS $$
 DECLARE
   v_user RECORD;
@@ -57,7 +57,7 @@ CREATE OR REPLACE FUNCTION public.distribute_weekly_coins(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_users_count INTEGER := 0;
@@ -127,7 +127,7 @@ CREATE OR REPLACE FUNCTION public.admin_grant_coins(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_wallet public.wallets%ROWTYPE;
@@ -204,7 +204,7 @@ CREATE OR REPLACE FUNCTION public.get_wallet_balance(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_balance NUMERIC := 0;

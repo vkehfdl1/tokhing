@@ -40,7 +40,7 @@ CREATE OR REPLACE FUNCTION public.lmsr_prices(
 RETURNS TABLE(outcome TEXT, price NUMERIC)
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_q_home NUMERIC;
@@ -88,7 +88,7 @@ CREATE OR REPLACE FUNCTION public.execute_buy_order(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -289,7 +289,7 @@ CREATE OR REPLACE FUNCTION public.execute_sell_order(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -469,7 +469,7 @@ CREATE OR REPLACE FUNCTION public.execute_buy_by_amount(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -601,7 +601,7 @@ CREATE OR REPLACE FUNCTION public.settle_market(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_result TEXT;
@@ -728,7 +728,7 @@ CREATE OR REPLACE FUNCTION public.create_market(
 RETURNS INTEGER
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_b NUMERIC;
@@ -796,7 +796,7 @@ CREATE OR REPLACE FUNCTION public.get_market_detail(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_detail RECORD;

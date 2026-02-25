@@ -36,7 +36,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF p_user_id IS NULL THEN
@@ -81,7 +81,7 @@ CREATE OR REPLACE FUNCTION public.execute_buy_order(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -296,7 +296,7 @@ CREATE OR REPLACE FUNCTION public.execute_sell_order(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -493,7 +493,7 @@ CREATE OR REPLACE FUNCTION public.execute_buy_by_amount(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_outcome TEXT;
@@ -652,7 +652,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF p_user_id IS NULL THEN
@@ -701,7 +701,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF p_user_id IS NULL THEN
@@ -743,7 +743,7 @@ RETURNS TABLE(
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF p_user_id IS NULL THEN
