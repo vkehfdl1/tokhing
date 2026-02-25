@@ -37,6 +37,7 @@ interface ToastState {
 }
 
 const OUTCOMES: MarketOutcome[] = ["HOME", "AWAY", "DRAW"];
+const DISPLAY_OUTCOMES: MarketOutcome[] = ["AWAY", "DRAW", "HOME"];
 
 const STATUS_BADGE_CLASSES: Record<DisplayMarketStatus, string> = {
   OPEN: "bg-tokhin-green/10 text-tokhin-green",
@@ -796,7 +797,7 @@ export default function MarketDetailPage() {
           <div className="my-4 h-px w-full bg-zinc-200" />
 
           <div className="grid grid-cols-3 gap-2">
-            {OUTCOMES.map((outcome) => (
+            {DISPLAY_OUTCOMES.map((outcome) => (
               <div key={`label-${outcome}`} className="text-center">
                 <p
                   className={`text-xs font-semibold ${getOutcomeColorClass(
@@ -810,7 +811,7 @@ export default function MarketDetailPage() {
               </div>
             ))}
 
-            {OUTCOMES.map((outcome) => (
+            {DISPLAY_OUTCOMES.map((outcome) => (
               <div key={outcome} className="text-center">
                 <p
                   className={`text-3xl font-bold tabular-nums ${getPriceTrendClass(
@@ -830,7 +831,7 @@ export default function MarketDetailPage() {
 
           {hasAnyPosition ? (
             <div className="mt-3 space-y-2">
-              {OUTCOMES.map((outcome) => {
+              {DISPLAY_OUTCOMES.map((outcome) => {
                 const quantity = positions[outcome].quantity;
                 const valuation = quantity * marketDetail.prices[outcome];
 
@@ -904,7 +905,7 @@ export default function MarketDetailPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
-            {OUTCOMES.map((outcome) => {
+            {DISPLAY_OUTCOMES.map((outcome) => {
               const isDisabledForSell =
                 tradeSide === "SELL" && positions[outcome].quantity <= 0;
               const isSelected = selectedOutcome === outcome;
