@@ -620,10 +620,6 @@ export default function HistoryPage() {
           ) : (
             groupedOrderHistory.map((group) => (
               <section key={group.dateLabel}>
-                <h2 className="mb-2 text-sm font-semibold text-zinc-500">
-                  {group.dateLabel}
-                </h2>
-
                 <div className="space-y-3">
                   {group.items.map((order) => {
                     const homeTeamName = getDisplayTeamName(
