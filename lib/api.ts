@@ -356,6 +356,13 @@ export interface LeaderboardRoiItem {
   totalGranted: number;
 }
 
+export interface PriceSnapshotItem {
+  homePrice: number;
+  awayPrice: number;
+  drawPrice: number;
+  snapshotAt: string;
+}
+
 export interface AdminInitialPricesInput {
   HOME: number;
   AWAY: number;
@@ -1050,6 +1057,39 @@ export const getMarketPositions = async (
   });
 
   return defaultPositions;
+};
+
+interface PriceSnapshotRpcRow {
+  home_price: number | string;
+  away_price: number | string;
+  draw_price: number | string;
+  snapshot_at: string;
+}
+
+export const getPriceSnapshots = async (
+  marketId: number
+): Promise<PriceSnapshotItem[]> => {
+  if (!Number.isFinite(marketId) || marketId <= 0) {
+    throw new Error("유효하지 않은 마켓 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("get_price_snapshots", {
+    p_market_id: marketId,
+  });
+
+  if (error) {
+    console.error("Error calling get_price_snapshots RPC:", error);
+    throw new Error("가격 스냅샷 조회 중 오류가 발생했습니다");
+  }
+
+  const rows = (data ?? []) as PriceSnapshotRpcRow[];
+
+  return rows.map((row) => ({
+    homePrice: toNumberOrNull(row.home_price) ?? 0,
+    awayPrice: toNumberOrNull(row.away_price) ?? 0,
+    drawPrice: toNumberOrNull(row.draw_price) ?? 0,
+    snapshotAt: row.snapshot_at,
+  }));
 };
 
 export const getOpenPositionsHistory = async (

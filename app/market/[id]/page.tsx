@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,11 +11,13 @@ import {
   executeSellOrder,
   getMarketDetail,
   getMarketPositions,
+  getPriceSnapshots,
   getWalletBalance,
   isMarketClosedHours,
   type MarketDetailItem,
   type MarketOutcome,
   type MarketPositionsByOutcome,
+  type PriceSnapshotItem,
 } from "@/lib/api";
 import { notifyWalletBalanceRefresh } from "@/lib/events";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -285,6 +287,175 @@ const getOutcomeLabel = (
   return "무승부";
 };
 
+type ChartOutcomeTab = "AWAY" | "DRAW" | "HOME";
+
+interface OhlcCandle {
+  time: number; // UTCTimestamp (seconds)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+const CHART_INTERVAL_MS = 10 * 60 * 1000; // 10분
+
+const aggregateToOhlc = (
+  snapshots: PriceSnapshotItem[],
+  outcomeKey: "homePrice" | "awayPrice" | "drawPrice"
+): OhlcCandle[] => {
+  if (snapshots.length === 0) return [];
+
+  const buckets = new Map<number, number[]>();
+
+  for (const snap of snapshots) {
+    const ts = new Date(snap.snapshotAt).getTime();
+    const bucketStart = Math.floor(ts / CHART_INTERVAL_MS) * CHART_INTERVAL_MS;
+    const existing = buckets.get(bucketStart);
+    if (existing) {
+      existing.push(snap[outcomeKey]);
+    } else {
+      buckets.set(bucketStart, [snap[outcomeKey]]);
+    }
+  }
+
+  const sortedKeys = Array.from(buckets.keys()).sort((a, b) => a - b);
+  const candles: OhlcCandle[] = [];
+  let lastClose = snapshots[0][outcomeKey];
+
+  if (sortedKeys.length > 0) {
+    const first = sortedKeys[0];
+    const last = sortedKeys[sortedKeys.length - 1];
+
+    for (let t = first; t <= last; t += CHART_INTERVAL_MS) {
+      const prices = buckets.get(t);
+      const timeSec = Math.floor(t / 1000);
+
+      if (prices && prices.length > 0) {
+        const open = prices[0];
+        const close = prices[prices.length - 1];
+        const high = Math.max(...prices);
+        const low = Math.min(...prices);
+        candles.push({ time: timeSec, open, high, low, close });
+        lastClose = close;
+      } else {
+        candles.push({
+          time: timeSec,
+          open: lastClose,
+          high: lastClose,
+          low: lastClose,
+          close: lastClose,
+        });
+      }
+    }
+  }
+
+  return candles;
+};
+
+const OUTCOME_TO_PRICE_KEY: Record<
+  ChartOutcomeTab,
+  "homePrice" | "awayPrice" | "drawPrice"
+> = {
+  HOME: "homePrice",
+  AWAY: "awayPrice",
+  DRAW: "drawPrice",
+};
+
+function CandlestickChart({
+  snapshots,
+  outcomeKey,
+}: {
+  snapshots: PriceSnapshotItem[];
+  outcomeKey: "homePrice" | "awayPrice" | "drawPrice";
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chartRef = useRef<any>(null);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const candles = aggregateToOhlc(snapshots, outcomeKey);
+    if (candles.length === 0) return;
+
+    let cancelled = false;
+
+    import("lightweight-charts").then(({ createChart, CandlestickSeries }) => {
+      if (cancelled || !containerRef.current) return;
+
+      // Remove old chart
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+
+      const chart = createChart(containerRef.current, {
+        width: containerRef.current.clientWidth,
+        height: 250,
+        layout: {
+          background: { color: "#FFFFFF" },
+          textColor: "#71717A",
+          fontSize: 11,
+        },
+        grid: {
+          vertLines: { color: "#F4F4F5" },
+          horzLines: { color: "#F4F4F5" },
+        },
+        rightPriceScale: {
+          borderColor: "#E4E4E7",
+          scaleMargins: { top: 0.1, bottom: 0.1 },
+        },
+        timeScale: {
+          borderColor: "#E4E4E7",
+          timeVisible: true,
+          secondsVisible: false,
+        },
+      });
+
+      const series = chart.addSeries(CandlestickSeries, {
+        upColor: "#EF4444",
+        downColor: "#3B82F6",
+        borderUpColor: "#EF4444",
+        borderDownColor: "#3B82F6",
+        wickUpColor: "#EF4444",
+        wickDownColor: "#3B82F6",
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      series.setData(candles as any);
+      chart.timeScale().fitContent();
+      chartRef.current = chart;
+
+      const handleResize = () => {
+        if (containerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: containerRef.current.clientWidth,
+          });
+        }
+      };
+
+      window.addEventListener("resize", handleResize);
+
+      // Store cleanup for resize listener
+      (el as HTMLElement & { _chartCleanup?: () => void })._chartCleanup = () => {
+        window.removeEventListener("resize", handleResize);
+      };
+    });
+
+    return () => {
+      cancelled = true;
+      (el as HTMLElement & { _chartCleanup?: () => void })._chartCleanup?.();
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+    };
+  }, [snapshots, outcomeKey]);
+
+  return <div ref={containerRef} />;
+}
+
 export default function MarketDetailPage() {
   const { session, isLoading } = useUserSession({ requireAuth: true });
   const params = useParams<{ id: string }>();
@@ -300,6 +471,9 @@ export default function MarketDetailPage() {
   const [walletBalance, setWalletBalance] = useState(0);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [priceSnapshots, setPriceSnapshots] = useState<PriceSnapshotItem[]>([]);
+  const [chartTab, setChartTab] = useState<ChartOutcomeTab>("AWAY");
 
   const [tradeSide, setTradeSide] = useState<TradeSide>("BUY");
   const [buyInputMode, setBuyInputMode] = useState<BuyInputMode>("QUANTITY");
@@ -321,15 +495,17 @@ export default function MarketDetailPage() {
     setError(null);
 
     try {
-      const [detail, userPositions, balance] = await Promise.all([
+      const [detail, userPositions, balance, snapshots] = await Promise.all([
         getMarketDetail(marketId),
         getMarketPositions(session.user_id, marketId),
         getWalletBalance(session.user_id),
+        getPriceSnapshots(marketId),
       ]);
 
       setMarketDetail(detail);
       setPositions(userPositions);
       setWalletBalance(balance);
+      setPriceSnapshots(snapshots);
     } catch (loadError) {
       console.error("Failed to load market detail page data:", loadError);
       setError("마켓 정보를 불러오는 중 오류가 발생했습니다");
@@ -823,6 +999,60 @@ export default function MarketDetailPage() {
                 </p>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl bg-white p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">
+          <h2 className="text-base font-semibold text-black">가격 차트</h2>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {(["AWAY", "DRAW", "HOME"] as const).map((tab) => {
+              const isSelected = chartTab === tab;
+              const label =
+                tab === "DRAW"
+                  ? "무승부"
+                  : tab === "HOME"
+                    ? homeTeamName
+                    : awayTeamName;
+              const teamName =
+                tab === "HOME"
+                  ? homeTeamName
+                  : tab === "AWAY"
+                    ? awayTeamName
+                    : "";
+              const colorClass =
+                tab === "DRAW"
+                  ? "border-zinc-500 bg-zinc-500/10 text-zinc-700"
+                  : `border-current ${getTeamTextColorClass(teamName)}`;
+
+              return (
+                <button
+                  key={`chart-tab-${tab}`}
+                  type="button"
+                  onClick={() => setChartTab(tab)}
+                  className={`rounded-lg border px-2 py-1.5 text-center text-sm font-semibold transition ${
+                    isSelected
+                      ? colorClass
+                      : "border-zinc-200 bg-white text-zinc-400"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3">
+            {priceSnapshots.length > 0 ? (
+              <CandlestickChart
+                snapshots={priceSnapshots}
+                outcomeKey={OUTCOME_TO_PRICE_KEY[chartTab]}
+              />
+            ) : (
+              <div className="flex h-[250px] items-center justify-center">
+                <p className="text-sm text-zinc-400">아직 거래가 없습니다</p>
+              </div>
+            )}
           </div>
         </section>
 
