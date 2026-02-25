@@ -585,12 +585,12 @@ export default function HistoryPage() {
                 >
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="text-base font-bold text-black">
-                      <span className={getTeamTextColorClass(homeTeamName)}>
-                        {homeTeamName}
-                      </span>
-                      <span className="px-1 text-zinc-400">vs</span>
                       <span className={getTeamTextColorClass(awayTeamName)}>
                         {awayTeamName}
+                      </span>
+                      <span className="px-1 text-zinc-400">vs</span>
+                      <span className={getTeamTextColorClass(homeTeamName)}>
+                        {homeTeamName}
                       </span>
                     </p>
                     <p className="text-xs text-zinc-500">
@@ -666,12 +666,12 @@ export default function HistoryPage() {
                         </div>
 
                         <p className="text-sm font-semibold text-black">
-                          <span className={getTeamTextColorClass(homeTeamName)}>
-                            {homeTeamName}
-                          </span>
-                          <span className="px-1 text-zinc-400">vs</span>
                           <span className={getTeamTextColorClass(awayTeamName)}>
                             {awayTeamName}
+                          </span>
+                          <span className="px-1 text-zinc-400">vs</span>
+                          <span className={getTeamTextColorClass(homeTeamName)}>
+                            {homeTeamName}
                           </span>
                         </p>
 
@@ -717,12 +717,12 @@ export default function HistoryPage() {
                 >
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <p className="text-base font-bold text-black">
-                      <span className={getTeamTextColorClass(homeTeamName)}>
-                        {homeTeamName}
-                      </span>
-                      <span className="px-1 text-zinc-400">vs</span>
                       <span className={getTeamTextColorClass(awayTeamName)}>
                         {awayTeamName}
+                      </span>
+                      <span className="px-1 text-zinc-400">vs</span>
+                      <span className={getTeamTextColorClass(homeTeamName)}>
+                        {homeTeamName}
                       </span>
                     </p>
                     <p className="text-xs text-zinc-500">
