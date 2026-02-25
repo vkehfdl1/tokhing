@@ -759,20 +759,39 @@ export default function MarketDetailPage() {
         {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
         <section className="rounded-2xl bg-white p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">
-          <h1 className="text-xl font-bold text-black">
-            <span className={getTeamTextColorClass(homeTeamName)}>
-              {homeTeamName}
-            </span>
-            <span className="px-1 text-zinc-400">vs</span>
-            <span className={getTeamTextColorClass(awayTeamName)}>
-              {awayTeamName}
-            </span>
-          </h1>
-
-          <p className="mt-1 text-sm text-zinc-500">
-            {formatGameDate(marketDetail.gameDate)} ·{" "}
-            {formatGameTime(marketDetail.gameTime)}
+          <p className="text-center text-xs text-zinc-500">
+            {formatGameDate(marketDetail.gameDate)} · {formatGameTime(marketDetail.gameTime)}
           </p>
+
+          <div className="mt-3 flex items-center justify-center gap-4">
+            <div className="flex-1 text-center">
+              <p className={`text-lg font-bold ${getTeamTextColorClass(awayTeamName)}`}>
+                {awayTeamName}
+              </p>
+              {marketDetail.awayPitcher ? (
+                <p className="mt-1 text-xs text-zinc-400">{marketDetail.awayPitcher}</p>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col items-center">
+              {marketDetail.homeScore !== null && marketDetail.awayScore !== null ? (
+                <p className="text-2xl font-bold tabular-nums text-black">
+                  {marketDetail.awayScore} <span className="text-zinc-300">:</span> {marketDetail.homeScore}
+                </p>
+              ) : (
+                <p className="text-lg font-semibold text-zinc-300">vs</p>
+              )}
+            </div>
+
+            <div className="flex-1 text-center">
+              <p className={`text-lg font-bold ${getTeamTextColorClass(homeTeamName)}`}>
+                {homeTeamName}
+              </p>
+              {marketDetail.homePitcher ? (
+                <p className="mt-1 text-xs text-zinc-400">{marketDetail.homePitcher}</p>
+              ) : null}
+            </div>
+          </div>
 
           <div className="my-4 h-px w-full bg-zinc-200" />
 

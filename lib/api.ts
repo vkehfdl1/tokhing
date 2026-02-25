@@ -136,6 +136,10 @@ interface MarketDetailRpcPayload {
     game_date: string;
     game_time: string | null;
     game_status: string;
+    home_pitcher: string | null;
+    away_pitcher: string | null;
+    home_score: number | string | null;
+    away_score: number | string | null;
     home_team: TeamWithShortName | null;
     away_team: TeamWithShortName | null;
   };
@@ -264,6 +268,10 @@ export interface MarketDetailItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+  homePitcher: string | null;
+  awayPitcher: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
 }
 
 export interface MarketPosition {
@@ -986,6 +994,10 @@ export const getMarketDetail = async (
     awayTeamName: awayTeam.name,
     homeTeamShortName: homeTeam.short_name ?? null,
     awayTeamShortName: awayTeam.short_name ?? null,
+    homePitcher: game.home_pitcher ?? null,
+    awayPitcher: game.away_pitcher ?? null,
+    homeScore: toNumberOrNull(game.home_score),
+    awayScore: toNumberOrNull(game.away_score),
   };
 };
 
