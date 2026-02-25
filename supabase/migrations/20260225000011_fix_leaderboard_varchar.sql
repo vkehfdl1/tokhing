@@ -1,6 +1,12 @@
--- US-008: 리더보드 — 코인 잔고 + 수익률 복합 랭킹
+-- Fix: 리더보드 함수 VARCHAR→TEXT 42804 에러 수정
+-- users.username이 VARCHAR(50)인데 RETURNS TABLE에서 TEXT로 선언되어
+-- "Returned type character varying(50) does not match expected type text" 에러 발생
+-- Convention: VARCHAR 컬럼 → TEXT 리턴 시 반드시 ::TEXT 캐스트 사용
 
--- REQ-053: 코인 잔고 순위 조회
+-- ============================================================
+-- 1) get_leaderboard_balance: u.username → u.username::TEXT
+-- ============================================================
+DROP FUNCTION IF EXISTS public.get_leaderboard_balance();
 CREATE OR REPLACE FUNCTION public.get_leaderboard_balance()
 RETURNS TABLE(
   rank BIGINT,
@@ -49,7 +55,12 @@ BEGIN
 END;
 $$;
 
--- REQ-054: 수익률 순위 조회
+GRANT EXECUTE ON FUNCTION public.get_leaderboard_balance() TO anon, authenticated;
+
+-- ============================================================
+-- 2) get_leaderboard_roi: u.username → u.username::TEXT
+-- ============================================================
+DROP FUNCTION IF EXISTS public.get_leaderboard_roi();
 CREATE OR REPLACE FUNCTION public.get_leaderboard_roi()
 RETURNS TABLE(
   rank BIGINT,
@@ -129,5 +140,4 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.get_leaderboard_balance() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_leaderboard_roi() TO anon, authenticated;
