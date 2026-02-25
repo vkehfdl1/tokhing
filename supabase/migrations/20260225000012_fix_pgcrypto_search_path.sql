@@ -1,18 +1,11 @@
--- US-001: 학번 로그인 + 비밀번호 인증 시스템
--- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+-- Fix: login/change_password 함수에서 digest() 못 찾는 42883 에러 수정
+-- pgcrypto 확장이 extensions 스키마에 설치되어 있는데
+-- SET search_path = public 으로 제한되어 digest() 함수를 찾지 못함
+-- → search_path에 extensions 추가
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-ALTER TABLE public.users
-ADD COLUMN IF NOT EXISTS password_hash TEXT;
-
-ALTER TABLE public.users
-ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
-
-UPDATE public.users
-SET password_hash = encode(digest(phone_number::TEXT, 'sha256'), 'hex')
-WHERE password_hash IS NULL;
-
+-- ============================================================
+-- 1) login: search_path에 extensions 추가
+-- ============================================================
 CREATE OR REPLACE FUNCTION public.login(
   p_student_number BIGINT,
   p_password TEXT
@@ -48,6 +41,10 @@ BEGIN
     );
   END IF;
 
+  INSERT INTO public.wallets (user_id, balance)
+  VALUES (v_user.id, 0)
+  ON CONFLICT (user_id) DO NOTHING;
+
   RETURN jsonb_build_object(
     'success', TRUE,
     'user_id', v_user.id,
@@ -57,6 +54,9 @@ BEGIN
 END;
 $$;
 
+-- ============================================================
+-- 2) change_password: search_path에 extensions 추가
+-- ============================================================
 CREATE OR REPLACE FUNCTION public.change_password(
   p_user_id UUID,
   p_new_password TEXT
