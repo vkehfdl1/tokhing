@@ -54,8 +54,8 @@ VALUES
 
 -- 4) settings (b값)
 INSERT INTO public.settings (key, value, updated_at)
-VALUES ('liquidity_b', '{"value": 10}', NOW())
-ON CONFLICT (key) DO UPDATE SET value = '{"value": 10}', updated_at = NOW();
+VALUES ('liquidity_b', '{"value": 200}', NOW())
+ON CONFLICT (key) DO UPDATE SET value = '{"value": 200}', updated_at = NOW();
 
 -- 5) 마켓 생성 (create_market RPC 사용)
 SELECT create_market(901, 47.5, 47.5, 5.0);  -- KIA vs 삼성 (OPEN)
