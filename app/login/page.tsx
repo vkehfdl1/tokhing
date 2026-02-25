@@ -12,6 +12,7 @@ import {
   setPendingPasswordChangeSession,
   setUserSession,
 } from "@/lib/auth";
+import Image from "next/image";
 import { login } from "@/lib/api";
 
 export default function LoginPage() {
@@ -85,8 +86,15 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-[calc(100vh-120px)] flex flex-col justify-center pb-10">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-black">승부예측 마켓</h1>
+      <div className="flex justify-center mb-6">
+        <Image
+          src="/toKHin.svg"
+          alt="ToKHin' Logo"
+          width={160}
+          height={80}
+          priority
+          className="h-auto"
+        />
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">

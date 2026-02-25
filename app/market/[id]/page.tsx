@@ -12,6 +12,7 @@ import {
   getMarketDetail,
   getMarketPositions,
   getWalletBalance,
+  isMarketClosedHours,
   type MarketDetailItem,
   type MarketOutcome,
   type MarketPositionsByOutcome,
@@ -59,9 +60,9 @@ const quantityFormatter = new Intl.NumberFormat("ko-KR", {
 });
 
 const createEmptyPositionsByOutcome = (): MarketPositionsByOutcome => ({
-  HOME: { quantity: 0, avgEntryPrice: 0 },
-  AWAY: { quantity: 0, avgEntryPrice: 0 },
-  DRAW: { quantity: 0, avgEntryPrice: 0 },
+  HOME: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
+  AWAY: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
+  DRAW: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
 });
 
 const formatGameTime = (gameTime: string | null): string => {
@@ -297,6 +298,8 @@ export default function MarketDetailPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [closedHours, setClosedHours] = useState(isMarketClosedHours);
+  const [cooldownRemaining, setCooldownRemaining] = useState("");
 
   const loadMarketData = useCallback(async () => {
     if (!session?.user_id || !isMarketIdValid) {
@@ -364,6 +367,47 @@ export default function MarketDetailPage() {
     }
   }, [positions, selectedOutcome, tradeSide]);
 
+  useEffect(() => {
+    const checkClosed = () => setClosedHours(isMarketClosedHours());
+    checkClosed();
+    const id = window.setInterval(checkClosed, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (tradeSide !== "SELL") {
+      setCooldownRemaining("");
+      return;
+    }
+
+    const purchasedAt = positions[selectedOutcome]?.purchasedAt;
+    if (!purchasedAt) {
+      setCooldownRemaining("");
+      return;
+    }
+
+    const update = () => {
+      const elapsed = Date.now() - new Date(purchasedAt).getTime();
+      const remaining = 30 * 60 * 1000 - elapsed;
+      if (remaining <= 0) {
+        setCooldownRemaining("");
+        return false;
+      }
+      const mins = Math.floor(remaining / 60000);
+      const secs = Math.floor((remaining % 60000) / 1000);
+      setCooldownRemaining(
+        `매도 가능까지 ${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
+      );
+      return true;
+    };
+
+    if (!update()) return;
+    const id = window.setInterval(() => {
+      if (!update()) window.clearInterval(id);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [tradeSide, selectedOutcome, positions]);
+
   const displayStatus = useMemo<DisplayMarketStatus>(() => {
     if (!marketDetail) {
       return "OPEN";
@@ -373,6 +417,7 @@ export default function MarketDetailPage() {
   }, [marketDetail]);
 
   const isTradingClosed =
+    closedHours ||
     displayStatus === "CLOSED" ||
     displayStatus === "SETTLED" ||
     displayStatus === "CANCELED";
@@ -470,6 +515,10 @@ export default function MarketDetailPage() {
       return null;
     }
 
+    if (closedHours) {
+      return "폐장 시간 (01:00~09:00)";
+    }
+
     if (isTradingClosed) {
       return "거래 마감";
     }
@@ -503,6 +552,10 @@ export default function MarketDetailPage() {
       return null;
     }
 
+    if (cooldownRemaining) {
+      return cooldownRemaining;
+    }
+
     const sellQuantity = parsePositiveNumber(quantityInput);
     if (!sellQuantity) {
       return null;
@@ -516,6 +569,8 @@ export default function MarketDetailPage() {
   }, [
     amountInput,
     buyInputMode,
+    closedHours,
+    cooldownRemaining,
     isTradingClosed,
     marketDetail,
     positions,
@@ -781,6 +836,17 @@ export default function MarketDetailPage() {
               : "border-red-100 bg-red-50/60"
           }`}
         >
+          {closedHours ? (
+            <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+              <p className="text-sm font-semibold text-amber-700">
+                폐장 시간 (01:00~09:00)
+              </p>
+              <p className="mt-1 text-xs text-amber-600">
+                오전 9시 이후에 거래해주세요.
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -904,7 +970,7 @@ export default function MarketDetailPage() {
                   : "예: 10"
               }
               disabled={isSubmitting || isTradingClosed}
-              className="text-center font-semibold tabular-nums"
+              className="text-center font-semibold tabular-nums text-black"
             />
           </div>
 

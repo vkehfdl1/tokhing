@@ -145,6 +145,7 @@ interface MarketPositionRow {
   outcome: string;
   quantity: number | string;
   avg_entry_price: number | string;
+  purchased_at: string | null;
 }
 
 interface OrderRpcResponse {
@@ -268,6 +269,7 @@ export interface MarketDetailItem {
 export interface MarketPosition {
   quantity: number;
   avgEntryPrice: number;
+  purchasedAt: string | null;
 }
 
 export type MarketPositionsByOutcome = Record<MarketOutcome, MarketPosition>;
@@ -438,9 +440,9 @@ const createEmptyPriceMap = (): Record<MarketOutcome, number> => ({
 });
 
 const createEmptyPositionsByOutcome = (): MarketPositionsByOutcome => ({
-  HOME: { quantity: 0, avgEntryPrice: 0 },
-  AWAY: { quantity: 0, avgEntryPrice: 0 },
-  DRAW: { quantity: 0, avgEntryPrice: 0 },
+  HOME: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
+  AWAY: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
+  DRAW: { quantity: 0, avgEntryPrice: 0, purchasedAt: null },
 });
 
 const getUniqueMarketIds = (values: Array<number | string>): number[] => {
@@ -576,6 +578,15 @@ export const getISODate = (date = new Date()) => {
   const kstOffset = 9 * 60 * 60 * 1000; // KST is UTC+9
   const kstDate = new Date(date.getTime() + kstOffset + offset);
   return kstDate.toISOString().slice(0, 10);
+};
+
+export const isMarketClosedHours = (): boolean => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60 * 1000;
+  const kstOffset = 9 * 60 * 60 * 1000;
+  const kstNow = new Date(now.getTime() + kstOffset + offset);
+  const hour = kstNow.getHours();
+  return hour >= 1 && hour < 9;
 };
 
 export const login = async (
@@ -1022,6 +1033,7 @@ export const getMarketPositions = async (
     defaultPositions[outcome] = {
       quantity: toNumberOrNull(row.quantity) ?? 0,
       avgEntryPrice: toNumberOrNull(row.avg_entry_price) ?? 0,
+      purchasedAt: row.purchased_at ?? null,
     };
   });
 

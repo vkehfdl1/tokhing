@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getISODate,
   getMarkets,
+  isMarketClosedHours,
   type MarketListItem,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -152,6 +153,7 @@ export default function HomePage() {
     useState<MarketDateLabel>("today");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [closedHours, setClosedHours] = useState(isMarketClosedHours);
 
   const fetchAndSetMarkets = useCallback(async () => {
     if (!session?.user_id) {
@@ -205,6 +207,13 @@ export default function HomePage() {
     void fetchAndSetMarkets();
   }, [fetchAndSetMarkets, session?.user_id]);
 
+  useEffect(() => {
+    const checkClosed = () => setClosedHours(isMarketClosedHours());
+    checkClosed();
+    const id = window.setInterval(checkClosed, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
   if (isSessionLoading) {
     return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
   }
@@ -215,6 +224,17 @@ export default function HomePage() {
 
   return (
     <div className="w-full pt-1">
+      {closedHours ? (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-amber-700">
+            폐장 시간 (01:00~09:00)
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            오전 9시 이후에 거래해주세요.
+          </p>
+        </div>
+      ) : null}
+
       <h1 className="mb-4 text-lg font-bold text-black">
         {formatMarketDateTitle(displayDate, displayDateLabel)}
       </h1>

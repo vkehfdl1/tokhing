@@ -19,7 +19,10 @@ export default function AppHeader() {
   const { session } = useUserSession();
   const [balance, setBalance] = useState<number | null>(null);
 
-  const shouldHideHeader = pathname?.startsWith("/admin");
+  const shouldHideHeader =
+    pathname?.startsWith("/admin") ||
+    pathname === "/login" ||
+    pathname === "/change-password";
   const hasUserSession = Boolean(session?.user_id);
   const canShowBalance =
     hasUserSession &&
