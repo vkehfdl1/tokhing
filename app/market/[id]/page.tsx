@@ -945,33 +945,47 @@ export default function MarketDetailPage() {
                 ? "투자 금액(코인)"
                 : "수량(주)"}
             </label>
-            <Input
-              id="order-input"
-              type="number"
-              min="0"
-              step="any"
-              value={
-                tradeSide === "BUY" && buyInputMode === "AMOUNT"
-                  ? amountInput
-                  : quantityInput
-              }
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                if (tradeSide === "BUY" && buyInputMode === "AMOUNT") {
-                  setAmountInput(nextValue);
-                  return;
+            <div className="flex gap-2">
+              <Input
+                id="order-input"
+                type="number"
+                min="0"
+                step="any"
+                value={
+                  tradeSide === "BUY" && buyInputMode === "AMOUNT"
+                    ? amountInput
+                    : quantityInput
                 }
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  if (tradeSide === "BUY" && buyInputMode === "AMOUNT") {
+                    setAmountInput(nextValue);
+                    return;
+                  }
 
-                setQuantityInput(nextValue);
-              }}
-              placeholder={
-                tradeSide === "BUY" && buyInputMode === "AMOUNT"
-                  ? "예: 500"
-                  : "예: 10"
-              }
-              disabled={isSubmitting || isTradingClosed}
-              className="text-center font-semibold tabular-nums text-black"
-            />
+                  setQuantityInput(nextValue);
+                }}
+                placeholder={
+                  tradeSide === "BUY" && buyInputMode === "AMOUNT"
+                    ? "예: 500"
+                    : "예: 10"
+                }
+                disabled={isSubmitting || isTradingClosed}
+                className="text-center font-semibold tabular-nums text-black"
+              />
+              {tradeSide === "SELL" && positions[selectedOutcome].quantity > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setQuantityInput(String(positions[selectedOutcome].quantity))
+                  }
+                  disabled={isSubmitting || isTradingClosed}
+                  className="shrink-0 rounded-lg bg-red-500 px-3 text-xs font-semibold text-white shadow-[0px_0px_8px_0px_rgba(0,0,0,0.12)] transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  전량
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-4 rounded-lg bg-white/80 p-3">
