@@ -274,6 +274,16 @@ const getOutcomeColorClass = (
   return "text-zinc-500";
 };
 
+const getOutcomeLabel = (
+  outcome: string,
+  homeTeamName: string,
+  awayTeamName: string
+): string => {
+  if (outcome === "HOME") return homeTeamName;
+  if (outcome === "AWAY") return awayTeamName;
+  return "무승부";
+};
+
 export default function MarketDetailPage() {
   const { session, isLoading } = useUserSession({ requireAuth: true });
   const params = useParams<{ id: string }>();
@@ -776,7 +786,7 @@ export default function MarketDetailPage() {
                     awayTeamName
                   )}`}
                 >
-                  {outcome}
+                  {getOutcomeLabel(outcome, homeTeamName, awayTeamName)}
                 </p>
               </div>
             ))}
@@ -811,7 +821,7 @@ export default function MarketDetailPage() {
                     className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2"
                   >
                     <p className="text-sm font-semibold text-zinc-700">
-                      {outcome}
+                      {getOutcomeLabel(outcome, homeTeamName, awayTeamName)}
                     </p>
                     <p className="text-sm tabular-nums text-zinc-700">
                       {quantity > 0
@@ -894,7 +904,7 @@ export default function MarketDetailPage() {
                       : "border-zinc-200 bg-white text-zinc-600"
                   } disabled:cursor-not-allowed disabled:opacity-50`}
                 >
-                  <p className="text-sm font-semibold">{outcome}</p>
+                  <p className="text-sm font-semibold">{getOutcomeLabel(outcome, homeTeamName, awayTeamName)}</p>
                   <p className="mt-1 text-xs text-zinc-500">
                     {tradeSide === "SELL"
                       ? `보유 ${quantityFormatter.format(
@@ -1045,7 +1055,7 @@ export default function MarketDetailPage() {
                 {homeTeamName} vs {awayTeamName}
               </p>
               <p>
-                {selectedOutcome} {tradeSide === "BUY" ? "매수" : "매도"}
+                {getOutcomeLabel(selectedOutcome, homeTeamName, awayTeamName)} {tradeSide === "BUY" ? "매수" : "매도"}
               </p>
               <p>수량: {quantityFormatter.format(tradePreview.quantity)}주</p>
               <p>

@@ -183,10 +183,24 @@ const getTeamTextColorClass = (teamName: string) => {
   return "text-black";
 };
 
-const formatPositionsSummary = (positions: SettlementHistoryItem["positions"]) => {
+const getOutcomeLabel = (
+  outcome: string,
+  homeTeamName: string,
+  awayTeamName: string
+): string => {
+  if (outcome === "HOME") return homeTeamName;
+  if (outcome === "AWAY") return awayTeamName;
+  return "무승부";
+};
+
+const formatPositionsSummary = (
+  positions: SettlementHistoryItem["positions"],
+  homeTeamName: string,
+  awayTeamName: string
+) => {
   const summaryItems = Object.entries(positions)
     .filter(([, quantity]) => quantity > 0)
-    .map(([outcome, quantity]) => `${outcome} ${quantityFormatter.format(quantity)}주`);
+    .map(([outcome, quantity]) => `${getOutcomeLabel(outcome, homeTeamName, awayTeamName)} ${quantityFormatter.format(quantity)}주`);
 
   return summaryItems.length > 0 ? summaryItems.join(" · ") : "보유 포지션 없음";
 };
@@ -585,7 +599,7 @@ export default function HistoryPage() {
                   </div>
 
                   <p className="text-sm font-semibold text-zinc-700">
-                    {position.outcome} {formatQuantity(position.quantity)}
+                    {getOutcomeLabel(position.outcome, homeTeamName, awayTeamName)} {formatQuantity(position.quantity)}
                   </p>
 
                   <p className="mt-2 text-sm text-zinc-600">
@@ -662,7 +676,7 @@ export default function HistoryPage() {
                         </p>
 
                         <p className="mt-2 text-sm text-zinc-700">
-                          {order.outcome} · 수량 {formatQuantity(order.quantity)} · 체결금액 {" "}
+                          {getOutcomeLabel(order.outcome, homeTeamName, awayTeamName)} · 수량 {formatQuantity(order.quantity)} · 체결금액 {" "}
                           {formatCoins(order.totalAmount)}
                         </p>
                       </article>
@@ -717,7 +731,7 @@ export default function HistoryPage() {
                   </div>
 
                   <p className="text-sm text-zinc-700">
-                    보유했던 포지션: {formatPositionsSummary(settlement.positions)}
+                    보유했던 포지션: {formatPositionsSummary(settlement.positions, homeTeamName, awayTeamName)}
                   </p>
 
                   <p className="mt-2 text-sm text-zinc-700">
