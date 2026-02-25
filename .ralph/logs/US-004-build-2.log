@@ -1,0 +1,3158 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/jeffrey/WebstormProjects/lookin/lookin
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019c8ffe-857b-7072-aebf-9142f00fe5b8
+--------
+user
+Read AGENTS.md for full project context, file paths, and rules.
+
+Check prd.json and implement story US-004: 지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급
+
+Acceptance criteria:
+- REQ-027 유저가 처음 로그인할 때 wallet이 없으면 자동 생성 (balance = 0).
+- REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC 함수 구현. 모든 유저에게 p_amount 코인 지급 + transaction 기록. 반환값: {success, users_count, total_distributed}.
+- REQ-029 Supabase pg_cron 확장을 사용하여 매주 월요일 00:00 KST에 distribute_weekly_coins() 자동 실행. 또는 pg_cron이 불가능할 경우 Admin에서 수동 트리거 버튼 제공.
+- REQ-030 Admin 페이지에서 특정 유저 또는 전체 유저에게 코인을 수동 지급하는 기능. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC 함수.
+- REQ-031 프론트엔드 상단 (헤더 영역)에 현재 코인 잔고를 항상 표시. 코인 아이콘 + 숫자 (예: 🪙 3,250).
+
+Read ERROR.md — it describes what failed. Fix it.
+
+mcp startup: no servers
+
+thinking
+**Confirming skill usage and repo inspection**
+codex
+요청하신 US-004 구현을 진행하겠습니다. 먼저 `AGENTS.md`, `prd.json`, `ERROR.md`를 읽어 실패 원인과 현재 스토리 상태를 파악한 뒤, 필요한 DB/RPC/프론트 수정을 순서대로 적용하겠습니다.
+
+thinking
+**Planning parallel file reading**
+exec
+/bin/zsh -lc 'pwd; ls -la' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg --files | rg 'AGENTS\\.md"'$|prd'"\\.json"'$|ERROR'"\\.md"'$|SKILL'"\\.md"'$'"' | head -n 200" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+/Users/jeffrey/WebstormProjects/lookin/lookin
+total 1064
+drwxr-xr-x@  36 jeffrey  staff    1152 Feb 24 23:12 .
+drwxr-xr-x@   3 jeffrey  staff      96 Jul 13  2025 ..
+-rw-r--r--@   1 jeffrey  staff     863 Jul 19  2025 .env.local
+-rw-r--r--@   1 jeffrey  staff     625 Aug  8  2025 .env.local.example
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 23:12 .git
+-rw-r--r--@   1 jeffrey  staff     491 Jul 13  2025 .gitignore
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 23:10 .next
+drwxr-xr-x@   4 jeffrey  staff     128 Feb 24 22:16 .ralph
+-rw-r--r--@   1 jeffrey  staff    3134 Jul 19  2025 ADMIN_SETUP.md
+-rw-r--r--@   1 jeffrey  staff    4760 Feb 24 22:11 AGENTS.md
+-rw-r--r--@   1 jeffrey  staff    2177 Feb 24 23:12 ERROR.md
+-rw-r--r--@   1 jeffrey  staff     219 Jul 13  2025 GEMINI.md
+-rw-r--r--@   1 jeffrey  staff     510 Feb 24 23:12 PROGRESS.md
+-rw-r--r--@   1 jeffrey  staff    5029 Jul 19  2025 README.md
+-rw-r--r--@   1 jeffrey  staff    4551 Jul 26  2025 RESPONSIVE_DESIGN_SUMMARY.md
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 22:23 app
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 23:06 components
+-rw-r--r--@   1 jeffrey  staff     427 Jul 13  2025 components.json
+ succeeded in 52ms:
+prd.json
+AGENTS.md
+ERROR.md
+
+thinking
+**Planning agent and skill loading**
+codex
+현재 저장소에서 `AGENTS.md`, `prd.json`, `ERROR.md`를 확인할 수 있었습니다. 지금 세 파일을 읽고 US-004의 누락/실패 지점을 정확히 짚겠습니다.
+
+thinking
+**Reviewing key doc files**
+exec
+/bin/zsh -lc "sed -n '1,260p' AGENTS.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,240p' ERROR.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "node -e \"const fs=require('fs');const j=JSON.parse(fs.readFileSync('prd.json','utf8'));const stories=j.user_stories||j.stories||[];const s=stories.find(x=>x.id==='US-004'||x.story_id==='US-004');console.log(JSON.stringify(s,null,2));\"" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+# US-004 Verification Result: FAIL
+
+## 범위
+- Story: `US-004` 지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급
+- 검증 기준: `REQ-027 ~ REQ-031`
+
+## 실행한 검증
+- `npm run lint` ✅
+- `npm run build` ✅
+- `supabase db lint --local --schema public` ❌ (로컬 Postgres 미기동으로 연결 실패: `127.0.0.1:54322`)
+
+## 핵심 실패 사유
+### 1) REQ-031 미충족 가능성: 로그인 직후 헤더 잔고가 즉시 표시되지 않을 수 있음
+- 관련 코드:
+  - [`components/app-header.tsx:15`](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:15)
+  - [`lib/hooks/useUserSession.ts:18`](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:18)
+  - [`app/login/page.tsx:66`](/Users/jeffrey/WebstormProjects/lookin/lookin/app/login/page.tsx:66)
+- 근거:
+  - `AppHeader`는 `useUserSession()`의 `session` 값으로 잔고 노출 여부를 결정합니다.
+  - `useUserSession`은 mount 시점 1회만 `localStorage`를 읽고(`useEffect`), 이후 `setUserSession()` 호출(로그인 성공) 이벤트를 구독하지 않습니다.
+ succeeded in 53ms:
+# AGENTS.md — ToKHin' LMSR Prediction Market
+
+## Project Overview
+
+KBO 야구 승부예측 앱(ToKHin')을 LMSR 기반 예측시장으로 전환하는 프로젝트.
+기존 "팀 하나 찍기 + 점수제"를 "HOME/AWAY/DRAW 토큰 매수/매도 + 만기 0/100 정산" 시스템으로 완전 대체한다.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router) + React 19 + TypeScript
+- **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix) + Pretendard 폰트
+- **Database**: Supabase (PostgreSQL) — 테이블, RPC 함수, RLS, pg_cron
+- **Auth**: 자체 구현 (학번 + SHA-256 해시 비밀번호, Supabase Auth 미사용)
+- **Deploy**: Vercel
+- **Package Manager**: npm
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+ succeeded in 53ms:
+undefined
+
+thinking
+**Inspecting JSON structure**
+codex
+`ERROR.md` 기준으로 현재 실패 원인은 로그인 직후 헤더 잔고 동기화(REQ-031)입니다. 이어서 `prd.json`에서 US-004 정의/상태를 정확히 찾아 구현 범위를 맞추겠습니다.
+exec
+/bin/zsh -lc "node -e \"const fs=require('fs');const j=JSON.parse(fs.readFileSync('prd.json','utf8'));console.log(Object.keys(j));console.log(JSON.stringify(j,null,2).slice(0,1500));\"" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+[ 'project', 'userStories' ]
+{
+  "project": {
+    "name": "LMSR Prediction Market (Stock-Market Style)",
+    "branch": "Feature/stock-market",
+    "description": "기존 승부예측(팀 선택 + 점수제)을 LMSR 기반 예측시장으로 완전 전환. 유저가 HOME/AWAY/DRAW 토큰을 매수/매도하여 경기 결과에 베팅하고, 만기 시 정답 토큰은 100코인, 오답 토큰은 0코인으로 정산되는 시스템. Supabase DB + RPC 기반으로 LMSR 엔진을 구현하고, 모바일 퍼스트 UI로 거래 인터페이스를 제공한다. 디자인 철학, 디자인 토큰, 와이어프레임(W-01~W-08)은 prd.md를 반드시 참조할 것."
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "인증 시스템 — 학번 로그인 + 비밀번호 (Supabase 직접 구현)",
+      "priority": 1,
+      "passes": true,
+      "description": "학번을 ID로, 전화번호를 초기 비밀번호로 사용하는 간단한 인증 시스템을 구현한다. Supabase Auth는 사용하지 않고, users 테이블에 password_hash 컬럼을 추가하여 직접 관리한다. 최초 로그인 시 비밀번호 변경을 강제한다. 로그인하지 않으면 모든 화면에 접근 불가. UI 와이어프레임은 prd.md의 W-01, W-02 참조.",
+      "acceptanceCriteria": [
+        "REQ-001 users 테이블에 password_hash (TEXT) 컬럼 추가. 초기값은 해당 유저의 phone_number를 SHA-256 해시한 값.",
+        "REQ-002 users 테이블에 password_changed (BOOLEAN DEFAULT FALSE) 컬럼 추가. 최초 로그인 후 비밀번호 변경 시 TRUE로 설정.",
+        "REQ-003 login(p_student_number BIGINT, p_password TEXT) RETURNS JSONB RPC 함수 구현. (1) student_number로 유저 조회, (2) SHA-256(p_password)와 password_hash 비교, (3) 일치 시 {success: true, user_id, username, password_changed} 반환, 불일치 시 {success: false, error: '학번 또는 비밀번호가 올바르지 않습니다'} 반환.",
+        "REQ-004 change_password(p_user_id UUID, p_new_password TEXT) RETURNS JSONB RPC 함수 구현. SHA-256(p_new_password)를 password_hash에 저장, password_changed를 TRUE로 설정.",
+        "REQ-005 로그인 화면 (prd.md W-01): 학번 + 비밀번호 입력
+
+thinking
+**Extracting specific user story**
+exec
+/bin/zsh -lc "node -e \"const fs=require('fs');const j=JSON.parse(fs.readFileSync('prd.json','utf8'));const s=j.userStories.find(x=>x.id==='US-004');console.log(JSON.stringify(s,null,2));\"" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+{
+  "id": "US-004",
+  "title": "지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급",
+  "priority": 4,
+  "passes": true,
+  "description": "유저별 코인 지갑을 관리하고, 매주 자동으로 코인을 지급하는 시스템을 구현한다.",
+  "acceptanceCriteria": [
+    "REQ-027 유저가 처음 로그인할 때 wallet이 없으면 자동 생성 (balance = 0).",
+    "REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC 함수 구현. 모든 유저에게 p_amount 코인 지급 + transaction 기록. 반환값: {success, users_count, total_distributed}.",
+    "REQ-029 Supabase pg_cron 확장을 사용하여 매주 월요일 00:00 KST에 distribute_weekly_coins() 자동 실행. 또는 pg_cron이 불가능할 경우 Admin에서 수동 트리거 버튼 제공.",
+    "REQ-030 Admin 페이지에서 특정 유저 또는 전체 유저에게 코인을 수동 지급하는 기능. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC 함수.",
+    "REQ-031 프론트엔드 상단 (헤더 영역)에 현재 코인 잔고를 항상 표시. 코인 아이콘 + 숫자 (예: 🪙 3,250)."
+  ]
+}
+
+thinking
+**Scoping relevant code inspection**
+exec
+/bin/zsh -lc 'rg -n "wallet|distribute_weekly_coins|admin_grant_coins|useUserSession|AppHeader|setUserSession|clearUserSession|transactions|pg_cron|REQ-031|weekly" app components lib supabase -S' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M prd.json
+?? .ralph/
+?? ERROR.md
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+ succeeded in 53ms:
+supabase/migrations/20260224_us004_wallet_system.sql:4:-- REQ-027: 로그인 성공 시 wallet 자동 생성
+supabase/migrations/20260224_us004_wallet_system.sql:40:  INSERT INTO public.wallets (user_id, balance)
+supabase/migrations/20260224_us004_wallet_system.sql:54:CREATE OR REPLACE FUNCTION public.distribute_weekly_coins(
+supabase/migrations/20260224_us004_wallet_system.sql:70:  INSERT INTO public.wallets (user_id, balance)
+supabase/migrations/20260224_us004_wallet_system.sql:75:  WITH updated_wallets AS (
+supabase/migrations/20260224_us004_wallet_system.sql:76:    UPDATE public.wallets w
+supabase/migrations/20260224_us004_wallet_system.sql:83:  ), inserted_transactions AS (
+supabase/migrations/20260224_us004_wallet_system.sql:84:    INSERT INTO public.transactions (
+supabase/migrations/20260224_us004_wallet_system.sql:99:    FROM updated_wallets uw
+supabase/migrations/20260224_us004_wallet_system.sql:106:  FROM inserted_transactions;
+supabase/migrations/20260224_us004_wallet_system.sql:123:CREATE OR REPLACE FUNCTION public.admin_grant_coins(
+supabase/migrations/20260224_us004_wallet_system.sql:133:  v_wallet public.wallets%ROWTYPE;
+supabase/migrations/20260224_us004_wallet_system.sql:149:  INTO v_wallet
+supabase/migrations/20260224_us004_wallet_system.sql:150:  FROM public.wallets
+supabase/migrations/20260224_us004_wallet_system.sql:155:    INSERT INTO public.wallets (user_id, balance)
+supabase/migrations/20260224_us004_wallet_system.sql:157:    RETURNING * INTO v_wallet;
+supabase/migrations/20260224_us004_wallet_system.sql:160:  v_new_balance := v_wallet.balance + p_amount;
+supabase/migrations/20260224_us004_wallet_system.sql:162:  UPDATE public.wallets
+supabase/migrations/20260224_us004_wallet_system.sql:166:  WHERE id = v_wallet.id;
+supabase/migrations/20260224_us004_wallet_system.sql:168:  INSERT INTO public.transactions (
+
+thinking
+**Inspecting session-related files**
+codex
+코드베이스에는 US-004 관련 마이그레이션/어드민/UI 코드가 이미 일부 들어가 있고, `ERROR.md`도 그 기준으로 생성된 상태입니다. 이제 세션 동기화 훅과 헤더/로그인 경로를 집중 점검해 REQ-031 실패를 우선 해결하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,220p' lib/auth.ts" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' lib/hooks/useUserSession.ts" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,220p' app/login/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' components/app-header.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getUserSession, type UserSession } from "@/lib/auth";
+
+interface UseUserSessionOptions {
+  requireAuth?: boolean;
+}
+
+export const useUserSession = ({
+  requireAuth = false,
+}: UseUserSessionOptions = {}) => {
+  const router = useRouter();
+  const [session, setSession] = useState<UserSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const storedSession = getUserSession();
+    setSession(storedSession);
+ succeeded in 52ms:
+export interface UserSession {
+  user_id: string;
+  username: string;
+  student_number: string;
+}
+
+const USER_SESSION_KEY = "tokhin_user_session";
+const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
+
+const isBrowser = () => typeof window !== "undefined";
+
+const parseSession = (value: string | null): UserSession | null => {
+  if (!value) return null;
+
+  try {
+    const parsed = JSON.parse(value) as Partial<UserSession>;
+
+    if (
+      typeof parsed.user_id === "string" &&
+      typeof parsed.username === "string" &&
+ succeeded in 51ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  clearUserSession,
+  clearPendingPasswordChangeSession,
+  getPendingPasswordChangeSession,
+  getUserSession,
+  setPendingPasswordChangeSession,
+  setUserSession,
+} from "@/lib/auth";
+import { login } from "@/lib/api";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [studentNumber, setStudentNumber] = useState("");
+  const [password, setPassword] = useState("");
+ succeeded in 51ms:
+"use client";
+
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { getWalletBalance } from "@/lib/api";
+import { useUserSession } from "@/lib/hooks/useUserSession";
+
+const numberFormatter = new Intl.NumberFormat("ko-KR", {
+  maximumFractionDigits: 2,
+});
+
+export default function AppHeader() {
+  const pathname = usePathname();
+  const { session } = useUserSession();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  const shouldHideHeader = pathname?.startsWith("/admin");
+  const hasUserSession = Boolean(session?.user_id);
+  const canShowBalance =
+
+thinking
+**Inspecting session usage on change-password page**
+exec
+/bin/zsh -lc "sed -n '1,220p' app/change-password/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  clearPendingPasswordChangeSession,
+  getPendingPasswordChangeSession,
+  getUserSession,
+  setUserSession,
+  type UserSession,
+} from "@/lib/auth";
+import { changePassword } from "@/lib/api";
+
+export default function ChangePasswordPage() {
+  const router = useRouter();
+  const [pendingSession, setPendingSession] = useState<UserSession | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+thinking
+**Inspecting admin and wallet APIs**
+codex
+세션 훅이 `mount 1회`만 동작하는 것이 실제 실패 포인트로 확인됐습니다. 다음으로 US-004 전체 요구사항(REQ-027~031)이 모두 충족되는지 확인하기 위해 API/RPC/어드민 구현을 점검합니다.
+exec
+/bin/zsh -lc "sed -n '560,780p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,360p' supabase/migrations/20260224_us004_wallet_system.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '900,1160p' app/admin/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+      }
+    };
+
+    void fetchUsers();
+  }, []);
+
+  const parseAmount = (raw: string) => {
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return null;
+    }
+    return amount;
+  };
+
+  const handleGrantAll = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+
+    const amount = parseAmount(allAmount);
+    if (amount === null) {
+ succeeded in 53ms:
+
+  const gameIds = games.map((g) => g.id);
+  const { data: predictions, error: predsError } = await supabase
+    .from("predictions")
+    .select("game_id, predicted_winner_team_id")
+    .eq("user_id", userId)
+    .in("game_id", gameIds);
+
+  if (predsError) {
+    console.error("Error fetching predictions:", predsError);
+    // Proceed with games even if predictions fail
+  }
+
+  return games.map((game) => {
+    const prediction = predictions?.find((p) => p.game_id === game.id) || null;
+    return { ...game, prediction };
+  });
+};
+
+// Fetch games for a specific date (admin)
+ succeeded in 53ms:
+-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+-- REQ-027: 로그인 성공 시 wallet 자동 생성
+CREATE OR REPLACE FUNCTION public.login(
+  p_student_number BIGINT,
+  p_password TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user RECORD;
+  v_input_hash TEXT;
+BEGIN
+  SELECT id, username, password_hash, password_changed
+  INTO v_user
+  FROM public.users
+
+thinking
+**Inspecting admin coin section layout**
+exec
+/bin/zsh -lc "sed -n '1,220p' app/layout.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "next-themes";
+import Navigation from "@/components/navigation"; // Import the new component
+import AppHeader from "@/components/app-header";
+import "./globals.css";
+import localFont from "next/font/local";
+
+const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "http://localhost:3000";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+export const metadata: Metadata = {
+  metadataBase: new URL(defaultUrl),
+  title: "ToKHin' 승부 예측",
+  icons: {
+
+thinking
+**Inspecting migrations and permissions**
+exec
+/bin/zsh -lc "sed -n '90,210p' supabase/migrations/20260224_us002_db_schema.sql" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  market_id INTEGER NOT NULL REFERENCES public.markets(id) ON DELETE CASCADE,
+  outcome VARCHAR NOT NULL CHECK (outcome IN ('HOME', 'AWAY', 'DRAW')),
+  quantity NUMERIC NOT NULL DEFAULT 0,
+  avg_entry_price NUMERIC NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT positions_user_market_outcome_key UNIQUE (user_id, market_id, outcome)
+);
+
+DROP TRIGGER IF EXISTS trg_positions_set_updated_at ON public.positions;
+CREATE TRIGGER trg_positions_set_updated_at
+BEFORE UPDATE ON public.positions
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+-- REQ-015 transactions
+CREATE TABLE IF NOT EXISTS public.transactions (
+  id SERIAL PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+
+thinking
+**Inspecting login function for migration differences**
+exec
+/bin/zsh -lc "sed -n '1,260p' supabase/migrations/20260224_us001_auth_system.sql" in /Users/jeffrey/WebstormProjects/lookin/lookin exited 1 in 53ms:
+sed: supabase/migrations/20260224_us001_auth_system.sql: No such file or directory
+
+thinking
+**Identifying need for migrations**
+exec
+/bin/zsh -lc 'ls -la supabase/migrations' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+total 88
+drwxr-xr-x@ 6 jeffrey  staff    192 Feb 24 23:05 .
+drwxr-xr-x@ 4 jeffrey  staff    128 Feb 24 22:47 ..
+-rw-r--r--@ 1 jeffrey  staff   2399 Feb 24 22:22 20260224_us001_auth.sql
+-rw-r--r--@ 1 jeffrey  staff   5951 Feb 24 22:45 20260224_us002_db_schema.sql
+-rw-r--r--@ 1 jeffrey  staff  21410 Feb 24 22:53 20260224_us003_lmsr_engine.sql
+-rw-r--r--@ 1 jeffrey  staff   6797 Feb 24 23:05 20260224_us004_wallet_system.sql
+
+thinking
+**Reviewing login flows for override**
+exec
+/bin/zsh -lc "sed -n '1,300p' supabase/migrations/20260224_us001_auth.sql" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+-- US-001: 학번 로그인 + 비밀번호 인증 시스템
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE public.users
+SET password_hash = encode(digest(phone_number::TEXT, 'sha256'), 'hex')
+WHERE password_hash IS NULL;
+
+CREATE OR REPLACE FUNCTION public.login(
+  p_student_number BIGINT,
+  p_password TEXT
+)
+RETURNS JSONB
+
+thinking
+**Verifying pgcrypto extension usage**
+exec
+/bin/zsh -lc "sed -n '1,220p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
+
+interface GameData {
+  game_date: string;
+  game_time?: string;
+  home_team_id?: number;
+  away_team_id?: number;
+  home_pitcher?: string;
+  away_pitcher?: string;
+  home_score?: number | null;
+  away_score?: number | null;
+  game_status?: "SCHEDULED" | "LIVE" | "FINISHED";
+}
+
+interface LoginRpcResponse {
+  success: boolean;
+  user_id?: string;
+  username?: string;
+
+thinking
+**Inspecting authentication flow**
+codex
+US-004 기능 자체는 대부분 구현되어 있고, 남은 실패는 `session` 갱신 이벤트 부재가 핵심입니다. 로그인/로그아웃/비번변경 경로 전체에서 즉시 반영되도록 `lib/auth.ts`와 `useUserSession`을 이벤트 기반으로 수정하겠습니다.
+
+thinking
+**Scanning agent skill instructions**
+exec
+/bin/zsh -lc "sed -n '1,220p' /Users/jeffrey/.codex/superpowers/skills/using-superpowers/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,240p' /Users/jeffrey/.codex/superpowers/skills/brainstorming/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' /Users/jeffrey/.codex/superpowers/skills/test-driven-development/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,240p' /Users/jeffrey/.codex/superpowers/skills/verification-before-completion/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+---
+name: brainstorming
+description: "You MUST use this before any creative work - creating features, building components, adding functionality, or modifying behavior. Explores user intent, requirements and design before implementation."
+---
+
+# Brainstorming Ideas Into Designs
+
+## Overview
+
+Help turn ideas into fully formed designs and specs through natural collaborative dialogue.
+
+Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
+
+<HARD-GATE>
+Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
+</HARD-GATE>
+
+## Anti-Pattern: "This Is Too Simple To Need A Design"
+
+Every project goes through this process. A todo list, a single-function utility, a config change — all of them. "Simple" projects are where unexamined assumptions cause the most wasted work. The design can be short (a few sentences for truly simple projects), but you MUST present it and get approval.
+ succeeded in 51ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
+---
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. This is not optional. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## How to Access Skills
+
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
+
+**In other environments:** Check your platform's documentation for how skills are loaded.
+
+# Using Skills
+ succeeded in 51ms:
+---
+name: test-driven-development
+description: Use when implementing any feature or bugfix, before writing implementation code
+---
+
+# Test-Driven Development (TDD)
+
+## Overview
+
+Write the test first. Watch it fail. Write minimal code to pass.
+
+**Core principle:** If you didn't watch the test fail, you don't know if it tests the right thing.
+
+**Violating the letter of the rules is violating the spirit of the rules.**
+
+## When to Use
+
+**Always:**
+- New features
+- Bug fixes
+ succeeded in 51ms:
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+Claiming work is complete without verification is dishonesty, not efficiency.
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+thinking
+**Planning session event refactor**
+codex
+수정 방향을 확정했습니다: `setUserSession/clearUserSession`에서 세션 변경 이벤트를 발행하고, `useUserSession`이 해당 이벤트와 `storage` 이벤트를 구독하도록 바꿔 로그인 직후 헤더 잔고가 즉시 갱신되게 하겠습니다. 이어서 빌드/린트로 회귀를 확인합니다.
+
+thinking
+**Scoping patch targets**
+exec
+/bin/zsh -lc "rg -n \"localStorage\\.setItem\\(|localStorage\\.removeItem\\(|getUserSession\\(|setUserSession\\(|clearUserSession\\(\" app components lib -S" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+lib/auth.ts:43:  window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
+lib/auth.ts:48:  window.localStorage.removeItem(USER_SESSION_KEY);
+lib/auth.ts:70:  clearUserSession();
+app/login/page.tsx:25:    if (getUserSession()) {
+app/login/page.tsx:68:        setUserSession(session);
+app/login/page.tsx:71:        clearUserSession();
+lib/hooks/useUserSession.ts:19:    const storedSession = getUserSession();
+app/change-password/page.tsx:25:    const currentSession = getUserSession();
+app/change-password/page.tsx:63:      setUserSession(pendingSession);
+
+thinking
+**Planning authentication patch and header display**
+file update
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts
+@@ -8,2 +8,3 @@
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+@@ -11,2 +12,7 @@
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+@@ -43,2 +49,3 @@
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+@@ -48,2 +55,3 @@
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+apply_patch(auto_approved=true) exited 0 in 36ms:
+Success. Updated the following files:
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+
+
+thinking
+**Applying patch hook**
+file update
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts
+@@ -4,3 +4,7 @@
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+@@ -18,10 +22,29 @@
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+apply_patch(auto_approved=true) exited 0 in 39ms:
+Success. Updated the following files:
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Refactoring session key usage**
+codex
+세션 이벤트 기반 수정을 적용했습니다. الآن `setUserSession/clearUserSession` 호출 즉시 `useUserSession`가 반응하도록 바뀌었고, 로그인 후 새로고침 없이 헤더 잔고가 갱신되는 경로를 커버합니다. 지금 린트/빌드로 회귀를 확인하겠습니다.
+
+thinking
+**Sequencing lint and build commands**
+exec
+/bin/zsh -lc 'npm run lint' in /Users/jeffrey/WebstormProjects/lookin/lookinfile update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+ succeeded in 1.36s:
+
+> lint
+> next lint
+
+✔ No ESLint warnings or errors
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Starting build process**
+exec
+/bin/zsh -lc 'npm run build' in /Users/jeffrey/WebstormProjects/lookin/lookinfile update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+ succeeded in 9.05s:
+
+> build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled successfully in 0ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/12) ...
+   Generating static pages (3/12) 
+   Generating static pages (6/12) 
+   Generating static pages (9/12) 
+ ✓ Generating static pages (12/12)
+   Finalizing page optimization ...
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Reviewing test and lint strategy**
+codex
+린트/빌드 둘 다 통과했습니다. 마지막으로 변경 diff를 점검해서 REQ-031 실패 원인과 대응이 정확히 반영됐는지 확인한 뒤 결과를 정리하겠습니다.
+
+thinking
+**Preparing targeted diff inspection**
+exec
+/bin/zsh -lc 'git diff -- lib/auth.ts lib/hooks/useUserSession.ts' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a..4c0dd5d 100644
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@ export interface UserSession {
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..4c0dd5defd9f3d9bea22f0d7f124ef1abbd7d767
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -6,9 +6,15 @@
+ 
+ const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Centralizing session key constant**
+file update
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts
+@@ -6,3 +6,3 @@
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
+apply_patch(auto_approved=true) exited 0 in 56ms:
+Success. Updated the following files:
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..5a5d20eb2000c9ca4abda111e9d31a781ad07de2
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,11 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +20,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === "tokhin_user_session") {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Importing and comparing patch hooks**
+file update
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts
+@@ -8,2 +8,3 @@
+   USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
+ } from "@/lib/auth";
+@@ -30,3 +31,3 @@
+     const handleStorage = (event: StorageEvent) => {
+-      if (event.key === null || event.key === "tokhin_user_session") {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
+         syncSession();
+apply_patch(auto_approved=true) exited 0 in 43ms:
+Success. Updated the following files:
+M /Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Rerunning lint check**
+codex
+세션 키 중복 문자열도 상수화해 동기화 안정성을 높였습니다. 이 변경까지 포함해 다시 린트/빌드를 재검증하겠습니다.
+
+thinking
+**Planning lint and build verification**
+exec
+/bin/zsh -lc 'npm run lint' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'npm run build' in /Users/jeffrey/WebstormProjects/lookin/lookinfile update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+ succeeded in 1.30s:
+
+> lint
+> next lint
+
+✔ No ESLint warnings or errors
+
+thinking
+**Planning parallel polling approach**
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+ succeeded in 8.83s:
+
+> build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled successfully in 0ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/12) ...
+   Generating static pages (3/12) 
+   Generating static pages (6/12) 
+   Generating static pages (9/12) 
+ ✓ Generating static pages (12/12)
+   Finalizing page optimization ...
+
+thinking
+**Checking current git status**
+exec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M lib/auth.ts
+ M lib/hooks/useUserSession.ts
+ M prd.json
+?? .ralph/
+?? ERROR.md
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Verifying existing implementation completeness**
+exec
+/bin/zsh -lc "nl -ba lib/auth.ts | sed -n '1,140p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/hooks/useUserSession.ts | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba supabase/migrations/20260224_us004_wallet_system.sql | sed -n '1,340p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba app/admin/page.tsx | sed -n '930,1120p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba components/app-header.tsx | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+     1	export interface UserSession {
+     2	  user_id: string;
+     3	  username: string;
+     4	  student_number: string;
+     5	}
+     6	
+     7	export const USER_SESSION_KEY = "tokhin_user_session";
+     8	const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
+     9	export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+    10	
+    11	const isBrowser = () => typeof window !== "undefined";
+    12	
+    13	const dispatchSessionChangedEvent = () => {
+    14	  if (!isBrowser()) return;
+    15	  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
+    16	};
+    17	
+    18	const parseSession = (value: string | null): UserSession | null => {
+    19	  if (!value) return null;
+    20	
+ succeeded in 50ms:
+     1	"use client";
+     2	
+     3	import { useEffect, useState } from "react";
+     4	import { useRouter } from "next/navigation";
+     5	import {
+     6	  getUserSession,
+     7	  type UserSession,
+     8	  USER_SESSION_CHANGED_EVENT,
+     9	  USER_SESSION_KEY,
+    10	} from "@/lib/auth";
+    11	
+    12	interface UseUserSessionOptions {
+    13	  requireAuth?: boolean;
+    14	}
+    15	
+    16	export const useUserSession = ({
+    17	  requireAuth = false,
+    18	}: UseUserSessionOptions = {}) => {
+    19	  const router = useRouter();
+    20	  const [session, setSession] = useState<UserSession | null>(null);
+ succeeded in 51ms:
+     1	-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+     2	-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+     3	
+     4	-- REQ-027: 로그인 성공 시 wallet 자동 생성
+     5	CREATE OR REPLACE FUNCTION public.login(
+     6	  p_student_number BIGINT,
+     7	  p_password TEXT
+     8	)
+     9	RETURNS JSONB
+    10	LANGUAGE plpgsql
+    11	SECURITY DEFINER
+    12	SET search_path = public
+    13	AS $$
+    14	DECLARE
+    15	  v_user RECORD;
+    16	  v_input_hash TEXT;
+    17	BEGIN
+    18	  SELECT id, username, password_hash, password_changed
+    19	  INTO v_user
+    20	  FROM public.users
+ succeeded in 51ms:
+   930	      setMessage({
+   931	        type: "success",
+   932	        text: `전체 지급 완료: ${result.users_count.toLocaleString()}명에게 총 ${result.total_distributed.toLocaleString()} 코인 지급`,
+   933	      });
+   934	    } catch (error) {
+   935	      setMessage({
+   936	        type: "error",
+   937	        text:
+   938	          error instanceof Error
+   939	            ? error.message
+   940	            : "전체 코인 지급 중 오류가 발생했습니다.",
+   941	      });
+   942	    } finally {
+   943	      setAllLoading(false);
+   944	    }
+   945	  };
+   946	
+   947	  const handleGrantSingleUser = async (event: React.FormEvent) => {
+   948	    event.preventDefault();
+   949	    setMessage(null);
+ succeeded in 50ms:
+     1	"use client";
+     2	
+     3	import Image from "next/image";
+     4	import { usePathname } from "next/navigation";
+     5	import { useCallback, useEffect, useState } from "react";
+     6	import { getWalletBalance } from "@/lib/api";
+     7	import { useUserSession } from "@/lib/hooks/useUserSession";
+     8	
+     9	const numberFormatter = new Intl.NumberFormat("ko-KR", {
+    10	  maximumFractionDigits: 2,
+    11	});
+    12	
+    13	export default function AppHeader() {
+    14	  const pathname = usePathname();
+    15	  const { session } = useUserSession();
+    16	  const [balance, setBalance] = useState<number | null>(null);
+    17	
+    18	  const shouldHideHeader = pathname?.startsWith("/admin");
+    19	  const hasUserSession = Boolean(session?.user_id);
+    20	  const canShowBalance =
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Planning line reference gathering**
+exec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '640,770p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+   640	  return data;
+   641	};
+   642	
+   643	// Fetch game data from external source via API route to avoid CORS issues
+   644	export const getGameData = async (date: Date) => {
+   645	  try {
+   646	    const response = await fetch("/api/crawl-games", {
+   647	      method: "POST",
+   648	      headers: {
+   649	        "Content-Type": "application/json",
+   650	      },
+   651	      body: JSON.stringify({
+   652	        date: date.toISOString(),
+   653	      }),
+   654	    });
+   655	
+   656	    if (!response.ok) {
+   657	      throw new Error(`HTTP error! status: ${response.status}`);
+   658	    }
+   659	
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Assessing error docs and DB lint**
+exec
+/bin/zsh -lc 'supabase db lint --local --schema public' in /Users/jeffrey/WebstormProjects/lookin/lookin exited 1 in 53ms:
+Connecting to local database...
+failed to connect to postgres: failed to connect to `host=127.0.0.1 user=postgres database=postgres`: dial error (dial tcp 127.0.0.1:54322: connect: connection refused)
+Try rerunning the command with --debug to troubleshoot the error.
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Planning authentication logout checks**
+exec
+/bin/zsh -lc "rg -n \"clearAllAuthState|clearUserSession\\(|setUserSession\\(|로그아웃|logout\" app components lib -S" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+lib/auth.ts:77:export const clearAllAuthState = () => {
+lib/auth.ts:78:  clearUserSession();
+components/navigation.tsx:7:import { clearAllAuthState } from "@/lib/auth";
+components/navigation.tsx:30:    clearAllAuthState();
+components/navigation.tsx:65:            aria-label="로그아웃"
+app/login/page.tsx:68:        setUserSession(session);
+app/login/page.tsx:71:        clearUserSession();
+components/auth-button.tsx:4:import { LogoutButton } from "./logout-button";
+app/change-password/page.tsx:63:      setUserSession(pendingSession);
+components/logout-button.tsx:10:  const logout = async () => {
+components/logout-button.tsx:16:  return <Button onClick={logout}>Logout</Button>;
+app/admin/page.tsx:1293:          로그아웃
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Assessing navigation and reload necessity**
+codex
+DB lint는 로컬 Postgres 미실행 상태로 기존과 동일하게 실패했습니다(`127.0.0.1:54322`). 코드 측면 검증은 완료됐고, 마지막으로 로그아웃 경로까지 세션 이벤트가 연결되는지 빠르게 확인 후 마무리하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,220p' components/navigation.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
+import { LogOut } from "lucide-react";
+import { clearAllAuthState } from "@/lib/auth";
+
+export default function Navigation() {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const navLinks = [
+    { href: "/", label: "오늘의 예측", icon: "/search-icon.svg" },
+    { href: "/history", label: "기록", icon: "/history-icon.svg" },
+    { href: "/leaderboard", label: "순위", icon: "/leaderboard-icon.svg" },
+    { href: "/tutorial", label: "튜토리얼", icon: "/info-icon.svg" },
+  ];
+
+  const shouldHide =
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+
+thinking
+**Summarizing session-sync fix with references**
+codex
+US-004 확인 후 `ERROR.md` 실패 원인(REQ-031 세션 stale) 수정까지 반영했습니다.
+
+- REQ-027: 로그인 시 지갑 자동 생성 로직 확인됨  
+  [20260224_us004_wallet_system.sql:5](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:5)
+
+- REQ-028: `distribute_weekly_coins(p_amount)` RPC + 트랜잭션 기록 구현 확인됨  
+  [20260224_us004_wallet_system.sql:54](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:54)
+
+- REQ-029: `pg_cron` 주간 실행(월요일 00:00 KST) + 실패 시 수동 트리거 fallback 확인됨  
+  [20260224_us004_wallet_system.sql:243](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:243)  
+  수동 트리거 UI는 [app/admin/page.tsx:1016](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1016)
+
+- REQ-030: `admin_grant_coins(p_user_id, p_amount)` RPC + Admin 단건/전체 지급 UI 확인됨  
+  [20260224_us004_wallet_system.sql:123](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:123)  
+  [app/admin/page.tsx:1045](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1045)
+
+- REQ-031: 헤더 잔고 표시(🪙) 구현 확인 + **로그인 직후 즉시 반영 버그 수정**  
+  [components/app-header.tsx:78](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:78)
+
+실제 수정한 파일(버그 픽스):
+
+- `setUserSession/clearUserSession`에서 세션 변경 이벤트 발행 추가  
+  [lib/auth.ts:7](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts:7)
+
+- `useUserSession`가 `storage` + 커스텀 이벤트를 구독하도록 변경, `requireAuth` 리다이렉트도 세션 변화에 반응하도록 분리  
+  [useUserSession.ts:23](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:23)
+
+검증:
+
+- `npm run lint` 통과
+- `npm run build` 통과
+- `supabase db lint --local --schema public` 실패 (로컬 Postgres 미기동: `127.0.0.1:54322` 연결 거부)
+
+다음으로 원하면:
+1. Supabase에 US-004 마이그레이션 실제 적용(`db push`/SQL Editor)까지 진행하겠습니다.
+2. 로그인 직후 헤더 잔고 표시 시나리오를 수동 E2E 체크 절차로 정리해드리겠습니다.
+file update:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a9c051b67f9f12675d856781ca9d0abec5..401477629c58f9632343e08a307899c389ddb4cf
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ const parseSession = (value: string | null): UserSession | null => {
+   if (!value) return null;
+ 
+@@ -41,11 +47,13 @@
+ export const setUserSession = (session: UserSession) => {
+   if (!isBrowser()) return;
+   window.localStorage.setItem(USER_SESSION_KEY, JSON.stringify(session));
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const clearUserSession = () => {
+   if (!isBrowser()) return;
+   window.localStorage.removeItem(USER_SESSION_KEY);
++  dispatchSessionChangedEvent();
+ };
+ 
+ export const getPendingPasswordChangeSession = (): UserSession | null => {
+diff --git a/lib/hooks/useUserSession.ts b/lib/hooks/useUserSession.ts
+index 37e7c60b977acbaf3c7809607f78a789b3214bf0..55ceeb939011f29a620a2cbd7e565032a9e78e3b
+--- a/lib/hooks/useUserSession.ts
++++ b/lib/hooks/useUserSession.ts
+@@ -2,7 +2,12 @@
+ 
+ import { useEffect, useState } from "react";
+ import { useRouter } from "next/navigation";
+-import { getUserSession, type UserSession } from "@/lib/auth";
++import {
++  getUserSession,
++  type UserSession,
++  USER_SESSION_CHANGED_EVENT,
++  USER_SESSION_KEY,
++} from "@/lib/auth";
+ 
+ interface UseUserSessionOptions {
+   requireAuth?: boolean;
+@@ -16,14 +21,33 @@
+   const [isLoading, setIsLoading] = useState(true);
+ 
+   useEffect(() => {
+-    const storedSession = getUserSession();
+-    setSession(storedSession);
++    const syncSession = () => {
++      setSession(getUserSession());
++    };
++
++    syncSession();
+     setIsLoading(false);
+ 
+-    if (requireAuth && !storedSession) {
++    const handleStorage = (event: StorageEvent) => {
++      if (event.key === null || event.key === USER_SESSION_KEY) {
++        syncSession();
++      }
++    };
++
++    window.addEventListener("storage", handleStorage);
++    window.addEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++
++    return () => {
++      window.removeEventListener("storage", handleStorage);
++      window.removeEventListener(USER_SESSION_CHANGED_EVENT, syncSession);
++    };
++  }, []);
++
++  useEffect(() => {
++    if (!isLoading && requireAuth && !session) {
+       router.replace("/login");
+     }
+-  }, [requireAuth, router]);
++  }, [isLoading, requireAuth, router, session]);
+ 
+   return { session, isLoading };
+ };
+
+tokens used
+100,193
+US-004 확인 후 `ERROR.md` 실패 원인(REQ-031 세션 stale) 수정까지 반영했습니다.
+
+- REQ-027: 로그인 시 지갑 자동 생성 로직 확인됨  
+  [20260224_us004_wallet_system.sql:5](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:5)
+
+- REQ-028: `distribute_weekly_coins(p_amount)` RPC + 트랜잭션 기록 구현 확인됨  
+  [20260224_us004_wallet_system.sql:54](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:54)
+
+- REQ-029: `pg_cron` 주간 실행(월요일 00:00 KST) + 실패 시 수동 트리거 fallback 확인됨  
+  [20260224_us004_wallet_system.sql:243](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:243)  
+  수동 트리거 UI는 [app/admin/page.tsx:1016](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1016)
+
+- REQ-030: `admin_grant_coins(p_user_id, p_amount)` RPC + Admin 단건/전체 지급 UI 확인됨  
+  [20260224_us004_wallet_system.sql:123](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql:123)  
+  [app/admin/page.tsx:1045](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1045)
+
+- REQ-031: 헤더 잔고 표시(🪙) 구현 확인 + **로그인 직후 즉시 반영 버그 수정**  
+  [components/app-header.tsx:78](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:78)
+
+실제 수정한 파일(버그 픽스):
+
+- `setUserSession/clearUserSession`에서 세션 변경 이벤트 발행 추가  
+  [lib/auth.ts:7](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/auth.ts:7)
+
+- `useUserSession`가 `storage` + 커스텀 이벤트를 구독하도록 변경, `requireAuth` 리다이렉트도 세션 변화에 반응하도록 분리  
+  [useUserSession.ts:23](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:23)
+
+검증:
+
+- `npm run lint` 통과
+- `npm run build` 통과
+- `supabase db lint --local --schema public` 실패 (로컬 Postgres 미기동: `127.0.0.1:54322` 연결 거부)
+
+다음으로 원하면:
+1. Supabase에 US-004 마이그레이션 실제 적용(`db push`/SQL Editor)까지 진행하겠습니다.
+2. 로그인 직후 헤더 잔고 표시 시나리오를 수동 E2E 체크 절차로 정리해드리겠습니다.

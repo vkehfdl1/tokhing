@@ -1,0 +1,876 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/jeffrey/WebstormProjects/lookin/lookin
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019c9042-11b6-7a23-b1dc-b869f5ea7448
+--------
+user
+Read AGENTS.md for project context.
+
+You are an independent verifier. Check prd.json and review story US-010: 기존 코드 정리 및 마이그레이션
+
+Acceptance criteria:
+- REQ-062 기존 predictions 관련 API 함수 (submitMultiplePredictions, getTodaysGamesWithPredictions 등)를 새로운 마켓/주문 API로 교체.
+- REQ-063 기존 calculate_daily_matches RPC를 settle_market으로 교체.
+- REQ-064 기존 get_prediction_ratios_by_date_grouped RPC를 마켓 가격 표시로 교체.
+- REQ-065 lib/api.ts에 새로운 API 함수 추가: login(), changePassword(), getMarkets(), getMarketDetail(), executeBuyOrder(), executeSellOrder(), executeBuyByAmount(), getPositions(), getOrderHistory(), getWalletBalance() 등.
+- REQ-066 튜토리얼 페이지 내용을 새로운 LMSR 예측시장 규칙으로 업데이트. 기존 점수제 설명 제거, 토큰 매수/매도 및 0/100 정산 설명으로 교체.
+
+Review the implementation. Run tests as you see fit.
+
+If PASS: delete ERROR.md if it exists, then git add and git commit the changes.
+If FAIL: write ERROR.md explaining what the builder must fix.
+
+mcp startup: no servers
+
+thinking
+**Announcing skill usage**
+codex
+요청하신 검증 작업을 시작합니다. 먼저 `AGENTS.md`와 관련 스킬 지침을 확인한 뒤, `prd.json`의 `US-010` 기준으로 코드/테스트를 실제로 검증하겠습니다.
+exec
+/bin/zsh -lc 'pwd && ls -la' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+/Users/jeffrey/WebstormProjects/lookin/lookin
+total 1056
+drwxr-xr-x@  35 jeffrey  staff    1120 Feb 25 00:24 .
+drwxr-xr-x@   3 jeffrey  staff      96 Jul 13  2025 ..
+-rw-r--r--@   1 jeffrey  staff     863 Jul 19  2025 .env.local
+-rw-r--r--@   1 jeffrey  staff     625 Aug  8  2025 .env.local.example
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 25 00:25 .git
+-rw-r--r--@   1 jeffrey  staff     491 Jul 13  2025 .gitignore
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 25 00:24 .next
+drwxr-xr-x@   4 jeffrey  staff     128 Feb 24 22:16 .ralph
+-rw-r--r--@   1 jeffrey  staff    3134 Jul 19  2025 ADMIN_SETUP.md
+-rw-r--r--@   1 jeffrey  staff    4760 Feb 24 22:11 AGENTS.md
+-rw-r--r--@   1 jeffrey  staff     219 Jul 13  2025 GEMINI.md
+-rw-r--r--@   1 jeffrey  staff    1230 Feb 25 00:18 PROGRESS.md
+-rw-r--r--@   1 jeffrey  staff    5029 Jul 19  2025 README.md
+-rw-r--r--@   1 jeffrey  staff    4551 Jul 26  2025 RESPONSIVE_DESIGN_SUMMARY.md
+drwxr-xr-x@  15 jeffrey  staff     480 Feb 24 23:25 app
+drwxr-xr-x@  19 jeffrey  staff     608 Feb 25 00:22 components
+-rw-r--r--@   1 jeffrey  staff     427 Jul 13  2025 components.json
+-rw-r--r--@   1 jeffrey  staff     393 Jul 13  2025 eslint.config.mjs
+
+thinking
+**Identifying skill file to read**
+exec
+/bin/zsh -lc 'cat /Users/jeffrey/.codex/superpowers/skills/using-superpowers/SKILL.md' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+---
+name: using-superpowers
+description: Use when starting any conversation - establishes how to find and use skills, requiring Skill tool invocation before ANY response including clarifying questions
+---
+
+<EXTREMELY-IMPORTANT>
+If you think there is even a 1% chance a skill might apply to what you are doing, you ABSOLUTELY MUST invoke the skill.
+
+IF A SKILL APPLIES TO YOUR TASK, YOU DO NOT HAVE A CHOICE. YOU MUST USE IT.
+
+This is not negotiable. This is not optional. You cannot rationalize your way out of this.
+</EXTREMELY-IMPORTANT>
+
+## How to Access Skills
+
+**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you—follow it directly. Never use the Read tool on skill files.
+
+**In other environments:** Check your platform's documentation for how skills are loaded.
+
+# Using Skills
+
+thinking
+**Determining applicable skills for review**
+codex
+`using-superpowers` 스킬을 기준으로 진행 중이며, 이번 작업 성격상 `requesting-code-review`와 `verification-before-completion` 지침도 함께 확인해 검증 절차를 맞추겠습니다. 이제 `prd.json`의 `US-010`과 실제 코드 변경 범위를 대조합니다.
+exec
+/bin/zsh -lc 'cat /Users/jeffrey/.codex/superpowers/skills/verification-before-completion/SKILL.md' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'cat AGENTS.md' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'cat /Users/jeffrey/.codex/superpowers/skills/requesting-code-review/SKILL.md' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+---
+name: requesting-code-review
+description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+---
+
+# Requesting Code Review
+
+Dispatch superpowers:code-reviewer subagent to catch issues before they cascade.
+
+**Core principle:** Review early, review often.
+
+## When to Request Review
+
+**Mandatory:**
+- After each task in subagent-driven development
+- After completing major feature
+- Before merge to main
+
+**Optional but valuable:**
+- When stuck (fresh perspective)
+ succeeded in 52ms:
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+Claiming work is complete without verification is dishonesty, not efficiency.
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+ succeeded in 52ms:
+# AGENTS.md — ToKHin' LMSR Prediction Market
+
+## Project Overview
+
+KBO 야구 승부예측 앱(ToKHin')을 LMSR 기반 예측시장으로 전환하는 프로젝트.
+기존 "팀 하나 찍기 + 점수제"를 "HOME/AWAY/DRAW 토큰 매수/매도 + 만기 0/100 정산" 시스템으로 완전 대체한다.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router) + React 19 + TypeScript
+- **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix) + Pretendard 폰트
+- **Database**: Supabase (PostgreSQL) — 테이블, RPC 함수, RLS, pg_cron
+- **Auth**: 자체 구현 (학번 + SHA-256 해시 비밀번호, Supabase Auth 미사용)
+- **Deploy**: Vercel
+- **Package Manager**: npm
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+
+thinking
+**Preparing US-010 evaluation**
+codex
+이제 `US-010` 스토리 정의와 실제 구현 파일을 매핑해서 항목별로 검증하겠습니다. 먼저 `prd.json`의 해당 스토리와 `lib/api.ts`, 튜토리얼/관리자/메인 연계 코드를 추적합니다.
+exec
+/bin/zsh -lc 'rg -n "US-010|REQ-062|REQ-063|REQ-064|REQ-065|REQ-066" prd.json' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n \"submitMultiplePredictions|getTodaysGamesWithPredictions|calculate_daily_matches|get_prediction_ratios_by_date_grouped|settle_market|login\\(|changePassword\\(|getMarkets\\(|getMarketDetail\\(|executeBuyOrder\\(|executeSellOrder\\(|executeBuyByAmount\\(|getPositions\\(|getOrderHistory\\(|getWalletBalance\\(\" lib app components supabase -S" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+151:      "id": "US-010",
+157:        "REQ-062 \uae30\uc874 predictions \uad00\ub828 API \ud568\uc218 (submitMultiplePredictions, getTodaysGamesWithPredictions \ub4f1)\ub97c \uc0c8\ub85c\uc6b4 \ub9c8\ucf13/\uc8fc\ubb38 API\ub85c \uad50\uccb4.",
+158:        "REQ-063 \uae30\uc874 calculate_daily_matches RPC\ub97c settle_market\uc73c\ub85c \uad50\uccb4.",
+159:        "REQ-064 \uae30\uc874 get_prediction_ratios_by_date_grouped RPC\ub97c \ub9c8\ucf13 \uac00\uaca9 \ud45c\uc2dc\ub85c \uad50\uccb4.",
+160:        "REQ-065 lib/api.ts\uc5d0 \uc0c8\ub85c\uc6b4 API \ud568\uc218 \ucd94\uac00: login(), changePassword(), getMarkets(), getMarketDetail(), executeBuyOrder(), executeSellOrder(), executeBuyByAmount(), getPositions(), getOrderHistory(), getWalletBalance() \ub4f1.",
+161:        "REQ-066 \ud29c\ud1a0\ub9ac\uc5bc \ud398\uc774\uc9c0 \ub0b4\uc6a9\uc744 \uc0c8\ub85c\uc6b4 LMSR \uc608\uce21\uc2dc\uc7a5 \uaddc\uce59\uc73c\ub85c \uc5c5\ub370\uc774\ud2b8. \uae30\uc874 \uc810\uc218\uc81c \uc124\uba85 \uc81c\uac70, \ud1a0\ud070 \ub9e4\uc218/\ub9e4\ub3c4 \ubc0f 0/100 \uc815\uc0b0 \uc124\uba85\uc73c\ub85c \uad50\uccb4."
+ succeeded in 51ms:
+ M app/admin/page.tsx
+ M app/history/page.tsx
+ M app/page.tsx
+ M app/tutorial/page.tsx
+ D components/daily-history-card.tsx
+ D components/prediction-ratio-chart.tsx
+ M lib/api.ts
+ M prd.json
+?? .ralph/
+?? PROGRESS.md
+?? supabase/.temp/
+ succeeded in 51ms:
+supabase/migrations/20260224_us004_wallet_system.sql:5:CREATE OR REPLACE FUNCTION public.login(
+supabase/migrations/20260224_us004_wallet_system.sql:285:GRANT EXECUTE ON FUNCTION public.login(BIGINT, TEXT) TO anon, authenticated;
+app/login/page.tsx:52:      const result = await login(studentNumber.trim(), password);
+supabase/migrations/20260224_us003_lmsr_engine.sql:597:CREATE OR REPLACE FUNCTION public.settle_market(
+supabase/migrations/20260224_us003_lmsr_engine.sql:908:GRANT EXECUTE ON FUNCTION public.settle_market(INTEGER, TEXT) TO anon, authenticated;
+app/change-password/page.tsx:62:      await changePassword(pendingSession.user_id, newPassword);
+components/app-header.tsx:34:      const currentBalance = await getWalletBalance(session.user_id);
+supabase/migrations/20260224_us001_auth.sql:16:CREATE OR REPLACE FUNCTION public.login(
+supabase/migrations/20260224_us001_auth.sql:95:GRANT EXECUTE ON FUNCTION public.login(BIGINT, TEXT) TO anon, authenticated;
+app/page.tsx:166:      const todayMarkets = await getMarkets(today);
+app/page.tsx:176:        const tomorrowMarkets = await getMarkets(tomorrowDate);
+lib/api.ts:1574:  const { data, error } = await supabase.rpc("settle_market", {
+lib/api.ts:1580:    console.error("Error calling settle_market RPC:", error);
+app/market/[id]/page.tsx:311:        getMarketDetail(marketId),
+app/market/[id]/page.tsx:313:        getWalletBalance(session.user_id),
+app/market/[id]/page.tsx:590:          await executeBuyByAmount(
+app/market/[id]/page.tsx:597:          await executeBuyOrder(
+app/market/[id]/page.tsx:605:        await executeSellOrder(
+app/admin/page.tsx:1102:      const marketList = await getMarkets(selectedDate);
+app/admin/page.tsx:1231:          결과 정산(settle_market)과 마켓 강제 종료(CLOSE), 취소(CANCEL)를
+
+thinking
+**Inspecting production status details**
+exec
+/bin/zsh -lc "sed -n '130,220p' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+        "REQ-053 get_leaderboard_balance() RETURNS TABLE(...) RPC \ud568\uc218. \ucf54\uc778 \uc794\uace0 \uae30\uc900 \ub0b4\ub9bc\ucc28\uc21c \uc815\ub82c. \ubc18\ud658: rank, user_id, username, balance.",
+        "REQ-054 get_leaderboard_roi() RETURNS TABLE(...) RPC \ud568\uc218. \uc218\uc775\ub960 = (\ud604\uc7ac\uc794\uace0 - \ub204\uc801\uc9c0\uae09\ucf54\uc778) / \ub204\uc801\uc9c0\uae09\ucf54\uc778 \u00d7 100. \ubc18\ud658: rank, user_id, username, roi_percent, current_balance, total_granted.",
+        "REQ-055 \ub9ac\ub354\ubcf4\ub4dc UI\uc5d0 '\uc794\uace0 \uc21c\uc704' / '\uc218\uc775\ub960 \uc21c\uc704' \ud0ed \uc804\ud658.",
+        "REQ-056 \uae30\uc874 \ub9ac\ub354\ubcf4\ub4dc \uc2a4\ud0c0\uc77c \uc720\uc9c0: 1\ub4f1 tokhin-green \ubc30\uacbd + \ud770 \ud14d\uc2a4\ud2b8, 2~3\ub4f1 tokhin-green \ud14d\uc2a4\ud2b8, \ub098\uba38\uc9c0 \ud68c\uc0c9."
+      ]
+    },
+    {
+      "id": "US-009",
+      "title": "Admin \ud328\ub110 \u2014 \ub9c8\ucf13 \uad00\ub9ac, \uc815\uc0b0, \uc124\uc815",
+      "priority": 9,
+      "passes": false,
+      "description": "Admin \ud398\uc774\uc9c0\uc5d0 \ub9c8\ucf13 \uad00\ub9ac, \uc815\uc0b0 \uc2e4\ud589, b\uac12(\uc720\ub3d9\uc131) \uc124\uc815, \ucf54\uc778 \uc9c0\uae09 \uae30\ub2a5\uc744 \ucd94\uac00\ud55c\ub2e4. \ub514\uc790\uc778\uc740 prd.md\uc758 W-08 \uc640\uc774\uc5b4\ud504\ub808\uc784 \ucc38\uc870.",
+      "acceptanceCriteria": [
+        "REQ-057 \uacbd\uae30 \ub4f1\ub85d(\uc800\uc7a5) \uc2dc \ud574\ub2f9 \uacbd\uae30\uc758 \ub9c8\ucf13\uc774 \uc790\ub3d9\uc73c\ub85c \uc0dd\uc131\ub428. \ucd08\uae30 \uac00\uaca9: HOME 47.5, AWAY 47.5, DRAW 5.0 (\uae30\ubcf8\uac12). Admin\uc5d0\uc11c \ucd08\uae30 \uac00\uaca9\uc744 \ucee4\uc2a4\ud140 \uc124\uc815 \uac00\ub2a5.",
+        "REQ-058 '\uc815\uc0b0 \uc2e4\ud589' \ubc84\ud2bc: \uacbd\uae30 \uacb0\uacfc(HOME/AWAY/DRAW)\ub97c \uc120\ud0dd\ud558\uace0 \uc815\uc0b0\uc744 \uc2e4\ud589. settle_market RPC \ud638\ucd9c. \uc815\uc0b0 \uacb0\uacfc(\uc815\uc0b0 \uc720\uc800 \uc218, \ucd1d \ubc30\ubd84 \ucf54\uc778) \ud45c\uc2dc.",
+        "REQ-059 '\uc720\ub3d9\uc131(b\uac12) \uc124\uc815' \uc139\uc158: \ud604\uc7ac \uc804\uc5ed b\uac12 \ud45c\uc2dc + \ubcc0\uacbd \uc785\ub825. \ubcc0\uacbd \uc2dc \uc774\ud6c4 \uc0dd\uc131\ub418\ub294 \ub9c8\ucf13\uc5d0 \uc801\uc6a9 (\uae30\uc874 \ub9c8\ucf13\uc740 \uadf8\ub300\ub85c).",
+        "REQ-060 '\ucf54\uc778 \uc9c0\uae09' \uc139\uc158: '\uc804\uccb4 \uc720\uc800 \ucf54\uc778 \uc9c0\uae09' \ubc84\ud2bc (\uae08\uc561 \uc785\ub825) + '\ud2b9\uc815 \uc720\uc800 \ucf54\uc778 \uc9c0\uae09' (\ud559\ubc88 + \uae08\uc561). pg_cron \uc0c1\ud0dc \ud45c\uc2dc (\ub9c8\uc9c0\ub9c9 \uc790\ub3d9 \uc9c0\uae09 \uc2dc\uac01).",
+        "REQ-061 \ub9c8\ucf13 \uc0c1\ud0dc \uad00\ub9ac: \ub9c8\ucf13 \uac15\uc81c \uc885\ub8cc(CLOSE) \ub610\ub294 \ucde8\uc18c(CANCEL) \uae30\ub2a5. \ucde8\uc18c \uc2dc \ubaa8\ub4e0 \uc720\uc800\uc5d0\uac8c \ud22c\uc790\uae08 \uc6d0\uac00 \ud658\uae09."
+      ]
+    },
+
+thinking
+**Inspecting API file changes**
+exec
+/bin/zsh -lc 'wc -l lib/api.ts' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n \"submitMultiplePredictions|getTodaysGamesWithPredictions|getPredictionRatiosByDateGrouped|calculate_daily_matches|settle_market|login\\(|changePassword\\(|getMarkets\\(|getMarketDetail\\(|executeBuyOrder\\(|executeSellOrder\\(|executeBuyByAmount\\(|getPositions\\(|getOrderHistory\\(|getWalletBalance\\(\" lib/api.ts -S" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "git diff -- lib/api.ts | sed -n '1,240p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+    1826 lib/api.ts
+ succeeded in 50ms:
+1574:  const { data, error } = await supabase.rpc("settle_market", {
+1580:    console.error("Error calling settle_market RPC:", error);
+ succeeded in 52ms:
+diff --git a/lib/api.ts b/lib/api.ts
+index 5ef405b..6b1a088 100644
+--- a/lib/api.ts
++++ b/lib/api.ts
+@@ -235,6 +235,18 @@ export interface MarketListItem {
+   initialPrices: Record<MarketOutcome, number | null>;
+ }
+ 
++export interface MarketPriceDisplayItem {
++  marketId: number;
++  gameDate: string;
++  gameTime: string | null;
++  marketStatus: string;
++  homeTeamName: string;
++  awayTeamName: string;
++  homeTeamShortName: string | null;
++  awayTeamShortName: string | null;
++  prices: Record<MarketOutcome, number>;
++}
++
+
+thinking
+**Refining function search patterns**
+exec
+/bin/zsh -lc 'rg -n "export const (login|changePassword|getMarkets|getMarketDetail|executeBuyOrder|executeSellOrder|executeBuyByAmount|getPositions|getOrderHistory|getWalletBalance|getMarketPricesByDate)|export const (getTodaysGamesWithPredictions|submitMultiplePredictions|getPredictionHistory|getHistoryForDate|submitPrediction|getPredictionRatiosByDateGrouped)" lib/api.ts -S' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+581:export const login = async (
+610:export const changePassword = async (userId: string, newPassword: string) => {
+837:export const getMarkets = async (
+897:export const getMarketDetail = async (
+1115:export const getPositions = async (
+1121:export const getOrderHistoryByDate = async (
+1209:export const getOrderHistory = async (
+1300:export const executeBuyOrder = async (
+1321:export const executeBuyByAmount = async (
+1342:export const executeSellOrder = async (
+1750:export const getWalletBalance = async (userId: string): Promise<number> => {
+
+thinking
+**Searching for deprecated prediction APIs**
+codex
+`lib/api.ts`의 신규 함수 선언은 존재함을 확인했습니다. 이제 레거시 `predictions` 흐름/구 RPC 호출이 앱 코드에 남아있는지 전체 검색으로 확인합니다.
+exec
+/bin/zsh -lc "rg -n \"\\bpredictions\\b|predicted_winner_team_id|points_earned|is_settled\" app components lib -S" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'rg -n "submitMultiplePredictions|getTodaysGamesWithPredictions|getPredictionHistory|getHistoryForDate|submitPrediction|get_prediction_ratios_by_date_grouped|calculate_daily_matches" app components lib -S' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'rg -n "getMarketPriceDisplayByDate|getOrderHistoryByDate|getMarkets|getMarketDetail|getPositions|getOrderHistory|executeBuyOrder|executeSellOrder|executeBuyByAmount|getWalletBalance" app components lib -S' in /Users/jeffrey/WebstormProjects/lookin/lookin exited 1 in 52ms:
+
+ exited 1 in 52ms:
+
+ succeeded in 51ms:
+components/app-header.tsx:6:import { getWalletBalance } from "@/lib/api";
+components/app-header.tsx:34:      const currentBalance = await getWalletBalance(session.user_id);
+app/page.tsx:7:  getMarkets,
+app/page.tsx:166:      const todayMarkets = await getMarkets(today);
+app/page.tsx:176:        const tomorrowMarkets = await getMarkets(tomorrowDate);
+lib/api.ts:837:export const getMarkets = async (
+lib/api.ts:897:export const getMarketDetail = async (
+lib/api.ts:1115:export const getPositions = async (
+lib/api.ts:1121:export const getOrderHistoryByDate = async (
+lib/api.ts:1209:export const getOrderHistory = async (
+lib/api.ts:1213:  return getOrderHistoryByDate(userId, date);
+lib/api.ts:1300:export const executeBuyOrder = async (
+lib/api.ts:1321:export const executeBuyByAmount = async (
+lib/api.ts:1342:export const executeSellOrder = async (
+lib/api.ts:1750:export const getWalletBalance = async (userId: string): Promise<number> => {
+app/market/[id]/page.tsx:9:  executeBuyByAmount,
+app/market/[id]/page.tsx:10:  executeBuyOrder,
+app/market/[id]/page.tsx:11:  executeSellOrder,
+app/market/[id]/page.tsx:12:  getMarketDetail,
+app/market/[id]/page.tsx:14:  getWalletBalance,
+
+thinking
+**Confirming absence of old references**
+exec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '540,760p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '800,980p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '1080,1380p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+   540	        const price = Number(row.price);
+   541	
+   542	        if (!isMarketOutcome(outcome) || !Number.isFinite(price)) {
+   543	          return;
+   544	        }
+   545	
+   546	        prices[outcome] = price;
+   547	      });
+   548	
+   549	      return [marketId, prices] as const;
+   550	    })
+   551	  );
+   552	
+   553	  return new Map<number, Record<MarketOutcome, number>>(priceEntries);
+   554	};
+   555	
+   556	const getKstDayRangeAsUtcIso = (date: string) => {
+   557	  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+   558	    throw new Error("조회 날짜 형식이 올바르지 않습니다");
+   559	  }
+ succeeded in 52ms:
+   800	      return [];
+   801	    }
+   802	
+   803	    return [
+   804	      {
+   805	        id: market.id,
+   806	        gameId: market.game_id,
+   807	        gameDate: game.game_date,
+   808	        gameTime: game.game_time ?? null,
+   809	        gameStatus: game.game_status,
+   810	        marketStatus: market.status,
+   811	        result: market.result,
+   812	        homeTeamName: homeTeam.name,
+   813	        awayTeamName: awayTeam.name,
+   814	        homeTeamShortName: homeTeam.short_name ?? null,
+   815	        awayTeamShortName: awayTeam.short_name ?? null,
+   816	        prices,
+   817	        initialPrices: {
+   818	          HOME: toNumberOrNull(market.initial_home_price),
+   819	          AWAY: toNumberOrNull(market.initial_away_price),
+ succeeded in 50ms:
+  1080	      return;
+  1081	    }
+  1082	
+  1083	    const homeTeam = normalizeTeamRelation(game.home_team);
+  1084	    const awayTeam = normalizeTeamRelation(game.away_team);
+  1085	
+  1086	    if (!homeTeam || !awayTeam) {
+  1087	      return;
+  1088	    }
+  1089	
+  1090	    const currentPrice = pricesByMarket.get(marketId)?.[outcome] ?? 0;
+  1091	    const unrealizedPnl = (currentPrice - avgEntryPrice) * quantity;
+  1092	
+  1093	    items.push({
+  1094	      marketId,
+  1095	      outcome,
+  1096	      quantity,
+  1097	      avgEntryPrice,
+  1098	      currentPrice,
+  1099	      unrealizedPnl,
+
+thinking
+**Identifying key functions for inspection**
+exec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '1520,1625p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+  1520	      skippedCount: uniqueGameIds.length,
+  1521	      createdMarketIds: [],
+  1522	    };
+  1523	  }
+  1524	
+  1525	  const createdMarketIds: number[] = [];
+  1526	  for (const gameId of missingGameIds) {
+  1527	    const { data, error } = await supabase.rpc("create_market", {
+  1528	      p_game_id: gameId,
+  1529	      p_initial_home: homePrice,
+  1530	      p_initial_away: awayPrice,
+  1531	      p_initial_draw: drawPrice,
+  1532	    });
+  1533	
+  1534	    if (error) {
+  1535	      const loweredMessage = error.message.toLowerCase();
+  1536	      const isDuplicateError =
+  1537	        loweredMessage.includes("duplicate") || loweredMessage.includes("unique");
+  1538	
+  1539	      if (isDuplicateError) {
+
+thinking
+**Reviewing wallet balance retrieval**
+exec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '1715,1785p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+  1715	  if (!Number.isFinite(previousB) || !Number.isFinite(currentB) || currentB <= 0) {
+  1716	    throw new Error("b값 변경 응답 형식이 올바르지 않습니다");
+  1717	  }
+  1718	
+  1719	  return {
+  1720	    previousB,
+  1721	    currentB,
+  1722	  };
+  1723	};
+  1724	
+  1725	export const getWeeklyCoinCronStatus =
+  1726	  async (): Promise<WeeklyCoinCronStatusResult> => {
+  1727	    const { data, error } = await supabase.rpc("get_weekly_coin_cron_status");
+  1728	
+  1729	    if (error) {
+  1730	      console.error("Error calling get_weekly_coin_cron_status RPC:", error);
+  1731	      throw new Error("자동 지급 상태 조회 중 오류가 발생했습니다");
+  1732	    }
+  1733	
+  1734	    const rpcResult = data as WeeklyCoinCronStatusRpcResponse | null;
+
+thinking
+**Reviewing interface and function changes**
+codex
+레거시 API 호출 흔적은 앱 코드에서 보이지 않습니다. 이어서 실제 화면 단의 교체 여부(메인/관리자/히스토리/튜토리얼)와 `settle_market` 전환을 파일별 diff로 확인합니다.
+exec
+/bin/zsh -lc "git diff -- app/page.tsx | sed -n '1,260p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "git diff -- app/tutorial/page.tsx | sed -n '1,260p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "git diff -- app/admin/page.tsx | sed -n '1,320p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "git diff -- app/history/page.tsx | sed -n '1,320p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 8a9ab3c..06493f5 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -18,7 +18,7 @@ import {
+   ensureMarketsForGames,
+   getGameData,
+   getLiquidityB,
+-  getMarketListForDate,
++  getMarkets,
+   getWeeklyCoinCronStatus,
+   getUsersForAdmin,
+   settleMarket,
+@@ -932,132 +932,6 @@ function MatchManagement({
+   );
+ }
+ 
+-// Simple Modal Component
+-interface ModalProps {
+-  isOpen: boolean;
+ succeeded in 52ms:
+diff --git a/app/page.tsx b/app/page.tsx
+index ba98125..fc1c766 100644
+--- a/app/page.tsx
++++ b/app/page.tsx
+@@ -4,7 +4,7 @@ import Link from "next/link";
+ import { useCallback, useEffect, useState } from "react";
+ import {
+   getISODate,
+-  getMarketListForDate,
++  getMarkets,
+   type MarketListItem,
+ } from "@/lib/api";
+ import { useUserSession } from "@/lib/hooks/useUserSession";
+@@ -163,7 +163,7 @@ export default function HomePage() {
+ 
+     try {
+       const today = getISODate();
+-      const todayMarkets = await getMarketListForDate(today);
++      const todayMarkets = await getMarkets(today);
+ 
+ succeeded in 52ms:
+diff --git a/app/tutorial/page.tsx b/app/tutorial/page.tsx
+index 2ca377f..e321eba 100644
+--- a/app/tutorial/page.tsx
++++ b/app/tutorial/page.tsx
+@@ -3,6 +3,15 @@
+ import { useIsMobile } from "@/lib/hooks/useResponsive";
+ import { useUserSession } from "@/lib/hooks/useUserSession";
+ 
++const OUTCOME_ITEMS = ["HOME", "AWAY", "DRAW"] as const;
++
++const MARKET_STATUS_ITEMS = [
++  { status: "OPEN", description: "주문 가능 상태입니다." },
++  { status: "CLOSED", description: "신규 주문은 막혀 있고 정산 대기 상태입니다." },
++  { status: "SETTLED", description: "결과 확정 및 정산이 완료된 상태입니다." },
++  { status: "CANCELED", description: "마켓 취소로 원가 환급이 처리된 상태입니다." },
++] as const;
++
+ export default function TutorialPage() {
+   const isMobile = useIsMobile();
+   const { session, isLoading } = useUserSession({ requireAuth: true });
+ succeeded in 50ms:
+diff --git a/app/history/page.tsx b/app/history/page.tsx
+index 769b608..c7b57e9 100644
+--- a/app/history/page.tsx
++++ b/app/history/page.tsx
+@@ -2,8 +2,8 @@
+ 
+ import { useEffect, useMemo, useRef, useState } from "react";
+ import {
+-  getOpenPositionsHistory,
+-  getOrderHistoryByDate,
++  getOrderHistory,
++  getPositions,
+   getSettlementHistory,
+   type OpenPositionHistoryItem,
+   type OrderHistoryItem,
+@@ -261,7 +261,7 @@ export default function HistoryPage() {
+       setPositionsError(null);
+ 
+       try {
+-        const data = await getOpenPositionsHistory(session.user_id);
+
+thinking
+**Preparing to inspect full tutorial**
+exec
+/bin/zsh -lc "nl -ba app/tutorial/page.tsx | sed -n '1,260p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+     1	"use client";
+     2	
+     3	import { useIsMobile } from "@/lib/hooks/useResponsive";
+     4	import { useUserSession } from "@/lib/hooks/useUserSession";
+     5	
+     6	const OUTCOME_ITEMS = ["HOME", "AWAY", "DRAW"] as const;
+     7	
+     8	const MARKET_STATUS_ITEMS = [
+     9	  { status: "OPEN", description: "주문 가능 상태입니다." },
+    10	  { status: "CLOSED", description: "신규 주문은 막혀 있고 정산 대기 상태입니다." },
+    11	  { status: "SETTLED", description: "결과 확정 및 정산이 완료된 상태입니다." },
+    12	  { status: "CANCELED", description: "마켓 취소로 원가 환급이 처리된 상태입니다." },
+    13	] as const;
+    14	
+    15	export default function TutorialPage() {
+    16	  const isMobile = useIsMobile();
+    17	  const { session, isLoading } = useUserSession({ requireAuth: true });
+    18	
+    19	  if (isLoading) {
+    20	    return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
+
+thinking
+**Inspecting admin and RPC usage**
+exec
+/bin/zsh -lc 'rg -n "calculate_daily_matches|get_prediction_ratios_by_date_grouped" -S' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+prd.json:158:        "REQ-063 \uae30\uc874 calculate_daily_matches RPC\ub97c settle_market\uc73c\ub85c \uad50\uccb4.",
+prd.json:159:        "REQ-064 \uae30\uc874 get_prediction_ratios_by_date_grouped RPC\ub97c \ub9c8\ucf13 \uac00\uaca9 \ud45c\uc2dc\ub85c \uad50\uccb4.",
+prd.md:399:  - REQ-063 기존 `calculate_daily_matches` RPC를 `settle_market`으로 교체.
+prd.md:400:  - REQ-064 기존 `get_prediction_ratios_by_date_grouped` RPC를 마켓 가격 표시로 교체.
+
+thinking
+**Verifying old chart removal**
+exec
+/bin/zsh -lc "git diff -- components/daily-history-card.tsx | sed -n '1,260p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "git diff -- components/prediction-ratio-chart.tsx | sed -n '1,260p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'rg -n "MarketPrice|가격|ratio|prediction" app components/lib -S' in /Users/jeffrey/WebstormProjects/lookin/lookin exited 2 in 51ms:
+rg: components/lib: No such file or directory (os error 2)
+app/layout.tsx:59:      suppressHydrationWarning
+app/admin/page.tsx:206:      throw new Error("초기 가격은 숫자로 입력해주세요.");
+app/admin/page.tsx:210:      throw new Error("초기 가격은 모두 0보다 커야 합니다.");
+app/admin/page.tsx:485:        <h3 className="font-semibold text-black mb-2">마켓 초기 가격 설정</h3>
+app/admin/page.tsx:487:          경기 저장 시 마켓 자동 생성에 사용할 초기 가격입니다. 합계는 100이어야
+app/tutorial/page.tsx:78:            2. 가격과 주문
+app/tutorial/page.tsx:82:              마켓 가격은 LMSR 수식으로 계산되며, HOME/AWAY/DRAW 가격 합은 항상
+ succeeded in 51ms:
+diff --git a/components/prediction-ratio-chart.tsx b/components/prediction-ratio-chart.tsx
+deleted file mode 100644
+index 1347db5..0000000
+--- a/components/prediction-ratio-chart.tsx
++++ /dev/null
+@@ -1,162 +0,0 @@
+-"use client";
+-
+-import { useState, useEffect } from "react";
+-import { getPredictionRatiosForActiveGames } from "@/lib/api";
+-import { useIsMobile } from "@/lib/hooks/useResponsive";
+-
+-type PredictionRatio = {
+-  home_team_name: string;
+-  away_team_name: string;
+-  home_team_ratio: number;
+-  away_team_ratio: number;
+-};
+-
+-interface PredictionRatioChartProps {
+ succeeded in 51ms:
+diff --git a/components/daily-history-card.tsx b/components/daily-history-card.tsx
+deleted file mode 100644
+index 6716233..0000000
+--- a/components/daily-history-card.tsx
++++ /dev/null
+@@ -1,296 +0,0 @@
+-"use client";
+-
+-import { useState, useEffect } from "react";
+-import { getHistoryForDate } from "@/lib/api";
+-import { useIsMobile } from "@/lib/hooks/useResponsive";
+-
+-function selectTeamColor(teamName: string): {
+-  backgroundColor: string;
+-  textColor: string;
+-} {
+-  switch (teamName) {
+-    case "KIA 타이거즈":
+-      return { backgroundColor: "bg-kia", textColor: "text-kia" };
+-    case "NC 다이노스":
+
+thinking
+**Reviewing history file for path consistency**
+exec
+/bin/zsh -lc "nl -ba app/history/page.tsx | sed -n '1,420p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+     1	"use client";
+     2	
+     3	import { useEffect, useMemo, useRef, useState } from "react";
+     4	import {
+     5	  getOrderHistory,
+     6	  getPositions,
+     7	  getSettlementHistory,
+     8	  type OpenPositionHistoryItem,
+     9	  type OrderHistoryItem,
+    10	  type SettlementHistoryItem,
+    11	} from "@/lib/api";
+    12	import { useUserSession } from "@/lib/hooks/useUserSession";
+    13	
+    14	type HistoryTab = "OPEN_POSITIONS" | "ORDERS" | "SETTLEMENTS";
+    15	
+    16	const KST_OFFSET_MINUTES = 9 * 60;
+    17	const HISTORY_TABS: Array<{ id: HistoryTab; label: string }> = [
+    18	  { id: "OPEN_POSITIONS", label: "진행 중 포지션" },
+    19	  { id: "ORDERS", label: "거래 내역" },
+    20	  { id: "SETTLEMENTS", label: "정산 내역" },
+
+thinking
+**Inspecting price display usage**
+exec
+/bin/zsh -lc "nl -ba app/page.tsx | sed -n '1,360p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+     1	"use client";
+     2	
+     3	import Link from "next/link";
+     4	import { useCallback, useEffect, useState } from "react";
+     5	import {
+     6	  getISODate,
+     7	  getMarkets,
+     8	  type MarketListItem,
+     9	} from "@/lib/api";
+    10	import { useUserSession } from "@/lib/hooks/useUserSession";
+    11	
+    12	type MarketOutcome = "HOME" | "AWAY" | "DRAW";
+    13	type MarketDateLabel = "today" | "tomorrow";
+    14	type DisplayMarketStatus = "OPEN" | "CLOSED" | "SETTLED" | "CANCELED";
+    15	
+    16	const KOREAN_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+    17	
+    18	const MARKET_STATUS_BADGE_CLASSES: Record<DisplayMarketStatus, string> = {
+    19	  OPEN: "bg-tokhin-green/10 text-tokhin-green",
+    20	  CLOSED: "bg-zinc-200 text-zinc-600",
+
+thinking
+**Verifying login API usage**
+exec
+/bin/zsh -lc "nl -ba app/login/page.tsx | sed -n '1,220p' && echo '---' && nl -ba app/change-password/page.tsx | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+     1	"use client";
+     2	
+     3	import { useEffect, useState } from "react";
+     4	import { useRouter } from "next/navigation";
+     5	import { Button } from "@/components/ui/button";
+     6	import { Input } from "@/components/ui/input";
+     7	import {
+     8	  clearUserSession,
+     9	  clearPendingPasswordChangeSession,
+    10	  getPendingPasswordChangeSession,
+    11	  getUserSession,
+    12	  setPendingPasswordChangeSession,
+    13	  setUserSession,
+    14	} from "@/lib/auth";
+    15	import { login } from "@/lib/api";
+    16	
+    17	export default function LoginPage() {
+    18	  const router = useRouter();
+    19	  const [studentNumber, setStudentNumber] = useState("");
+    20	  const [password, setPassword] = useState("");
+
+thinking
+**Verifying API functions and scripts**
+exec
+/bin/zsh -lc 'cat package.json' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+{
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-label": "^2.1.6",
+    "@radix-ui/react-slot": "^1.2.2",
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "next": "latest",
+    "next-themes": "^0.4.6",
+
+thinking
+**Deciding lint and build steps**
+codex
+코드 기준 점검을 마친 뒤 실제 검증 명령으로 넘어갑니다. `lint`와 `build`를 실행해 현재 구현이 최소 품질 게이트를 통과하는지 확인하겠습니다.
+exec
+/bin/zsh -lc 'npm run lint' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 1.19s:
+
+> lint
+> next lint
+
+✔ No ESLint warnings or errors
+
+thinking
+**Running build step**
+exec
+/bin/zsh -lc 'npm run build' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 8.86s:
+
+> build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled successfully in 0ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/12) ...
+   Generating static pages (3/12) 
+   Generating static pages (6/12) 
+   Generating static pages (9/12) 
+ ✓ Generating static pages (12/12)
+   Finalizing page optimization ...
+
+thinking
+**Inspecting settle market usage**
+exec
+/bin/zsh -lc 'rg -n "settleMarket|settle_market|calculate_daily_matches" app/admin/page.tsx lib/api.ts -S' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+lib/api.ts:1562:export const settleMarket = async (
+lib/api.ts:1574:  const { data, error } = await supabase.rpc("settle_market", {
+lib/api.ts:1580:    console.error("Error calling settle_market RPC:", error);
+app/admin/page.tsx:24:  settleMarket,
+app/admin/page.tsx:1148:      const result = await settleMarket(market.id, targetResult);
+app/admin/page.tsx:1231:          결과 정산(settle_market)과 마켓 강제 종료(CLOSE), 취소(CANCEL)를
+
+thinking
+**Inspecting legacy prediction calls**
+exec
+/bin/zsh -lc 'rg -n "getPredictionRatios|get_prediction_ratios|prediction ratio|ratio" lib/api.ts app components -S' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+components/navigation.tsx:41:              className="flex items-center justify-center py-2 transition-all duration-200"
+components/forgot-password-form.tsx:34:      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
+components/tutorial/sign-up-user-steps.tsx:28:                "https://supabase.com/dashboard/project/_/auth/url-configuration"
+app/layout.tsx:59:      suppressHydrationWarning
+
+thinking
+**Verifying API replacement and preparing commit**
+codex
+수용 기준/코드/빌드 검증 결과를 바탕으로 PASS 판정을 준비 중입니다. 마지막으로 `ERROR.md` 존재 여부를 확인하고, 있으면 삭제 후 관련 변경만 커밋하겠습니다.
+exec
+/bin/zsh -lc 'if [ -f ERROR.md ]; then echo "exists"; else echo "missing"; fi && git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+missing
+ M app/admin/page.tsx
+ M app/history/page.tsx
+ M app/page.tsx
+ M app/tutorial/page.tsx
+ D components/daily-history-card.tsx
+ D components/prediction-ratio-chart.tsx
+ M lib/api.ts
+ M prd.json
+?? .ralph/
+?? PROGRESS.md
+?? supabase/.temp/
+
+thinking
+**Verifying acceptance before commit**
+exec
+/bin/zsh -lc 'git add app/admin/page.tsx app/history/page.tsx app/page.tsx app/tutorial/page.tsx components/daily-history-card.tsx components/prediction-ratio-chart.tsx lib/api.ts prd.json && git commit -m "refactor: migrate legacy prediction flow to LMSR market APIs"' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+[Feature/stock-market 53c7940] refactor: migrate legacy prediction flow to LMSR market APIs
+ 8 files changed, 147 insertions(+), 1243 deletions(-)
+ delete mode 100644 components/daily-history-card.tsx
+ delete mode 100644 components/prediction-ratio-chart.tsx
+
+thinking
+**Verifying untracked files in status**
+exec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+?? .ralph/
+?? PROGRESS.md
+?? supabase/.temp/
+
+thinking
+**Summarizing final acceptance**
+codex
+PASS: `US-010` 구현이 수용 기준을 충족합니다.
+
+검증 근거:
+- REQ-062: 레거시 predictions API 제거/교체 확인.
+  - `submitMultiplePredictions`, `getTodaysGamesWithPredictions` 등은 `lib/api.ts`에서 제거됨.
+  - 앱은 마켓/주문 API 사용: [app/page.tsx:7](/Users/jeffrey/WebstormProjects/lookin/lookin/app/page.tsx:7), [app/history/page.tsx:5](/Users/jeffrey/WebstormProjects/lookin/lookin/app/history/page.tsx:5)
+- REQ-063: `calculate_daily_matches` 제거, `settle_market` 사용 확인.
+  - [lib/api.ts:1562](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1562), [lib/api.ts:1574](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1574)
+  - 관리자 정산 호출: [app/admin/page.tsx:1148](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1148)
+- REQ-064: 예측 비율 RPC 기반 UI 제거, 마켓 가격 표시로 전환 확인.
+  - 레거시 컴포넌트 삭제: [components/prediction-ratio-chart.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/components/prediction-ratio-chart.tsx)
+  - 마켓 가격 표시: [app/page.tsx:246](/Users/jeffrey/WebstormProjects/lookin/lookin/app/page.tsx:246)
+- REQ-065: 신규 API 함수 추가 확인.
+  - [lib/api.ts:581](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:581) `login`
+  - [lib/api.ts:610](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:610) `changePassword`
+  - [lib/api.ts:837](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:837) `getMarkets`
+  - [lib/api.ts:897](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:897) `getMarketDetail`
+  - [lib/api.ts:1300](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1300) `executeBuyOrder`
+  - [lib/api.ts:1321](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1321) `executeBuyByAmount`
+  - [lib/api.ts:1342](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1342) `executeSellOrder`
+  - [lib/api.ts:1115](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1115) `getPositions`
+  - [lib/api.ts:1209](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1209) `getOrderHistory`
+  - [lib/api.ts:1750](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1750) `getWalletBalance`
+- REQ-066: 튜토리얼 LMSR 규칙 반영 확인.
+  - [app/tutorial/page.tsx:42](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:42), [app/tutorial/page.tsx:78](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:78), [app/tutorial/page.tsx:99](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:99)
+
+실행 검증:
+- `npm run lint` 통과
+- `npm run build` 통과 (타입체크/프로덕션 빌드 성공)
+
+요청된 후속 처리:
+- `ERROR.md` 없음(삭제 불필요) 확인
+- 커밋 완료: `53c7940`
+- 커밋 메시지: `refactor: migrate legacy prediction flow to LMSR market APIs`
+tokens used
+64,471
+PASS: `US-010` 구현이 수용 기준을 충족합니다.
+
+검증 근거:
+- REQ-062: 레거시 predictions API 제거/교체 확인.
+  - `submitMultiplePredictions`, `getTodaysGamesWithPredictions` 등은 `lib/api.ts`에서 제거됨.
+  - 앱은 마켓/주문 API 사용: [app/page.tsx:7](/Users/jeffrey/WebstormProjects/lookin/lookin/app/page.tsx:7), [app/history/page.tsx:5](/Users/jeffrey/WebstormProjects/lookin/lookin/app/history/page.tsx:5)
+- REQ-063: `calculate_daily_matches` 제거, `settle_market` 사용 확인.
+  - [lib/api.ts:1562](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1562), [lib/api.ts:1574](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1574)
+  - 관리자 정산 호출: [app/admin/page.tsx:1148](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx:1148)
+- REQ-064: 예측 비율 RPC 기반 UI 제거, 마켓 가격 표시로 전환 확인.
+  - 레거시 컴포넌트 삭제: [components/prediction-ratio-chart.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/components/prediction-ratio-chart.tsx)
+  - 마켓 가격 표시: [app/page.tsx:246](/Users/jeffrey/WebstormProjects/lookin/lookin/app/page.tsx:246)
+- REQ-065: 신규 API 함수 추가 확인.
+  - [lib/api.ts:581](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:581) `login`
+  - [lib/api.ts:610](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:610) `changePassword`
+  - [lib/api.ts:837](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:837) `getMarkets`
+  - [lib/api.ts:897](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:897) `getMarketDetail`
+  - [lib/api.ts:1300](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1300) `executeBuyOrder`
+  - [lib/api.ts:1321](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1321) `executeBuyByAmount`
+  - [lib/api.ts:1342](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1342) `executeSellOrder`
+  - [lib/api.ts:1115](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1115) `getPositions`
+  - [lib/api.ts:1209](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1209) `getOrderHistory`
+  - [lib/api.ts:1750](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/api.ts:1750) `getWalletBalance`
+- REQ-066: 튜토리얼 LMSR 규칙 반영 확인.
+  - [app/tutorial/page.tsx:42](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:42), [app/tutorial/page.tsx:78](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:78), [app/tutorial/page.tsx:99](/Users/jeffrey/WebstormProjects/lookin/lookin/app/tutorial/page.tsx:99)
+
+실행 검증:
+- `npm run lint` 통과
+- `npm run build` 통과 (타입체크/프로덕션 빌드 성공)
+
+요청된 후속 처리:
+- `ERROR.md` 없음(삭제 불필요) 확인
+- 커밋 완료: `53c7940`
+- 커밋 메시지: `refactor: migrate legacy prediction flow to LMSR market APIs`

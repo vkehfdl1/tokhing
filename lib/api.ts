@@ -1848,3 +1848,31 @@ export const getUsersForAdmin = async (): Promise<AdminUser[]> => {
 
   return (data ?? []) as AdminUser[];
 };
+
+export const adminResetPassword = async (studentNumber: number) => {
+  const { data, error } = await supabase.rpc("admin_reset_password", {
+    p_student_number: studentNumber,
+  });
+
+  if (error) {
+    console.error("Error calling admin_reset_password RPC:", error);
+    throw new Error("비밀번호 초기화 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as {
+    success: boolean;
+    error?: string;
+    username?: string;
+    student_number?: number;
+  } | null;
+
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "비밀번호 초기화에 실패했습니다");
+  }
+
+  return {
+    success: true,
+    username: rpcResult.username ?? "",
+    studentNumber: Number(rpcResult.student_number ?? studentNumber),
+  };
+};

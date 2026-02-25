@@ -1,0 +1,939 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/jeffrey/WebstormProjects/lookin/lookin
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019c8ffb-4de8-7de3-9d56-c87b417a417b
+--------
+user
+Read AGENTS.md for project context.
+
+You are an independent verifier. Check prd.json and review story US-004: 지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급
+
+Acceptance criteria:
+- REQ-027 유저가 처음 로그인할 때 wallet이 없으면 자동 생성 (balance = 0).
+- REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC 함수 구현. 모든 유저에게 p_amount 코인 지급 + transaction 기록. 반환값: {success, users_count, total_distributed}.
+- REQ-029 Supabase pg_cron 확장을 사용하여 매주 월요일 00:00 KST에 distribute_weekly_coins() 자동 실행. 또는 pg_cron이 불가능할 경우 Admin에서 수동 트리거 버튼 제공.
+- REQ-030 Admin 페이지에서 특정 유저 또는 전체 유저에게 코인을 수동 지급하는 기능. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC 함수.
+- REQ-031 프론트엔드 상단 (헤더 영역)에 현재 코인 잔고를 항상 표시. 코인 아이콘 + 숫자 (예: 🪙 3,250).
+
+Review the implementation. Run tests as you see fit.
+
+If PASS: delete ERROR.md if it exists, then git add and git commit the changes.
+If FAIL: write ERROR.md explaining what the builder must fix.
+
+mcp startup: no servers
+
+thinking
+**Planning initial inspection and commentary**
+codex
+요청하신 대로 `US-004` 구현을 독립 검증하겠습니다. 먼저 `AGENTS.md`와 `prd.json`의 해당 스토리 정의를 확인하고, 이후 코드/RPC/스케줄/프론트 표시를 점검한 뒤 테스트 결과로 PASS/FAIL을 판정하겠습니다.
+
+thinking
+**Deciding skill for review task**
+exec
+/bin/zsh -lc 'pwd && ls -la' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg --files | rg -n 'AGENTS\\.md|prd\\.json|ERROR\\.md|lib/api\\.ts|app/admin/page\\.tsx|app/layout\\.tsx|app/page\\.tsx|components/navigation\\.tsx'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+/Users/jeffrey/WebstormProjects/lookin/lookin
+total 1056
+drwxr-xr-x@  35 jeffrey  staff    1120 Feb 24 23:07 .
+drwxr-xr-x@   3 jeffrey  staff      96 Jul 13  2025 ..
+-rw-r--r--@   1 jeffrey  staff     863 Jul 19  2025 .env.local
+-rw-r--r--@   1 jeffrey  staff     625 Aug  8  2025 .env.local.example
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 23:08 .git
+-rw-r--r--@   1 jeffrey  staff     491 Jul 13  2025 .gitignore
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 22:40 .next
+drwxr-xr-x@   4 jeffrey  staff     128 Feb 24 22:16 .ralph
+-rw-r--r--@   1 jeffrey  staff    3134 Jul 19  2025 ADMIN_SETUP.md
+-rw-r--r--@   1 jeffrey  staff    4760 Feb 24 22:11 AGENTS.md
+-rw-r--r--@   1 jeffrey  staff     219 Jul 13  2025 GEMINI.md
+-rw-r--r--@   1 jeffrey  staff     457 Feb 24 23:02 PROGRESS.md
+-rw-r--r--@   1 jeffrey  staff    5029 Jul 19  2025 README.md
+-rw-r--r--@   1 jeffrey  staff    4551 Jul 26  2025 RESPONSIVE_DESIGN_SUMMARY.md
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 22:23 app
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 23:06 components
+-rw-r--r--@   1 jeffrey  staff     427 Jul 13  2025 components.json
+-rw-r--r--@   1 jeffrey  staff     393 Jul 13  2025 eslint.config.mjs
+ succeeded in 52ms:
+3:prd.json
+4:AGENTS.md
+14:lib/api.ts
+34:components/navigation.tsx
+76:app/page.tsx
+81:app/layout.tsx
+84:app/admin/page.tsx
+ succeeded in 52ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M prd.json
+?? .ralph/
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+
+thinking
+**Planning exploration and commentary**
+codex
+현재 워크트리에 `US-004` 관련 변경(`lib/api.ts`, `app/admin/page.tsx`, `app/layout.tsx`, 마이그레이션)이 이미 있습니다. 이제 `AGENTS.md`와 `prd.json`의 US-004 요구사항을 대조 기준으로 고정해 코드 검증을 진행하겠습니다.
+
+thinking
+**Assessing skill usage from AGENTS and SKILL files**
+exec
+/bin/zsh -lc "sed -n '1,220p' AGENTS.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n 'US-004|REQ-027|REQ-028|REQ-029|REQ-030|REQ-031' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,220p' /Users/jeffrey/.codex/superpowers/skills/requesting-code-review/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+62:      "id": "US-004",
+68:        "REQ-027 \uc720\uc800\uac00 \ucc98\uc74c \ub85c\uadf8\uc778\ud560 \ub54c wallet\uc774 \uc5c6\uc73c\uba74 \uc790\ub3d9 \uc0dd\uc131 (balance = 0).",
+69:        "REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. \ubaa8\ub4e0 \uc720\uc800\uc5d0\uac8c p_amount \ucf54\uc778 \uc9c0\uae09 + transaction \uae30\ub85d. \ubc18\ud658\uac12: {success, users_count, total_distributed}.",
+70:        "REQ-029 Supabase pg_cron \ud655\uc7a5\uc744 \uc0ac\uc6a9\ud558\uc5ec \ub9e4\uc8fc \uc6d4\uc694\uc77c 00:00 KST\uc5d0 distribute_weekly_coins() \uc790\ub3d9 \uc2e4\ud589. \ub610\ub294 pg_cron\uc774 \ubd88\uac00\ub2a5\ud560 \uacbd\uc6b0 Admin\uc5d0\uc11c \uc218\ub3d9 \ud2b8\ub9ac\uac70 \ubc84\ud2bc \uc81c\uacf5.",
+71:        "REQ-030 Admin \ud398\uc774\uc9c0\uc5d0\uc11c \ud2b9\uc815 \uc720\uc800 \ub610\ub294 \uc804\uccb4 \uc720\uc800\uc5d0\uac8c \ucf54\uc778\uc744 \uc218\ub3d9 \uc9c0\uae09\ud558\ub294 \uae30\ub2a5. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC \ud568\uc218.",
+72:        "REQ-031 \ud504\ub860\ud2b8\uc5d4\ub4dc \uc0c1\ub2e8 (\ud5e4\ub354 \uc601\uc5ed)\uc5d0 \ud604\uc7ac \ucf54\uc778 \uc794\uace0\ub97c \ud56d\uc0c1 \ud45c\uc2dc. \ucf54\uc778 \uc544\uc774\ucf58 + \uc22b\uc790 (\uc608: \ud83e\ude99 3,250)."
+ succeeded in 51ms:
+---
+name: requesting-code-review
+description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
+---
+
+# Requesting Code Review
+
+Dispatch superpowers:code-reviewer subagent to catch issues before they cascade.
+
+**Core principle:** Review early, review often.
+
+## When to Request Review
+
+**Mandatory:**
+- After each task in subagent-driven development
+- After completing major feature
+- Before merge to main
+
+**Optional but valuable:**
+- When stuck (fresh perspective)
+ succeeded in 52ms:
+# AGENTS.md — ToKHin' LMSR Prediction Market
+
+## Project Overview
+
+KBO 야구 승부예측 앱(ToKHin')을 LMSR 기반 예측시장으로 전환하는 프로젝트.
+기존 "팀 하나 찍기 + 점수제"를 "HOME/AWAY/DRAW 토큰 매수/매도 + 만기 0/100 정산" 시스템으로 완전 대체한다.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router) + React 19 + TypeScript
+- **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix) + Pretendard 폰트
+- **Database**: Supabase (PostgreSQL) — 테이블, RPC 함수, RLS, pg_cron
+- **Auth**: 자체 구현 (학번 + SHA-256 해시 비밀번호, Supabase Auth 미사용)
+- **Deploy**: Vercel
+- **Package Manager**: npm
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+
+thinking
+**Announcing chosen skills use**
+codex
+검증 단계이므로 `requesting-code-review`와 `verification-before-completion` 워크플로우를 따르겠습니다. 다음으로 `US-004` 관련 변경 파일과 SQL을 정밀 확인하고, 실제 테스트/검증 명령 결과로 PASS/FAIL을 판단하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,240p' /Users/jeffrey/.codex/superpowers/skills/verification-before-completion/SKILL.md" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+---
+name: verification-before-completion
+description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+---
+
+# Verification Before Completion
+
+## Overview
+
+Claiming work is complete without verification is dishonesty, not efficiency.
+
+**Core principle:** Evidence before claims, always.
+
+**Violating the letter of this rule is violating the spirit of this rule.**
+
+## The Iron Law
+
+```
+NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
+```
+
+thinking
+**Checking requirements in specification**
+exec
+/bin/zsh -lc "jq '.stories[] | select(.id==\"US-004\")' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookin exited 5 in 51ms:
+jq: error (at prd.json:178): Cannot iterate over null (null)
+
+thinking
+**Inspecting JSON structure**
+codex
+`prd.json` 구조를 확인해 `US-004` 메타데이터를 정확히 추출하겠습니다. 지금은 top-level 키가 예상과 달라 `jq` 경로만 조정하면 됩니다.
+exec
+/bin/zsh -lc "rg -n '\"id\": \"US-004\"|\"status\"|acceptance|requirements|REQ-027|REQ-031' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+14:      "acceptanceCriteria": [
+32:      "acceptanceCriteria": [
+50:      "acceptanceCriteria": [
+62:      "id": "US-004",
+67:      "acceptanceCriteria": [
+68:        "REQ-027 \uc720\uc800\uac00 \ucc98\uc74c \ub85c\uadf8\uc778\ud560 \ub54c wallet\uc774 \uc5c6\uc73c\uba74 \uc790\ub3d9 \uc0dd\uc131 (balance = 0).",
+72:        "REQ-031 \ud504\ub860\ud2b8\uc5d4\ub4dc \uc0c1\ub2e8 (\ud5e4\ub354 \uc601\uc5ed)\uc5d0 \ud604\uc7ac \ucf54\uc778 \uc794\uace0\ub97c \ud56d\uc0c1 \ud45c\uc2dc. \ucf54\uc778 \uc544\uc774\ucf58 + \uc22b\uc790 (\uc608: \ud83e\ude99 3,250)."
+81:      "acceptanceCriteria": [
+97:      "acceptanceCriteria": [
+115:      "acceptanceCriteria": [
+129:      "acceptanceCriteria": [
+142:      "acceptanceCriteria": [
+156:      "acceptanceCriteria": [
+170:      "acceptanceCriteria": [
+ succeeded in 52ms:
+{
+  "project": {
+    "name": "LMSR Prediction Market (Stock-Market Style)",
+    "branch": "Feature/stock-market",
+    "description": "\uae30\uc874 \uc2b9\ubd80\uc608\uce21(\ud300 \uc120\ud0dd + \uc810\uc218\uc81c)\uc744 LMSR \uae30\ubc18 \uc608\uce21\uc2dc\uc7a5\uc73c\ub85c \uc644\uc804 \uc804\ud658. \uc720\uc800\uac00 HOME/AWAY/DRAW \ud1a0\ud070\uc744 \ub9e4\uc218/\ub9e4\ub3c4\ud558\uc5ec \uacbd\uae30 \uacb0\uacfc\uc5d0 \ubca0\ud305\ud558\uace0, \ub9cc\uae30 \uc2dc \uc815\ub2f5 \ud1a0\ud070\uc740 100\ucf54\uc778, \uc624\ub2f5 \ud1a0\ud070\uc740 0\ucf54\uc778\uc73c\ub85c \uc815\uc0b0\ub418\ub294 \uc2dc\uc2a4\ud15c. Supabase DB + RPC \uae30\ubc18\uc73c\ub85c LMSR \uc5d4\uc9c4\uc744 \uad6c\ud604\ud558\uace0, \ubaa8\ubc14\uc77c \ud37c\uc2a4\ud2b8 UI\ub85c \uac70\ub798 \uc778\ud130\ud398\uc774\uc2a4\ub97c \uc81c\uacf5\ud55c\ub2e4. \ub514\uc790\uc778 \ucca0\ud559, \ub514\uc790\uc778 \ud1a0\ud070, \uc640\uc774\uc5b4\ud504\ub808\uc784(W-01~W-08)\uc740 prd.md\ub97c \ubc18\ub4dc\uc2dc \ucc38\uc870\ud560 \uac83."
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "\uc778\uc99d \uc2dc\uc2a4\ud15c \u2014 \ud559\ubc88 \ub85c\uadf8\uc778 + \ube44\ubc00\ubc88\ud638 (Supabase \uc9c1\uc811 \uad6c\ud604)",
+      "priority": 1,
+      "passes": true,
+      "description": "\ud559\ubc88\uc744 ID\ub85c, \uc804\ud654\ubc88\ud638\ub97c \ucd08\uae30 \ube44\ubc00\ubc88\ud638\ub85c \uc0ac\uc6a9\ud558\ub294 \uac04\ub2e8\ud55c \uc778\uc99d \uc2dc\uc2a4\ud15c\uc744 \uad6c\ud604\ud55c\ub2e4. Supabase Auth\ub294 \uc0ac\uc6a9\ud558\uc9c0 \uc54a\uace0, users \ud14c\uc774\ube14\uc5d0 password_hash \uceec\ub7fc\uc744 \ucd94\uac00\ud558\uc5ec \uc9c1\uc811 \uad00\ub9ac\ud55c\ub2e4. \ucd5c\ucd08 \ub85c\uadf8\uc778 \uc2dc \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd\uc744 \uac15\uc81c\ud55c\ub2e4. \ub85c\uadf8\uc778\ud558\uc9c0 \uc54a\uc73c\uba74 \ubaa8\ub4e0 \ud654\uba74\uc5d0 \uc811\uadfc \ubd88\uac00. UI \uc640\uc774\uc5b4\ud504\ub808\uc784\uc740 prd.md\uc758 W-01, W-02 \ucc38\uc870.",
+      "acceptanceCriteria": [
+        "REQ-001 users \ud14c\uc774\ube14\uc5d0 password_hash (TEXT) \uceec\ub7fc \ucd94\uac00. \ucd08\uae30\uac12\uc740 \ud574\ub2f9 \uc720\uc800\uc758 phone_number\ub97c SHA-256 \ud574\uc2dc\ud55c \uac12.",
+        "REQ-002 users \ud14c\uc774\ube14\uc5d0 password_changed (BOOLEAN DEFAULT FALSE) \uceec\ub7fc \ucd94\uac00. \ucd5c\ucd08 \ub85c\uadf8\uc778 \ud6c4 \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd \uc2dc TRUE\ub85c \uc124\uc815.",
+        "REQ-003 login(p_student_number BIGINT, p_password TEXT) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. (1) student_number\ub85c \uc720\uc800 \uc870\ud68c, (2) SHA-256(p_password)\uc640 password_hash \ube44\uad50, (3) \uc77c\uce58 \uc2dc {success: true, user_id, username, password_changed} \ubc18\ud658, \ubd88\uc77c\uce58 \uc2dc {success: false, error: '\ud559\ubc88 \ub610\ub294 \ube44\ubc00\ubc88\ud638\uac00 \uc62c\ubc14\ub974\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4'} \ubc18\ud658.",
+        "REQ-004 change_password(p_user_id UUID, p_new_password TEXT) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. SHA-256(p_new_password)\ub97c password_hash\uc5d0 \uc800\uc7a5, password_changed\ub97c TRUE\ub85c \uc124\uc815.",
+        "REQ-005 \ub85c\uadf8\uc778 \ud654\uba74 (prd.md W-01): \ud559\ubc88 + \ube44\ubc00\ubc88\ud638 \uc785\ub825 \u2192 \ub85c\uadf8\uc778 \ubc84\ud2bc. \uae30\uc874 ToKHin' \ub514\uc790\uc778 \ud1a4 \uc720\uc9c0 (tokhin-green \ubc84\ud2bc, rounded-2xl \uce74\ub4dc, \uc911\uc559 \uc815\ub82c). PC\uc5d0\uc11c\ub3c4 430px \uace0\uc815.",
+        "REQ-006 \ucd5c\ucd08 \ub85c\uadf8\uc778 \uc2dc (password_changed === false): \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd \ud654\uba74 (prd.md W-02) \uac15\uc81c \ud45c\uc2dc. \uc0c8 \ube44\ubc00\ubc88\ud638 + \ud655\uc778 \uc785\ub825. \ubcc0\uacbd \uc644\ub8cc \ud6c4 \uba54\uc778\uc73c\ub85c \uc774\ub3d9.",
+
+thinking
+**Planning targeted diffs inspection**
+codex
+요구사항 대비 정확도를 위해 변경분(diff) 중심으로 검토하겠습니다. SQL RPC 정의와 프론트 연결(`api`, `admin`, `header`)을 같이 확인해 누락/회귀 여부를 찾겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,320p' supabase/migrations/20260224_us004_wallet_system.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' components/app-header.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- lib/api.ts' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- app/admin/page.tsx' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- app/layout.tsx' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+-- REQ-027: 로그인 성공 시 wallet 자동 생성
+CREATE OR REPLACE FUNCTION public.login(
+  p_student_number BIGINT,
+  p_password TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user RECORD;
+  v_input_hash TEXT;
+BEGIN
+  SELECT id, username, password_hash, password_changed
+  INTO v_user
+  FROM public.users
+ succeeded in 50ms:
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 6b6e929..969814f 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -10,7 +10,13 @@ import { Select } from "@/components/ui/select";
+ import { createClient } from "@/lib/supabase/client";
+ import { useIsMobile } from "@/lib/hooks/useResponsive";
+ import { DefaultInput } from "@/components/ui/default_input";
+-import { getGameData } from "@/lib/api";
++import {
++  adminGrantCoins,
++  distributeWeeklyCoins,
++  getGameData,
++  getUsersForAdmin,
++  type AdminUser,
++} from "@/lib/api";
+ 
+ // Interface definitions
+ interface Team {
+@@ -860,11 +866,251 @@ function ForcedCalculation() {
+ succeeded in 53ms:
+"use client";
+
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { getWalletBalance } from "@/lib/api";
+import { useUserSession } from "@/lib/hooks/useUserSession";
+
+const numberFormatter = new Intl.NumberFormat("ko-KR", {
+  maximumFractionDigits: 2,
+});
+
+export default function AppHeader() {
+  const pathname = usePathname();
+  const { session } = useUserSession();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  const shouldHideHeader = pathname?.startsWith("/admin");
+  const hasUserSession = Boolean(session?.user_id);
+  const canShowBalance =
+ succeeded in 52ms:
+diff --git a/lib/api.ts b/lib/api.ts
+index 66a685b..5569013 100644
+--- a/lib/api.ts
++++ b/lib/api.ts
+@@ -22,6 +22,33 @@ interface LoginRpcResponse {
+   error?: string;
+ }
+ 
++interface WalletBalanceRpcResponse {
++  success: boolean;
++  balance?: number | string;
++  error?: string;
++}
++
++interface WeeklyCoinsRpcResponse {
++  success: boolean;
++  users_count?: number | string;
++  total_distributed?: number | string;
++  error?: string;
++}
+ succeeded in 52ms:
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 06e9981..73818ba 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,7 +1,7 @@
+ import type { Metadata, Viewport } from "next";
+ import { ThemeProvider } from "next-themes";
+-import Image from "next/image";
+ import Navigation from "@/components/navigation"; // Import the new component
++import AppHeader from "@/components/app-header";
+ import "./globals.css";
+ import localFont from "next/font/local";
+ 
+@@ -68,16 +68,7 @@ export default function RootLayout({
+         >
+           <main className="min-h-screen bg-[#111111]">
+             <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white px-4 pb-28">
+-              <div className="w-full flex justify-center py-4">
+-                <Image
+-                  src="/toKHin.svg"
+
+thinking
+**Verifying login and migration logic**
+exec
+/bin/zsh -lc 'cat package.json' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+{
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-label": "^2.1.6",
+    "@radix-ui/react-slot": "^1.2.2",
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "next": "latest",
+    "next-themes": "^0.4.6",
+
+thinking
+**Setting up periodic update messages**
+codex
+코드 변경은 확인했고, 이제 검증 명령(`lint`, `build`)과 US-004 요구사항 매핑으로 판정하겠습니다. 특히 RPC 시그니처/반환값, 자동 스케줄, Admin 수동지급, 헤더 잔고 표시가 실제로 충족되는지 항목별로 체크합니다.
+
+thinking
+**Inspecting component definitions and layout constraints**
+exec
+/bin/zsh -lc "sed -n '1,220p' components/ui/select.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+const Select = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(({ className, ...props }, ref) => {
+  return (
+    <select
+      className={cn(
+        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  );
+});
+Select.displayName = "Select";
+
+
+thinking
+**Inspecting session hook usage**
+exec
+/bin/zsh -lc "sed -n '1,240p' lib/hooks/useUserSession.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getUserSession, type UserSession } from "@/lib/auth";
+
+interface UseUserSessionOptions {
+  requireAuth?: boolean;
+}
+
+export const useUserSession = ({
+  requireAuth = false,
+}: UseUserSessionOptions = {}) => {
+  const router = useRouter();
+  const [session, setSession] = useState<UserSession | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const storedSession = getUserSession();
+    setSession(storedSession);
+
+thinking
+**Identifying session update bug**
+exec
+/bin/zsh -lc "sed -n '1,260p' app/login/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  clearUserSession,
+  clearPendingPasswordChangeSession,
+  getPendingPasswordChangeSession,
+  getUserSession,
+  setPendingPasswordChangeSession,
+  setUserSession,
+} from "@/lib/auth";
+import { login } from "@/lib/api";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [studentNumber, setStudentNumber] = useState("");
+  const [password, setPassword] = useState("");
+
+thinking
+**Identifying session state sync issue**
+exec
+/bin/zsh -lc "sed -n '1,220p' app/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  getTodaysGamesWithPredictions,
+  getGamesWithPredictionsForDate,
+  submitMultiplePredictions,
+  getISODate,
+} from "@/lib/api";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { useUserSession } from "@/lib/hooks/useUserSession";
+
+// --- TYPE DEFINITIONS ---
+type Team = { id: number; name: string };
+type Game = {
+  id: number;
+  home_team: Team;
+  away_team: Team;
+  home_pitcher: string | null;
+  away_pitcher: string | null;
+
+thinking
+**Inspecting login logic for session setup**
+exec
+/bin/zsh -lc "rg -n '"'^export const login|changePassword|getWalletBalance|distributeWeeklyCoins|adminGrantCoins|getUsersForAdmin'"' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+60:export const login = async (
+89:export const changePassword = async (userId: string, newPassword: string) => {
+673:export const getWalletBalance = async (userId: string): Promise<number> => {
+691:export const distributeWeeklyCoins = async (amount = 1000) => {
+713:export const adminGrantCoins = async (userId: string, amount: number) => {
+737:export const getUsersForAdmin = async (): Promise<AdminUser[]> => {
+
+thinking
+**Planning login function inspection**
+exec
+/bin/zsh -lc "sed -n '1,170p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
+
+interface GameData {
+  game_date: string;
+  game_time?: string;
+  home_team_id?: number;
+  away_team_id?: number;
+  home_pitcher?: string;
+  away_pitcher?: string;
+  home_score?: number | null;
+  away_score?: number | null;
+  game_status?: "SCHEDULED" | "LIVE" | "FINISHED";
+}
+
+interface LoginRpcResponse {
+  success: boolean;
+  user_id?: string;
+  username?: string;
+
+thinking
+**Inspecting migration syntax and idempotency**
+exec
+/bin/zsh -lc "ls -la supabase/migrations | sed -n '1,200p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+total 88
+drwxr-xr-x@ 6 jeffrey  staff    192 Feb 24 23:05 .
+drwxr-xr-x@ 4 jeffrey  staff    128 Feb 24 22:47 ..
+-rw-r--r--@ 1 jeffrey  staff   2399 Feb 24 22:22 20260224_us001_auth.sql
+-rw-r--r--@ 1 jeffrey  staff   5951 Feb 24 22:45 20260224_us002_db_schema.sql
+-rw-r--r--@ 1 jeffrey  staff  21410 Feb 24 22:53 20260224_us003_lmsr_engine.sql
+-rw-r--r--@ 1 jeffrey  staff   6797 Feb 24 23:05 20260224_us004_wallet_system.sql
+
+thinking
+**Reviewing migration constraints and enums**
+codex
+SQL 정합성 검증을 위해 기존 마이그레이션(특히 `transactions.type` 제약)과 US-004 마이그레이션의 호환성을 교차 확인하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,320p' supabase/migrations/20260224_us002_db_schema.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' supabase/migrations/20260224_us001_auth.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n 'transactions|type|WEEKLY_GRANT|ADMIN_GRANT|wallets|RLS|CREATE POLICY' supabase/migrations/20260224_us002_db_schema.sql" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+-- US-001: 학번 로그인 + 비밀번호 인증 시스템
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS password_hash TEXT;
+
+ALTER TABLE public.users
+ADD COLUMN IF NOT EXISTS password_changed BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE public.users
+SET password_hash = encode(digest(phone_number::TEXT, 'sha256'), 'hex')
+WHERE password_hash IS NULL;
+
+CREATE OR REPLACE FUNCTION public.login(
+  p_student_number BIGINT,
+  p_password TEXT
+)
+RETURNS JSONB
+ succeeded in 51ms:
+-- US-002: LMSR 예측시장용 DB 스키마 마이그레이션
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+-- REQ-010 wallets
+CREATE TABLE IF NOT EXISTS public.wallets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  balance NUMERIC NOT NULL DEFAULT 0 CHECK (balance >= 0),
+ succeeded in 52ms:
+16:-- REQ-010 wallets
+17:CREATE TABLE IF NOT EXISTS public.wallets (
+23:  CONSTRAINT wallets_user_id_key UNIQUE (user_id)
+26:DROP TRIGGER IF EXISTS trg_wallets_set_updated_at ON public.wallets;
+27:CREATE TRIGGER trg_wallets_set_updated_at
+28:BEFORE UPDATE ON public.wallets
+106:-- REQ-015 transactions
+107:CREATE TABLE IF NOT EXISTS public.transactions (
+110:  type VARCHAR NOT NULL CHECK (type IN ('BUY', 'SELL', 'SETTLEMENT', 'WEEKLY_GRANT', 'ADMIN_GRANT')),
+118:-- REQ-017 RLS
+119:ALTER TABLE public.wallets ENABLE ROW LEVEL SECURITY;
+124:ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+126:DROP POLICY IF EXISTS wallets_select_own ON public.wallets;
+127:CREATE POLICY wallets_select_own
+128:ON public.wallets
+133:CREATE POLICY positions_select_own
+139:CREATE POLICY orders_select_own
+144:DROP POLICY IF EXISTS transactions_select_own ON public.transactions;
+145:CREATE POLICY transactions_select_own
+146:ON public.transactions
+
+thinking
+**Verifying compatibility with migration**
+exec
+/bin/zsh -lc 'npm run lint' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 1.26s:
+
+> lint
+> next lint
+
+✔ No ESLint warnings or errors
+
+thinking
+**Planning build step**
+exec
+/bin/zsh -lc 'npm run build' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 9.58s:
+
+> build
+> next build
+
+   ▲ Next.js 15.3.5
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+Browserslist: browsers data (caniuse-lite) is 8 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+ ✓ Compiled successfully in 2000ms
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/12) ...
+   Generating static pages (3/12) 
+   Generating static pages (6/12) 
+   Generating static pages (9/12) 
+ ✓ Generating static pages (12/12)
+   Finalizing page optimization ...
+
+thinking
+**Verifying SQL logic and requirements**
+exec
+/bin/zsh -lc 'ls -la ERROR.md 2>/dev/null || true' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+
+
+thinking
+**Planning error report creation**
+codex
+검증 중 주요 이슈 1건을 확인했습니다: 로그인 직후 헤더 잔고가 갱신되지 않아 REQ-031의 “항상 표시”를 만족하지 못할 가능성이 큽니다. 근거 라인 번호를 확정하고 `ERROR.md`에 수정 가이드를 남기겠습니다.
+exec
+/bin/zsh -lc "nl -ba app/login/page.tsx | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba components/app-header.tsx | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/hooks/useUserSession.ts | sed -n '1,220p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+     1	"use client";
+     2	
+     3	import { useEffect, useState } from "react";
+     4	import { useRouter } from "next/navigation";
+     5	import { getUserSession, type UserSession } from "@/lib/auth";
+     6	
+     7	interface UseUserSessionOptions {
+     8	  requireAuth?: boolean;
+     9	}
+    10	
+    11	export const useUserSession = ({
+    12	  requireAuth = false,
+    13	}: UseUserSessionOptions = {}) => {
+    14	  const router = useRouter();
+    15	  const [session, setSession] = useState<UserSession | null>(null);
+    16	  const [isLoading, setIsLoading] = useState(true);
+    17	
+    18	  useEffect(() => {
+    19	    const storedSession = getUserSession();
+    20	    setSession(storedSession);
+ succeeded in 53ms:
+     1	"use client";
+     2	
+     3	import { useEffect, useState } from "react";
+     4	import { useRouter } from "next/navigation";
+     5	import { Button } from "@/components/ui/button";
+     6	import { Input } from "@/components/ui/input";
+     7	import {
+     8	  clearUserSession,
+     9	  clearPendingPasswordChangeSession,
+    10	  getPendingPasswordChangeSession,
+    11	  getUserSession,
+    12	  setPendingPasswordChangeSession,
+    13	  setUserSession,
+    14	} from "@/lib/auth";
+    15	import { login } from "@/lib/api";
+    16	
+    17	export default function LoginPage() {
+    18	  const router = useRouter();
+    19	  const [studentNumber, setStudentNumber] = useState("");
+    20	  const [password, setPassword] = useState("");
+ succeeded in 53ms:
+     1	"use client";
+     2	
+     3	import Image from "next/image";
+     4	import { usePathname } from "next/navigation";
+     5	import { useCallback, useEffect, useState } from "react";
+     6	import { getWalletBalance } from "@/lib/api";
+     7	import { useUserSession } from "@/lib/hooks/useUserSession";
+     8	
+     9	const numberFormatter = new Intl.NumberFormat("ko-KR", {
+    10	  maximumFractionDigits: 2,
+    11	});
+    12	
+    13	export default function AppHeader() {
+    14	  const pathname = usePathname();
+    15	  const { session } = useUserSession();
+    16	  const [balance, setBalance] = useState<number | null>(null);
+    17	
+    18	  const shouldHideHeader = pathname?.startsWith("/admin");
+    19	  const hasUserSession = Boolean(session?.user_id);
+    20	  const canShowBalance =
+
+thinking
+**Planning line number extraction**
+exec
+/bin/zsh -lc "nl -ba supabase/migrations/20260224_us004_wallet_system.sql | sed -n '1,320p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+     1	-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+     2	-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+     3	
+     4	-- REQ-027: 로그인 성공 시 wallet 자동 생성
+     5	CREATE OR REPLACE FUNCTION public.login(
+     6	  p_student_number BIGINT,
+     7	  p_password TEXT
+     8	)
+     9	RETURNS JSONB
+    10	LANGUAGE plpgsql
+    11	SECURITY DEFINER
+    12	SET search_path = public
+    13	AS $$
+    14	DECLARE
+    15	  v_user RECORD;
+    16	  v_input_hash TEXT;
+    17	BEGIN
+    18	  SELECT id, username, password_hash, password_changed
+    19	  INTO v_user
+    20	  FROM public.users
+
+thinking
+**Gathering relevant line numbers**
+exec
+/bin/zsh -lc "nl -ba app/layout.tsx | sed -n '1,180p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba app/admin/page.tsx | sed -n '840,1360p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '660,820p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba lib/api.ts | sed -n '1,120p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+     1	import type { Metadata, Viewport } from "next";
+     2	import { ThemeProvider } from "next-themes";
+     3	import Navigation from "@/components/navigation"; // Import the new component
+     4	import AppHeader from "@/components/app-header";
+     5	import "./globals.css";
+     6	import localFont from "next/font/local";
+     7	
+     8	const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+     9	  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    10	  : "http://localhost:3000";
+    11	
+    12	export const viewport: Viewport = {
+    13	  width: "device-width",
+    14	  initialScale: 1,
+    15	};
+    16	
+    17	export const metadata: Metadata = {
+    18	  metadataBase: new URL(defaultUrl),
+    19	  title: "ToKHin' 승부 예측",
+    20	  icons: {
+ succeeded in 52ms:
+   840	              onChange={(e) => setSelectedDate(e.target.value)}
+   841	              required
+   842	              className="w-full text-black"
+   843	              disabled={isLoading}
+   844	            />
+   845	          </div>
+   846	
+   847	          <Button
+   848	            type="submit"
+   849	            disabled={!selectedDate || isLoading}
+   850	            className={`${isMobile ? "w-full" : ""}`}
+   851	          >
+   852	            {isLoading ? "계산 중..." : "매치 계산 실행"}
+   853	          </Button>
+   854	        </form>
+   855	      </Card>
+   856	
+   857	      <Modal isOpen={isModalOpen} onClose={closeModal} title="계산 결과">
+   858	        <div className="text-center">
+   859	          <p className="text-gray-700 mb-4">{modalMessage}</p>
+ succeeded in 51ms:
+   660	    const result = await response.json();
+   661	
+   662	    if (!result.success) {
+   663	      throw new Error(result.error || "Failed to fetch game data");
+   664	    }
+   665	
+   666	    return result.data;
+   667	  } catch (error) {
+   668	    console.error("Error fetching game data:", error);
+   669	    return null;
+   670	  }
+   671	};
+   672	
+   673	export const getWalletBalance = async (userId: string): Promise<number> => {
+   674	  const { data, error } = await supabase.rpc("get_wallet_balance", {
+   675	    p_user_id: userId,
+   676	  });
+   677	
+   678	  if (error) {
+   679	    console.error("Error calling get_wallet_balance RPC:", error);
+ succeeded in 50ms:
+     1	import { createClient } from "@/lib/supabase/client";
+     2	
+     3	const supabase = createClient();
+     4	
+     5	interface GameData {
+     6	  game_date: string;
+     7	  game_time?: string;
+     8	  home_team_id?: number;
+     9	  away_team_id?: number;
+    10	  home_pitcher?: string;
+    11	  away_pitcher?: string;
+    12	  home_score?: number | null;
+    13	  away_score?: number | null;
+    14	  game_status?: "SCHEDULED" | "LIVE" | "FINISHED";
+    15	}
+    16	
+    17	interface LoginRpcResponse {
+    18	  success: boolean;
+    19	  user_id?: string;
+    20	  username?: string;
+
+thinking
+**Planning database script linting**
+exec
+/bin/zsh -lc 'supabase db lint --help' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+Checks local database for typing error
+
+Usage:
+  supabase db lint [flags]
+
+Flags:
+      --db-url string                        Lints the database specified by the connection string (must be percent-encoded).
+      --fail-on [ none | warning | error ]   Error level to exit with non-zero status. (default none)
+  -h, --help                                 help for lint
+      --level [ warning | error ]            Error level to emit. (default warning)
+      --linked                               Lints the linked project for schema errors.
+      --local                                Lints the local database for schema errors. (default true)
+  -s, --schema strings                       Comma separated list of schema to include.
+
+Global Flags:
+      --create-ticket                                  create a support ticket for any CLI error
+      --debug                                          output debug logs to stderr
+      --dns-resolver [ native | https ]                lookup domain names using the specified resolver (default native)
+      --experimental                                   enable experimental features
+      --network-id string                              use the specified docker network instead of a generated one
+
+thinking
+**Checking local lint feasibility**
+exec
+/bin/zsh -lc 'supabase db lint --local --schema public' in /Users/jeffrey/WebstormProjects/lookin/lookin exited 1 in 53ms:
+Connecting to local database...
+failed to connect to postgres: failed to connect to `host=127.0.0.1 user=postgres database=postgres`: dial error (dial tcp 127.0.0.1:54322: connect: connection refused)
+Try rerunning the command with --debug to troubleshoot the error.
+
+thinking
+**Flagging session update flaw**
+codex
+판정은 `FAIL`로 내리겠습니다. 이유는 REQ-031의 “항상 표시”가 로그인 직후 라우팅 흐름에서 깨질 수 있는 구조적 문제이며, 이에 대한 수정 지시를 `ERROR.md`에 작성하겠습니다.
+
+thinking
+**Creating ERROR.md with findings and fixes**
+exec
+/bin/zsh -lc "cat > ERROR.md <<'EOF'
+# US-004 Verification Result: FAIL
+
+## 범위
+- Story: "'`US-004` 지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급
+- 검증 기준: `REQ-027 ~ REQ-031`
+
+## 실행한 검증
+- `npm run lint` ✅
+- `npm run build` ✅
+- `supabase db lint --local --schema public` ❌ (로컬 Postgres 미기동으로 연결 실패: `127.0.0.1:54322`)
+
+## 핵심 실패 사유
+### 1) REQ-031 미충족 가능성: 로그인 직후 헤더 잔고가 즉시 표시되지 않을 수 있음
+- 관련 코드:
+  - [`components/app-header.tsx:15`](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:15)
+  - [`lib/hooks/useUserSession.ts:18`](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:18)
+  - [`app/login/page.tsx:66`](/Users/jeffrey/WebstormProjects/lookin/lookin/app/login/page.tsx:66)
+- 근거:
+  - `AppHeader`는 `useUserSession()`의 `session` 값으로 잔고 노출 여부를 결정합니다.
+  - `useUserSession`은 mount 시점 1회만 `localStorage`를 읽고(`useEffect`), 이후 `setUserSession()` 호출(로그인 성공) 이벤트를 구독하지 않습니다.
+  - 로그인은 `router.replace("/")`로 클라이언트 라우팅되므로, 헤더 컴포넌트가 유지되는 경우 `session`이 stale 상태(null)로 남아 잔고 UI(`🪙 숫자`)가 즉시 보이지 않을 수 있습니다.
+- 결과:
+  - REQ-031의 "항상 표시" 조건을 안정적으로 만족한다고 보기 어렵습니다.
+
+## 수정 필요 사항
+1. `useUserSession`를 세션 변경에 반응하도록 수정하세요.
+- 예: `storage` 이벤트 + 커스텀 이벤트(`window.dispatchEvent(new Event('"'user-session-changed'))"'`) 구독.
+- 또는 pathname 변경 시 재동기화 등, 로그인 직후 즉시 `session`이 반영되도록 보장.
+
+2. 로그인/로그아웃/비밀번호 변경 경로에서 세션 갱신 이벤트를 발행하세요.
+- 최소 `setUserSession`, `clearUserSession` 호출 시점마다 헤더가 즉시 상태를 갱신해야 합니다.
+
+3. REQ-031 회귀 방지 검증을 추가하세요.
+- 시나리오: 로그인 성공 직후 `/` 이동 시 새로고침 없이 헤더에 `🪙`와 잔고가 보이는지 확인.
+EOF' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+
+
+thinking
+**Clarifying commit conditions and error handling**
+codex
+`ERROR.md`를 작성해 FAIL 근거와 수정 지시를 남겼습니다. 마지막으로 변경 상태를 확인하고 검토 결과를 요약해 전달하겠습니다.
+exec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M prd.json
+?? .ralph/
+?? ERROR.md
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+
+thinking
+**Summarizing final review verdict**
+codex
+**Verdict: FAIL (US-004 불합격)**
+
+1. **[High] REQ-031 “헤더에 잔고 항상 표시”가 로그인 직후 보장되지 않습니다.**  
+[components/app-header.tsx:15](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:15), [lib/hooks/useUserSession.ts:18](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:18), [app/login/page.tsx:66](/Users/jeffrey/WebstormProjects/lookin/lookin/app/login/page.tsx:66)  
+`useUserSession`가 mount 시 1회만 session을 읽고, 로그인 후 `setUserSession` 변경을 구독하지 않아 헤더가 stale session(null) 상태로 남을 수 있습니다. 이 경우 `🪙 잔고`가 즉시 표시되지 않습니다.
+
+검증 실행:
+- `npm run lint` 통과
+- `npm run build` 통과
+- `supabase db lint --local --schema public` 실패 (로컬 DB 미기동: `127.0.0.1:54322` 연결 거부)
+
+조치:
+- 요구대로 `ERROR.md`를 작성했습니다: [ERROR.md](/Users/jeffrey/WebstormProjects/lookin/lookin/ERROR.md)
+
+PASS 조건이 아니므로 `git add`/`git commit`은 진행하지 않았습니다.
+tokens used
+99,620
+**Verdict: FAIL (US-004 불합격)**
+
+1. **[High] REQ-031 “헤더에 잔고 항상 표시”가 로그인 직후 보장되지 않습니다.**  
+[components/app-header.tsx:15](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx:15), [lib/hooks/useUserSession.ts:18](/Users/jeffrey/WebstormProjects/lookin/lookin/lib/hooks/useUserSession.ts:18), [app/login/page.tsx:66](/Users/jeffrey/WebstormProjects/lookin/lookin/app/login/page.tsx:66)  
+`useUserSession`가 mount 시 1회만 session을 읽고, 로그인 후 `setUserSession` 변경을 구독하지 않아 헤더가 stale session(null) 상태로 남을 수 있습니다. 이 경우 `🪙 잔고`가 즉시 표시되지 않습니다.
+
+검증 실행:
+- `npm run lint` 통과
+- `npm run build` 통과
+- `supabase db lint --local --schema public` 실패 (로컬 DB 미기동: `127.0.0.1:54322` 연결 거부)
+
+조치:
+- 요구대로 `ERROR.md`를 작성했습니다: [ERROR.md](/Users/jeffrey/WebstormProjects/lookin/lookin/ERROR.md)
+
+PASS 조건이 아니므로 `git add`/`git commit`은 진행하지 않았습니다.

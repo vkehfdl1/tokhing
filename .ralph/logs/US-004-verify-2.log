@@ -1,0 +1,851 @@
+OpenAI Codex v0.104.0 (research preview)
+--------
+workdir: /Users/jeffrey/WebstormProjects/lookin/lookin
+model: gpt-5.3-codex
+provider: openai
+approval: never
+sandbox: danger-full-access
+reasoning effort: xhigh
+reasoning summaries: auto
+session id: 019c9002-4589-7c90-8bf7-9243347af495
+--------
+user
+Read AGENTS.md for project context.
+
+You are an independent verifier. Check prd.json and review story US-004: 지갑(Wallet) 시스템 — 코인 잔고 및 주간 자동 지급
+
+Acceptance criteria:
+- REQ-027 유저가 처음 로그인할 때 wallet이 없으면 자동 생성 (balance = 0).
+- REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC 함수 구현. 모든 유저에게 p_amount 코인 지급 + transaction 기록. 반환값: {success, users_count, total_distributed}.
+- REQ-029 Supabase pg_cron 확장을 사용하여 매주 월요일 00:00 KST에 distribute_weekly_coins() 자동 실행. 또는 pg_cron이 불가능할 경우 Admin에서 수동 트리거 버튼 제공.
+- REQ-030 Admin 페이지에서 특정 유저 또는 전체 유저에게 코인을 수동 지급하는 기능. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC 함수.
+- REQ-031 프론트엔드 상단 (헤더 영역)에 현재 코인 잔고를 항상 표시. 코인 아이콘 + 숫자 (예: 🪙 3,250).
+
+Review the implementation. Run tests as you see fit.
+
+If PASS: delete ERROR.md if it exists, then git add and git commit the changes.
+If FAIL: write ERROR.md explaining what the builder must fix.
+
+mcp startup: no servers
+
+thinking
+**Confirming AGENTS instructions and plan**
+codex
+요청하신 대로 `AGENTS.md`와 `prd.json`을 먼저 확인한 뒤, US-004 구현을 코드/DB 관점에서 검증하고 테스트까지 실행하겠습니다. 지금은 관련 파일과 변경 내역부터 빠르게 스캔하겠습니다.
+
+thinking
+**Preparing repository inspection**
+exec
+/bin/zsh -lc 'pwd && ls -la' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg --files | rg 'AGENTS.md|prd.json|ERROR.md|lib/api.ts|app/admin/page.tsx|app/layout.tsx|components|wallet|transaction|cron|sql'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+/Users/jeffrey/WebstormProjects/lookin/lookin
+total 1056
+drwxr-xr-x@  35 jeffrey  staff    1120 Feb 24 23:16 .
+drwxr-xr-x@   3 jeffrey  staff      96 Jul 13  2025 ..
+-rw-r--r--@   1 jeffrey  staff     863 Jul 19  2025 .env.local
+-rw-r--r--@   1 jeffrey  staff     625 Aug  8  2025 .env.local.example
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 23:15 .git
+-rw-r--r--@   1 jeffrey  staff     491 Jul 13  2025 .gitignore
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 23:15 .next
+drwxr-xr-x@   4 jeffrey  staff     128 Feb 24 22:16 .ralph
+-rw-r--r--@   1 jeffrey  staff    3134 Jul 19  2025 ADMIN_SETUP.md
+-rw-r--r--@   1 jeffrey  staff    4760 Feb 24 22:11 AGENTS.md
+-rw-r--r--@   1 jeffrey  staff     219 Jul 13  2025 GEMINI.md
+-rw-r--r--@   1 jeffrey  staff     510 Feb 24 23:12 PROGRESS.md
+-rw-r--r--@   1 jeffrey  staff    5029 Jul 19  2025 README.md
+-rw-r--r--@   1 jeffrey  staff    4551 Jul 26  2025 RESPONSIVE_DESIGN_SUMMARY.md
+drwxr-xr-x@  14 jeffrey  staff     448 Feb 24 22:23 app
+drwxr-xr-x@  21 jeffrey  staff     672 Feb 24 23:06 components
+-rw-r--r--@   1 jeffrey  staff     427 Jul 13  2025 components.json
+-rw-r--r--@   1 jeffrey  staff     393 Jul 13  2025 eslint.config.mjs
+ succeeded in 51ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M lib/auth.ts
+ M lib/hooks/useUserSession.ts
+ M prd.json
+?? .ralph/
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+ succeeded in 53ms:
+prd.json
+AGENTS.md
+components.json
+lib/api.ts
+components/supabase-logo.tsx
+components/deploy-button.tsx
+components/navigation.tsx
+components/auth-button.tsx
+components/login-form.tsx
+components/app-header.tsx
+components/next-logo.tsx
+components/theme-switcher.tsx
+components/sign-up-form.tsx
+components/logout-button.tsx
+components/update-password-form.tsx
+components/forgot-password-form.tsx
+components/daily-history-card.tsx
+components/env-var-warning.tsx
+components/prediction-ratio-chart.tsx
+components/tutorial/code-block.tsx
+
+thinking
+**Inspecting AGENTS.md contents**
+codex
+지금 작업 트리를 확인했고 US-004 관련 파일(`supabase/migrations/20260224_us004_wallet_system.sql`, `lib/api.ts`, `app/admin/page.tsx`, `app/layout.tsx`, `components/app-header.tsx`)이 수정되어 있습니다. 다음으로 `AGENTS.md`와 `prd.json`의 US-004 상태/요구사항을 대조하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,220p' AGENTS.md" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n 'US-004|REQ-027|REQ-028|REQ-029|REQ-030|REQ-031' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,240p' prd.json" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+62:      "id": "US-004",
+68:        "REQ-027 \uc720\uc800\uac00 \ucc98\uc74c \ub85c\uadf8\uc778\ud560 \ub54c wallet\uc774 \uc5c6\uc73c\uba74 \uc790\ub3d9 \uc0dd\uc131 (balance = 0).",
+69:        "REQ-028 distribute_weekly_coins(p_amount NUMERIC DEFAULT 1000) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. \ubaa8\ub4e0 \uc720\uc800\uc5d0\uac8c p_amount \ucf54\uc778 \uc9c0\uae09 + transaction \uae30\ub85d. \ubc18\ud658\uac12: {success, users_count, total_distributed}.",
+70:        "REQ-029 Supabase pg_cron \ud655\uc7a5\uc744 \uc0ac\uc6a9\ud558\uc5ec \ub9e4\uc8fc \uc6d4\uc694\uc77c 00:00 KST\uc5d0 distribute_weekly_coins() \uc790\ub3d9 \uc2e4\ud589. \ub610\ub294 pg_cron\uc774 \ubd88\uac00\ub2a5\ud560 \uacbd\uc6b0 Admin\uc5d0\uc11c \uc218\ub3d9 \ud2b8\ub9ac\uac70 \ubc84\ud2bc \uc81c\uacf5.",
+71:        "REQ-030 Admin \ud398\uc774\uc9c0\uc5d0\uc11c \ud2b9\uc815 \uc720\uc800 \ub610\ub294 \uc804\uccb4 \uc720\uc800\uc5d0\uac8c \ucf54\uc778\uc744 \uc218\ub3d9 \uc9c0\uae09\ud558\ub294 \uae30\ub2a5. admin_grant_coins(p_user_id UUID, p_amount NUMERIC) RPC \ud568\uc218.",
+72:        "REQ-031 \ud504\ub860\ud2b8\uc5d4\ub4dc \uc0c1\ub2e8 (\ud5e4\ub354 \uc601\uc5ed)\uc5d0 \ud604\uc7ac \ucf54\uc778 \uc794\uace0\ub97c \ud56d\uc0c1 \ud45c\uc2dc. \ucf54\uc778 \uc544\uc774\ucf58 + \uc22b\uc790 (\uc608: \ud83e\ude99 3,250)."
+ succeeded in 53ms:
+# AGENTS.md — ToKHin' LMSR Prediction Market
+
+## Project Overview
+
+KBO 야구 승부예측 앱(ToKHin')을 LMSR 기반 예측시장으로 전환하는 프로젝트.
+기존 "팀 하나 찍기 + 점수제"를 "HOME/AWAY/DRAW 토큰 매수/매도 + 만기 0/100 정산" 시스템으로 완전 대체한다.
+
+## Tech Stack
+
+- **Framework**: Next.js 15 (App Router) + React 19 + TypeScript
+- **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix) + Pretendard 폰트
+- **Database**: Supabase (PostgreSQL) — 테이블, RPC 함수, RLS, pg_cron
+- **Auth**: 자체 구현 (학번 + SHA-256 해시 비밀번호, Supabase Auth 미사용)
+- **Deploy**: Vercel
+- **Package Manager**: npm
+
+## Key Files
+
+| Path | Description |
+|------|-------------|
+ succeeded in 53ms:
+{
+  "project": {
+    "name": "LMSR Prediction Market (Stock-Market Style)",
+    "branch": "Feature/stock-market",
+    "description": "\uae30\uc874 \uc2b9\ubd80\uc608\uce21(\ud300 \uc120\ud0dd + \uc810\uc218\uc81c)\uc744 LMSR \uae30\ubc18 \uc608\uce21\uc2dc\uc7a5\uc73c\ub85c \uc644\uc804 \uc804\ud658. \uc720\uc800\uac00 HOME/AWAY/DRAW \ud1a0\ud070\uc744 \ub9e4\uc218/\ub9e4\ub3c4\ud558\uc5ec \uacbd\uae30 \uacb0\uacfc\uc5d0 \ubca0\ud305\ud558\uace0, \ub9cc\uae30 \uc2dc \uc815\ub2f5 \ud1a0\ud070\uc740 100\ucf54\uc778, \uc624\ub2f5 \ud1a0\ud070\uc740 0\ucf54\uc778\uc73c\ub85c \uc815\uc0b0\ub418\ub294 \uc2dc\uc2a4\ud15c. Supabase DB + RPC \uae30\ubc18\uc73c\ub85c LMSR \uc5d4\uc9c4\uc744 \uad6c\ud604\ud558\uace0, \ubaa8\ubc14\uc77c \ud37c\uc2a4\ud2b8 UI\ub85c \uac70\ub798 \uc778\ud130\ud398\uc774\uc2a4\ub97c \uc81c\uacf5\ud55c\ub2e4. \ub514\uc790\uc778 \ucca0\ud559, \ub514\uc790\uc778 \ud1a0\ud070, \uc640\uc774\uc5b4\ud504\ub808\uc784(W-01~W-08)\uc740 prd.md\ub97c \ubc18\ub4dc\uc2dc \ucc38\uc870\ud560 \uac83."
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "\uc778\uc99d \uc2dc\uc2a4\ud15c \u2014 \ud559\ubc88 \ub85c\uadf8\uc778 + \ube44\ubc00\ubc88\ud638 (Supabase \uc9c1\uc811 \uad6c\ud604)",
+      "priority": 1,
+      "passes": true,
+      "description": "\ud559\ubc88\uc744 ID\ub85c, \uc804\ud654\ubc88\ud638\ub97c \ucd08\uae30 \ube44\ubc00\ubc88\ud638\ub85c \uc0ac\uc6a9\ud558\ub294 \uac04\ub2e8\ud55c \uc778\uc99d \uc2dc\uc2a4\ud15c\uc744 \uad6c\ud604\ud55c\ub2e4. Supabase Auth\ub294 \uc0ac\uc6a9\ud558\uc9c0 \uc54a\uace0, users \ud14c\uc774\ube14\uc5d0 password_hash \uceec\ub7fc\uc744 \ucd94\uac00\ud558\uc5ec \uc9c1\uc811 \uad00\ub9ac\ud55c\ub2e4. \ucd5c\ucd08 \ub85c\uadf8\uc778 \uc2dc \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd\uc744 \uac15\uc81c\ud55c\ub2e4. \ub85c\uadf8\uc778\ud558\uc9c0 \uc54a\uc73c\uba74 \ubaa8\ub4e0 \ud654\uba74\uc5d0 \uc811\uadfc \ubd88\uac00. UI \uc640\uc774\uc5b4\ud504\ub808\uc784\uc740 prd.md\uc758 W-01, W-02 \ucc38\uc870.",
+      "acceptanceCriteria": [
+        "REQ-001 users \ud14c\uc774\ube14\uc5d0 password_hash (TEXT) \uceec\ub7fc \ucd94\uac00. \ucd08\uae30\uac12\uc740 \ud574\ub2f9 \uc720\uc800\uc758 phone_number\ub97c SHA-256 \ud574\uc2dc\ud55c \uac12.",
+        "REQ-002 users \ud14c\uc774\ube14\uc5d0 password_changed (BOOLEAN DEFAULT FALSE) \uceec\ub7fc \ucd94\uac00. \ucd5c\ucd08 \ub85c\uadf8\uc778 \ud6c4 \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd \uc2dc TRUE\ub85c \uc124\uc815.",
+        "REQ-003 login(p_student_number BIGINT, p_password TEXT) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. (1) student_number\ub85c \uc720\uc800 \uc870\ud68c, (2) SHA-256(p_password)\uc640 password_hash \ube44\uad50, (3) \uc77c\uce58 \uc2dc {success: true, user_id, username, password_changed} \ubc18\ud658, \ubd88\uc77c\uce58 \uc2dc {success: false, error: '\ud559\ubc88 \ub610\ub294 \ube44\ubc00\ubc88\ud638\uac00 \uc62c\ubc14\ub974\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4'} \ubc18\ud658.",
+        "REQ-004 change_password(p_user_id UUID, p_new_password TEXT) RETURNS JSONB RPC \ud568\uc218 \uad6c\ud604. SHA-256(p_new_password)\ub97c password_hash\uc5d0 \uc800\uc7a5, password_changed\ub97c TRUE\ub85c \uc124\uc815.",
+        "REQ-005 \ub85c\uadf8\uc778 \ud654\uba74 (prd.md W-01): \ud559\ubc88 + \ube44\ubc00\ubc88\ud638 \uc785\ub825 \u2192 \ub85c\uadf8\uc778 \ubc84\ud2bc. \uae30\uc874 ToKHin' \ub514\uc790\uc778 \ud1a4 \uc720\uc9c0 (tokhin-green \ubc84\ud2bc, rounded-2xl \uce74\ub4dc, \uc911\uc559 \uc815\ub82c). PC\uc5d0\uc11c\ub3c4 430px \uace0\uc815.",
+        "REQ-006 \ucd5c\ucd08 \ub85c\uadf8\uc778 \uc2dc (password_changed === false): \ube44\ubc00\ubc88\ud638 \ubcc0\uacbd \ud654\uba74 (prd.md W-02) \uac15\uc81c \ud45c\uc2dc. \uc0c8 \ube44\ubc00\ubc88\ud638 + \ud655\uc778 \uc785\ub825. \ubcc0\uacbd \uc644\ub8cc \ud6c4 \uba54\uc778\uc73c\ub85c \uc774\ub3d9.",
+
+thinking
+**Planning implementation inspection**
+codex
+`prd.json`에서 US-004는 `passes: true`로 체크되어 있지만, 실제 코드/마이그레이션 기준으로 독립 검증이 필요합니다. 지금부터 US-004 관련 구현 파일들을 직접 읽어 수용 기준별로 매핑하겠습니다.
+exec
+/bin/zsh -lc "sed -n '1,320p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' supabase/migrations/20260224_us004_wallet_system.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '320,700p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+
+-- REQ-027: 로그인 성공 시 wallet 자동 생성
+CREATE OR REPLACE FUNCTION public.login(
+  p_student_number BIGINT,
+  p_password TEXT
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user RECORD;
+  v_input_hash TEXT;
+BEGIN
+  SELECT id, username, password_hash, password_changed
+  INTO v_user
+  FROM public.users
+ succeeded in 53ms:
+import { createClient } from "@/lib/supabase/client";
+
+const supabase = createClient();
+
+interface GameData {
+  game_date: string;
+  game_time?: string;
+  home_team_id?: number;
+  away_team_id?: number;
+  home_pitcher?: string;
+  away_pitcher?: string;
+  home_score?: number | null;
+  away_score?: number | null;
+  game_status?: "SCHEDULED" | "LIVE" | "FINISHED";
+}
+
+interface LoginRpcResponse {
+  success: boolean;
+  user_id?: string;
+  username?: string;
+ succeeded in 53ms:
+  if (predsError) {
+    console.error(`Error fetching predictions for date ${date}:`, predsError);
+    // Continue, but predictions will be missing.
+  }
+
+  // 3. If no finished games, but user has predictions, show message about pending games
+  if (games.length === 0) {
+    const userPredictionsCount = predictions?.length || 0;
+    if (userPredictionsCount > 0) {
+      return {
+        games: [],
+        totalPoints: 0,
+        message: `You have ${userPredictionsCount} prediction(s) for this date, but games haven't finished yet.`,
+      };
+    }
+    return { games: [], totalPoints: 0 };
+  }
+
+  // 4. Combine the data and calculate total points for the day.
+  let totalPoints = 0;
+
+thinking
+**Checking for truncated API code**
+exec
+/bin/zsh -lc "sed -n '700,980p' lib/api.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+
+  const rpcResult = data as WeeklyCoinsRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "전체 코인 지급에 실패했습니다");
+  }
+
+  return {
+    success: true,
+    users_count: Number(rpcResult.users_count ?? 0),
+    total_distributed: Number(rpcResult.total_distributed ?? 0),
+  };
+};
+
+export const adminGrantCoins = async (userId: string, amount: number) => {
+  const { data, error } = await supabase.rpc("admin_grant_coins", {
+    p_user_id: userId,
+    p_amount: amount,
+  });
+
+  if (error) {
+
+thinking
+**Inspecting admin page changes**
+exec
+/bin/zsh -lc "sed -n '1,260p' app/layout.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,320p' app/admin/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' components/app-header.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' lib/auth.ts" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1,260p' lib/hooks/useUserSession.ts" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "next-themes";
+import Navigation from "@/components/navigation"; // Import the new component
+import AppHeader from "@/components/app-header";
+import "./globals.css";
+import localFont from "next/font/local";
+
+const defaultUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "http://localhost:3000";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+export const metadata: Metadata = {
+  metadataBase: new URL(defaultUrl),
+  title: "ToKHin' 승부 예측",
+  icons: {
+ succeeded in 51ms:
+"use client";
+
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { getWalletBalance } from "@/lib/api";
+import { useUserSession } from "@/lib/hooks/useUserSession";
+
+const numberFormatter = new Intl.NumberFormat("ko-KR", {
+  maximumFractionDigits: 2,
+});
+
+export default function AppHeader() {
+  const pathname = usePathname();
+  const { session } = useUserSession();
+  const [balance, setBalance] = useState<number | null>(null);
+
+  const shouldHideHeader = pathname?.startsWith("/admin");
+  const hasUserSession = Boolean(session?.user_id);
+  const canShowBalance =
+ succeeded in 51ms:
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Game as CrawledGame } from "kbo-game";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { createClient } from "@/lib/supabase/client";
+import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { DefaultInput } from "@/components/ui/default_input";
+import {
+  adminGrantCoins,
+  distributeWeeklyCoins,
+  getGameData,
+  getUsersForAdmin,
+  type AdminUser,
+} from "@/lib/api";
+
+ succeeded in 50ms:
+export interface UserSession {
+  user_id: string;
+  username: string;
+  student_number: string;
+}
+
+export const USER_SESSION_KEY = "tokhin_user_session";
+const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
+export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+
+const isBrowser = () => typeof window !== "undefined";
+
+const dispatchSessionChangedEvent = () => {
+  if (!isBrowser()) return;
+  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
+};
+
+const parseSession = (value: string | null): UserSession | null => {
+  if (!value) return null;
+
+ succeeded in 50ms:
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getUserSession,
+  type UserSession,
+  USER_SESSION_CHANGED_EVENT,
+  USER_SESSION_KEY,
+} from "@/lib/auth";
+
+interface UseUserSessionOptions {
+  requireAuth?: boolean;
+}
+
+export const useUserSession = ({
+  requireAuth = false,
+}: UseUserSessionOptions = {}) => {
+  const router = useRouter();
+  const [session, setSession] = useState<UserSession | null>(null);
+
+thinking
+**Searching admin page details**
+exec
+/bin/zsh -lc "rg -n 'coin|wallet|grant|weekly|distribute|adminGrantCoins|getUsersForAdmin|pg_cron|자동|지급' app/admin/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+14:  adminGrantCoins,
+15:  distributeWeeklyCoins,
+17:  getUsersForAdmin,
+235:      let message = `자동 채우기 완료! ${
+325:            {loading ? "Auto-filling..." : "자동 채우기"}
+351:            해당 날짜의 경기가 없습니다. 새 경기를 추가하거나 자동 채우기를
+362:              {loading ? "Auto-filling..." : "자동 채우기"}
+377:            💡 자동 채우기를 여러 번 클릭하지 마시고, 결과가 나올 때까지
+887:        const userList = await getUsersForAdmin();
+893:        console.error("Failed to fetch users for coin grant:", error);
+922:        text: "전체 지급 금액은 0보다 큰 숫자여야 합니다.",
+929:      const result = await distributeWeeklyCoins(amount);
+932:        text: `전체 지급 완료: ${result.users_count.toLocaleString()}명에게 총 ${result.total_distributed.toLocaleString()} 코인 지급`,
+940:            : "전체 코인 지급 중 오류가 발생했습니다.",
+954:        text: "지급할 유저를 선택해주세요.",
+963:        text: "개별 지급 금액은 0보다 큰 숫자여야 합니다.",
+970:      const result = await adminGrantCoins(selectedUserId, amount);
+974:        text: `${selectedUser?.username || "선택한 유저"}에게 ${result.granted_amount.toLocaleString()} 코인 지급 완료 (현재 잔고 ${result.new_balance.toLocaleString()})`,
+982:            : "개별 코인 지급 중 오류가 발생했습니다.",
+997:          코인 지급 관리
+
+thinking
+**Inspecting coin grant and admin page**
+codex
+코인 지급 기능(REQ-030)과 pg_cron 대체 경로(REQ-029)를 정확히 보기 위해 `admin/page.tsx`의 코인 관리 섹션만 집중해서 확인하겠습니다. ત્યાર પછી 테스트를 돌려 PASS/FAIL을 판단하겠습니다.
+exec
+/bin/zsh -lc "sed -n '260,460p' supabase/migrations/20260224_us004_wallet_system.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '820,1135p' app/admin/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "sed -n '1135,1320p' app/admin/page.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+    EXCEPTION
+      WHEN OTHERS THEN
+        v_job_id := NULL;
+    END;
+
+    IF v_job_id IS NOT NULL THEN
+      BEGIN
+        EXECUTE format('SELECT cron.unschedule(%s)', v_job_id);
+      EXCEPTION
+        WHEN OTHERS THEN
+          RAISE NOTICE '기존 cron 작업 해제 실패: %', SQLERRM;
+      END;
+    END IF;
+
+    BEGIN
+      EXECUTE
+        'SELECT cron.schedule(''weekly_coin_distribution'', ''0 15 * * 0'', ''SELECT public.distribute_weekly_coins();'')';
+    EXCEPTION
+      WHEN OTHERS THEN
+        RAISE NOTICE 'cron 스케줄 등록 실패(수동 트리거 사용): %', SQLERRM;
+ succeeded in 51ms:
+            현재 시각: {getCurrentKSTTime()}
+          </div>
+        </div>
+
+        {currentView === "calculate" ? (
+          <ForcedCalculation />
+        ) : currentView === "coins" ? (
+          <CoinGrantManagement />
+        ) : (
+          <MatchManagement
+            selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
+          />
+        )}
+
+        <div
+          className={`mt-8 ${
+            isMobile ? "flex justify-center" : "flex justify-end"
+          }`}
+        >
+          <Button
+ succeeded in 51ms:
+            isMobile ? "text-xl" : "text-2xl"
+          }`}
+        >
+          특정 날짜 매치 강제 계산
+        </h2>
+        <p className="text-muted-foreground mt-2">
+          특정 날짜의 매치를 강제로 계산합니다.
+        </p>
+      </div>
+
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <Label htmlFor="date-picker" className="block mb-2">
+              날짜 선택
+            </Label>
+            <Input
+              id="date-picker"
+              type="date"
+              value={selectedDate}
+
+thinking
+**Inspecting migration completeness with line numbers**
+exec
+/bin/zsh -lc 'nl -ba supabase/migrations/20260224_us004_wallet_system.sql' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+     1	-- US-004: 지갑 시스템 - 코인 잔고 및 주간 자동 지급
+     2	-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+     3	
+     4	-- REQ-027: 로그인 성공 시 wallet 자동 생성
+     5	CREATE OR REPLACE FUNCTION public.login(
+     6	  p_student_number BIGINT,
+     7	  p_password TEXT
+     8	)
+     9	RETURNS JSONB
+    10	LANGUAGE plpgsql
+    11	SECURITY DEFINER
+    12	SET search_path = public
+    13	AS $$
+    14	DECLARE
+    15	  v_user RECORD;
+    16	  v_input_hash TEXT;
+    17	BEGIN
+    18	  SELECT id, username, password_hash, password_changed
+    19	  INTO v_user
+    20	  FROM public.users
+
+thinking
+**Inspecting login and migration dependencies**
+exec
+/bin/zsh -lc "rg -n 'CREATE EXTENSION|digest\\(|CREATE OR REPLACE FUNCTION public.login|change_password' supabase/migrations/20260224_us001_auth.sql" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+4:CREATE EXTENSION IF NOT EXISTS pgcrypto;
+13:SET password_hash = encode(digest(phone_number::TEXT, 'sha256'), 'hex')
+16:CREATE OR REPLACE FUNCTION public.login(
+42:  v_input_hash := encode(digest(COALESCE(p_password, ''), 'sha256'), 'hex');
+60:CREATE OR REPLACE FUNCTION public.change_password(
+79:    password_hash = encode(digest(p_new_password, 'sha256'), 'hex'),
+96:GRANT EXECUTE ON FUNCTION public.change_password(UUID, TEXT) TO anon, authenticated;
+
+thinking
+**Verifying coin distribution logic and schema**
+codex
+US-004 SQL 구현은 전반적으로 들어가 있지만, 실제 스키마 제약과 충돌 가능성(예: `transactions.type` 허용값, `wallets` 컬럼 제약)을 확인해야 정확히 PASS/FAIL을 낼 수 있습니다. 지금 US-002 스키마를 대조 확인하겠습니다.
+exec
+/bin/zsh -lc "nl -ba supabase/migrations/20260224_us002_db_schema.sql | sed -n '280,520p'" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "rg -n 'CREATE TABLE public.wallets|CREATE TABLE public.transactions|CHECK|type|WEEKLY_GRANT|ADMIN_GRANT|RLS|POLICY' supabase/migrations/20260224_us002_db_schema.sql" in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc "nl -ba supabase/migrations/20260224_us002_db_schema.sql | sed -n '1,280p'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+
+ succeeded in 52ms:
+20:  balance NUMERIC NOT NULL DEFAULT 0 CHECK (balance >= 0),
+65:  CONSTRAINT markets_status_check CHECK (status IN ('OPEN', 'CLOSED', 'SETTLED', 'CANCELED')),
+66:  CONSTRAINT markets_result_check CHECK (result IS NULL OR result IN ('HOME', 'AWAY', 'DRAW'))
+80:  outcome VARCHAR NOT NULL CHECK (outcome IN ('HOME', 'AWAY', 'DRAW')),
+81:  side VARCHAR NOT NULL CHECK (side IN ('BUY', 'SELL')),
+82:  quantity NUMERIC NOT NULL CHECK (quantity > 0),
+93:  outcome VARCHAR NOT NULL CHECK (outcome IN ('HOME', 'AWAY', 'DRAW')),
+110:  type VARCHAR NOT NULL CHECK (type IN ('BUY', 'SELL', 'SETTLEMENT', 'WEEKLY_GRANT', 'ADMIN_GRANT')),
+118:-- REQ-017 RLS
+126:DROP POLICY IF EXISTS wallets_select_own ON public.wallets;
+127:CREATE POLICY wallets_select_own
+132:DROP POLICY IF EXISTS positions_select_own ON public.positions;
+133:CREATE POLICY positions_select_own
+138:DROP POLICY IF EXISTS orders_select_own ON public.orders;
+139:CREATE POLICY orders_select_own
+144:DROP POLICY IF EXISTS transactions_select_own ON public.transactions;
+145:CREATE POLICY transactions_select_own
+150:DROP POLICY IF EXISTS markets_select_all ON public.markets;
+151:CREATE POLICY markets_select_all
+156:DROP POLICY IF EXISTS settings_select_all ON public.settings;
+ succeeded in 51ms:
+     1	-- US-002: LMSR 예측시장용 DB 스키마 마이그레이션
+     2	-- 실행 대상: Supabase SQL Editor 또는 `supabase db execute`
+     3	
+     4	CREATE EXTENSION IF NOT EXISTS pgcrypto;
+     5	
+     6	CREATE OR REPLACE FUNCTION public.set_updated_at()
+     7	RETURNS TRIGGER
+     8	LANGUAGE plpgsql
+     9	AS $$
+    10	BEGIN
+    11	  NEW.updated_at = NOW();
+    12	  RETURN NEW;
+    13	END;
+    14	$$;
+    15	
+    16	-- REQ-010 wallets
+    17	CREATE TABLE IF NOT EXISTS public.wallets (
+    18	  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    19	  user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    20	  balance NUMERIC NOT NULL DEFAULT 0 CHECK (balance >= 0),
+
+thinking
+**Reviewing test and script setup**
+exec
+/bin/zsh -lc 'cat package.json' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 52ms:
+{
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.3.1",
+    "@radix-ui/react-dropdown-menu": "^2.1.15",
+    "@radix-ui/react-label": "^2.1.6",
+    "@radix-ui/react-slot": "^1.2.2",
+    "@supabase/ssr": "latest",
+    "@supabase/supabase-js": "latest",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.511.0",
+    "next": "latest",
+    "next-themes": "^0.4.6",
+
+thinking
+**Inspecting git diff for issues**
+exec
+/bin/zsh -lc 'git diff -- lib/api.ts' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- app/layout.tsx' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- lib/auth.ts lib/hooks/useUserSession.ts components/app-header.tsx supabase/migrations/20260224_us004_wallet_system.sql prd.json' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git diff -- app/admin/page.tsx' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+diff --git a/app/layout.tsx b/app/layout.tsx
+index 06e9981..73818ba 100644
+--- a/app/layout.tsx
++++ b/app/layout.tsx
+@@ -1,7 +1,7 @@
+ import type { Metadata, Viewport } from "next";
+ import { ThemeProvider } from "next-themes";
+-import Image from "next/image";
+ import Navigation from "@/components/navigation"; // Import the new component
++import AppHeader from "@/components/app-header";
+ import "./globals.css";
+ import localFont from "next/font/local";
+ 
+@@ -68,16 +68,7 @@ export default function RootLayout({
+         >
+           <main className="min-h-screen bg-[#111111]">
+             <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white px-4 pb-28">
+-              <div className="w-full flex justify-center py-4">
+-                <Image
+-                  src="/toKHin.svg"
+ succeeded in 53ms:
+diff --git a/app/admin/page.tsx b/app/admin/page.tsx
+index 6b6e929..969814f 100644
+--- a/app/admin/page.tsx
++++ b/app/admin/page.tsx
+@@ -10,7 +10,13 @@ import { Select } from "@/components/ui/select";
+ import { createClient } from "@/lib/supabase/client";
+ import { useIsMobile } from "@/lib/hooks/useResponsive";
+ import { DefaultInput } from "@/components/ui/default_input";
+-import { getGameData } from "@/lib/api";
++import {
++  adminGrantCoins,
++  distributeWeeklyCoins,
++  getGameData,
++  getUsersForAdmin,
++  type AdminUser,
++} from "@/lib/api";
+ 
+ // Interface definitions
+ interface Team {
+@@ -860,11 +866,251 @@ function ForcedCalculation() {
+ succeeded in 53ms:
+diff --git a/lib/auth.ts b/lib/auth.ts
+index 1fc935a..4014776 100644
+--- a/lib/auth.ts
++++ b/lib/auth.ts
+@@ -4,11 +4,17 @@ export interface UserSession {
+   student_number: string;
+ }
+ 
+-const USER_SESSION_KEY = "tokhin_user_session";
++export const USER_SESSION_KEY = "tokhin_user_session";
+ const PENDING_PASSWORD_CHANGE_KEY = "tokhin_pending_password_change";
++export const USER_SESSION_CHANGED_EVENT = "tokhin:user-session-changed";
+ 
+ const isBrowser = () => typeof window !== "undefined";
+ 
++const dispatchSessionChangedEvent = () => {
++  if (!isBrowser()) return;
++  window.dispatchEvent(new Event(USER_SESSION_CHANGED_EVENT));
++};
++
+ succeeded in 53ms:
+diff --git a/lib/api.ts b/lib/api.ts
+index 66a685b..5569013 100644
+--- a/lib/api.ts
++++ b/lib/api.ts
+@@ -22,6 +22,33 @@ interface LoginRpcResponse {
+   error?: string;
+ }
+ 
++interface WalletBalanceRpcResponse {
++  success: boolean;
++  balance?: number | string;
++  error?: string;
++}
++
++interface WeeklyCoinsRpcResponse {
++  success: boolean;
++  users_count?: number | string;
++  total_distributed?: number | string;
++  error?: string;
++}
+
+thinking
+**Assessing acceptance criteria and risks**
+codex
+수용 기준별 구현은 확인했고, 이제 정적 검증으로 `lint`와 타입 체크를 실행해 빌드 안정성을 확인하겠습니다. 그 결과와 코드 리뷰 이슈를 합쳐 최종 PASS/FAIL을 판정하겠습니다.
+exec
+/bin/zsh -lc 'npm run lint' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'npx tsc --noEmit' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 1.31s:
+
+> lint
+> next lint
+
+✔ No ESLint warnings or errors
+ succeeded in 1.46s:
+
+
+thinking
+**Verifying cron schedule and coin grant flows**
+exec
+/bin/zsh -lc 'ls -la ERROR.md 2>/dev/null || true' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 50ms:
+
+
+thinking
+**Evaluating major security and criteria compliance**
+exec
+/bin/zsh -lc "sed -n '1,220p' components/ui/select.tsx" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+import * as React from "react";
+import { cn } from "@/lib/utils";
+
+const Select = React.forwardRef<
+  HTMLSelectElement,
+  React.SelectHTMLAttributes<HTMLSelectElement>
+>(({ className, ...props }, ref) => {
+  return (
+    <select
+      className={cn(
+        "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+        className
+      )}
+      ref={ref}
+      {...props}
+    />
+  );
+});
+Select.displayName = "Select";
+
+
+thinking
+**Assessing untracked files for commit**
+codex
+테스트(`npm run lint`, `npx tsc --noEmit`)는 통과했습니다. 이제 PASS/FAIL 판정 전에 커밋 대상에 포함하면 안 될 임시 파일(`.ralph/`, `supabase/.temp/`) 여부만 확인하고 최종 처리하겠습니다.
+exec
+/bin/zsh -lc 'find .ralph -maxdepth 3 -type f | head -n 30' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'find supabase/.temp -maxdepth 3 -type f | head -n 30' in /Users/jeffrey/WebstormProjects/lookin/lookinexec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 51ms:
+supabase/.temp/cli-latest
+ succeeded in 53ms:
+.ralph/logs/US-003-build-1.log
+.ralph/logs/US-001-verify-1.log
+.ralph/logs/US-001-verify-2.log
+.ralph/logs/US-003-verify-1.log
+.ralph/logs/US-004-verify-1.log
+.ralph/logs/US-004-verify-2.log
+.ralph/logs/US-002-build-1.log
+.ralph/logs/US-002-verify-1.log
+.ralph/logs/US-001-build-2.log
+.ralph/logs/US-001-build-1.log
+.ralph/logs/US-004-build-1.log
+.ralph/logs/US-004-build-2.log
+ succeeded in 53ms:
+ M app/admin/page.tsx
+ M app/layout.tsx
+ M lib/api.ts
+ M lib/auth.ts
+ M lib/hooks/useUserSession.ts
+ M prd.json
+?? .ralph/
+?? PROGRESS.md
+?? components/app-header.tsx
+?? supabase/.temp/
+?? supabase/migrations/20260224_us004_wallet_system.sql
+
+thinking
+**Deciding files to commit**
+exec
+/bin/zsh -lc 'cat PROGRESS.md' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+## US-001 — FAIL attempt 1 (2026-02-24T13:32:54Z)
+
+## US-001 — PASS (2026-02-24T13:42:56Z)
+- Title: 인증 시스템 — 학번 로그인 + 비밀번호 (Supabase 직접 구현)
+- Attempts: 2
+
+## US-002 — PASS (2026-02-24T13:49:00Z)
+- Title: DB 스키마 마이그레이션 — 새 테이블 생성 및 기존 테이블 정리
+- Attempts: 1
+
+## US-003 — PASS (2026-02-24T14:02:16Z)
+- Title: LMSR 엔진 — Supabase RPC 함수 구현
+- Attempts: 1
+
+## US-004 — FAIL attempt 1 (2026-02-24T14:12:28Z)
+
+
+thinking
+**Planning selective commit content**
+codex
+수용 기준 대비 구현과 테스트 기준으로는 US-004를 PASS로 판정할 수 있어, 요청하신 대로 `ERROR.md`는 확인 후(없음) 그대로 두고 관련 구현 파일만 스테이징해 커밋하겠습니다. 임시 로그/캐시 파일(`.ralph`, `supabase/.temp`)은 커밋에서 제외하겠습니다.
+
+thinking
+**Committing wallet feature**
+exec
+/bin/zsh -lc 'git add app/admin/page.tsx app/layout.tsx components/app-header.tsx lib/api.ts lib/auth.ts lib/hooks/useUserSession.ts supabase/migrations/20260224_us004_wallet_system.sql prd.json && git commit -m "feat(us-004): implement wallet balance and coin distribution"' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+[Feature/stock-market e33c355] feat(us-004): implement wallet balance and coin distribution
+ 8 files changed, 790 insertions(+), 21 deletions(-)
+ create mode 100644 components/app-header.tsx
+ create mode 100644 supabase/migrations/20260224_us004_wallet_system.sql
+
+thinking
+**Verifying commit file count**
+exec
+/bin/zsh -lc 'git status --short' in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+?? .ralph/
+?? PROGRESS.md
+?? supabase/.temp/
+
+thinking
+**Preparing final review summary**
+exec
+/bin/zsh -lc "git show --name-only --oneline --no-patch HEAD && git show --name-only --pretty=format: HEAD | sed '/"'^$/d'"'" in /Users/jeffrey/WebstormProjects/lookin/lookin succeeded in 53ms:
+e33c355 feat(us-004): implement wallet balance and coin distribution
+app/admin/page.tsx
+app/layout.tsx
+components/app-header.tsx
+lib/api.ts
+lib/auth.ts
+lib/hooks/useUserSession.ts
+prd.json
+supabase/migrations/20260224_us004_wallet_system.sql
+
+thinking
+**Crafting final test review**
+codex
+**판정**
+PASS (차단 이슈 없음)
+
+**리뷰 결과 (우선순위 순)**
+1. 차단/중대/경미 이슈 없음.
+
+**수용 기준 확인**
+1. REQ-027 충족: 로그인 RPC에서 wallet 없을 때 `balance=0` 자동 생성 확인 ([20260224_us004_wallet_system.sql](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql)).
+2. REQ-028 충족: `distribute_weekly_coins(p_amount DEFAULT 1000)` 구현, 전체 유저 지급 + `transactions` 기록 + `{success, users_count, total_distributed}` 반환 확인.
+3. REQ-029 충족: `pg_cron` 스케줄(월 00:00 KST = 일 15:00 UTC) 등록 로직 + 실패 시 Admin 수동 지급 경로 확인.
+4. REQ-030 충족: `admin_grant_coins(p_user_id, p_amount)` RPC + Admin의 전체/개별 수동 지급 UI 확인 ([page.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx)).
+5. REQ-031 충족: 상단 헤더에 코인 아이콘+잔고 표시 구현 확인 ([app-header.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx), [layout.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/app/layout.tsx)).
+
+**검증 실행**
+1. `npm run lint` 통과.
+2. `npx tsc --noEmit` 통과.
+
+**요청하신 후속 조치**
+1. `ERROR.md` 존재 여부 확인: 없음(삭제 작업 불필요).
+2. 커밋 완료: `e33c355` (`feat(us-004): implement wallet balance and coin distribution`).
+
+**참고(잔여 리스크)**
+1. 실제 Supabase 환경에서 마이그레이션/`pg_cron` 등록 런타임 검증은 별도 실행하지 않았습니다.
+tokens used
+94,283
+**판정**
+PASS (차단 이슈 없음)
+
+**리뷰 결과 (우선순위 순)**
+1. 차단/중대/경미 이슈 없음.
+
+**수용 기준 확인**
+1. REQ-027 충족: 로그인 RPC에서 wallet 없을 때 `balance=0` 자동 생성 확인 ([20260224_us004_wallet_system.sql](/Users/jeffrey/WebstormProjects/lookin/lookin/supabase/migrations/20260224_us004_wallet_system.sql)).
+2. REQ-028 충족: `distribute_weekly_coins(p_amount DEFAULT 1000)` 구현, 전체 유저 지급 + `transactions` 기록 + `{success, users_count, total_distributed}` 반환 확인.
+3. REQ-029 충족: `pg_cron` 스케줄(월 00:00 KST = 일 15:00 UTC) 등록 로직 + 실패 시 Admin 수동 지급 경로 확인.
+4. REQ-030 충족: `admin_grant_coins(p_user_id, p_amount)` RPC + Admin의 전체/개별 수동 지급 UI 확인 ([page.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/app/admin/page.tsx)).
+5. REQ-031 충족: 상단 헤더에 코인 아이콘+잔고 표시 구현 확인 ([app-header.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/components/app-header.tsx), [layout.tsx](/Users/jeffrey/WebstormProjects/lookin/lookin/app/layout.tsx)).
+
+**검증 실행**
+1. `npm run lint` 통과.
+2. `npx tsc --noEmit` 통과.
+
+**요청하신 후속 조치**
+1. `ERROR.md` 존재 여부 확인: 없음(삭제 작업 불필요).
+2. 커밋 완료: `e33c355` (`feat(us-004): implement wallet balance and coin distribution`).
+
+**참고(잔여 리스크)**
+1. 실제 Supabase 환경에서 마이그레이션/`pg_cron` 등록 런타임 검증은 별도 실행하지 않았습니다.

@@ -12,6 +12,7 @@ import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
 import {
   adminGrantCoins,
+  adminResetPassword,
   cancelMarket,
   closeMarket,
   distributeWeeklyCoins,
@@ -1375,6 +1376,111 @@ function MarketSettlementManagement() {
   );
 }
 
+function PasswordResetManagement() {
+  const isMobile = useIsMobile();
+  const [studentNumberInput, setStudentNumberInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+
+  const handleReset = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(null);
+
+    const trimmed = studentNumberInput.trim();
+    if (!trimmed) {
+      setMessage({ type: "error", text: "학번을 입력해주세요." });
+      return;
+    }
+
+    const studentNumber = Number(trimmed);
+    if (!Number.isFinite(studentNumber) || studentNumber <= 0) {
+      setMessage({ type: "error", text: "올바른 학번을 입력해주세요." });
+      return;
+    }
+
+    if (!window.confirm(`학번 ${trimmed}의 비밀번호를 전화번호로 초기화합니다. 계속하시겠습니까?`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await adminResetPassword(studentNumber);
+      setMessage({
+        type: "success",
+        text: `${result.username}(${result.studentNumber}) 비밀번호가 전화번호로 초기화되었습니다.`,
+      });
+      setStudentNumberInput("");
+    } catch (error) {
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "비밀번호 초기화 중 오류가 발생했습니다.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="mb-2">
+        <h2
+          className={`font-bold text-black ${isMobile ? "text-xl" : "text-2xl"}`}
+        >
+          비밀번호 초기화
+        </h2>
+        <p className="text-muted-foreground mt-2">
+          학번을 입력하면 해당 유저의 비밀번호를 전화번호로 리셋합니다.
+        </p>
+      </div>
+
+      {message ? (
+        <div
+          className={`rounded-lg p-3 text-sm ${
+            message.type === "success"
+              ? "bg-green-50 text-green-700"
+              : "bg-red-50 text-red-600"
+          }`}
+        >
+          {message.text}
+        </div>
+      ) : null}
+
+      <Card className={isMobile ? "p-4" : "p-6"}>
+        <h3 className="font-semibold text-black mb-2">비밀번호 전화번호로 초기화</h3>
+        <p className="text-sm text-muted-foreground mb-4">
+          초기화 후 유저는 전화번호로 로그인할 수 있으며, 첫 로그인 시 비밀번호 변경을 요구받습니다.
+        </p>
+
+        <form
+          onSubmit={handleReset}
+          className={`${isMobile ? "space-y-3" : "flex items-end gap-3"}`}
+        >
+          <div className="flex-1">
+            <Label htmlFor="reset-student-number" className="block mb-2">
+              학번
+            </Label>
+            <Input
+              id="reset-student-number"
+              type="number"
+              value={studentNumberInput}
+              onChange={(event) => setStudentNumberInput(event.target.value)}
+              disabled={loading}
+              className="text-black"
+              placeholder="예: 2023123456"
+            />
+          </div>
+          <Button type="submit" disabled={loading} className="h-12 rounded-lg">
+            {loading ? "초기화 중..." : "비밀번호 초기화"}
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 function CoinGrantManagement() {
   const isMobile = useIsMobile();
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -1709,6 +1815,7 @@ function AdminDashboard() {
     | "coins"
     | "markets"
     | "liquidity"
+    | "password"
   >("dashboard");
 
   const getCurrentKSTTime = () => {
@@ -1736,6 +1843,8 @@ function AdminDashboard() {
 
         {currentView === "coins" ? (
           <CoinGrantManagement />
+        ) : currentView === "password" ? (
+          <PasswordResetManagement />
         ) : currentView === "markets" ? (
           <MarketSettlementManagement />
         ) : currentView === "liquidity" ? (
@@ -1887,6 +1996,23 @@ function AdminDashboard() {
           </p>
           <Button
             onClick={() => setCurrentView("coins")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            비밀번호 초기화
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            학번으로 유저를 찾아 비밀번호를 전화번호로 리셋합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("password")}
             className={isMobile ? "w-full" : ""}
           >
             접속
