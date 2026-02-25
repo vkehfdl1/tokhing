@@ -282,12 +282,12 @@ export default function HomePage() {
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-base font-bold text-black">
-                    <span className={getTeamTextColorClass(homeTeamName)}>
-                      {homeTeamName}
-                    </span>
-                    <span className="px-1 text-zinc-400">vs</span>
                     <span className={getTeamTextColorClass(awayTeamName)}>
                       {awayTeamName}
+                    </span>
+                    <span className="px-1 text-zinc-400">vs</span>
+                    <span className={getTeamTextColorClass(homeTeamName)}>
+                      {homeTeamName}
                     </span>
                   </p>
                   <p className="text-sm text-zinc-500 tabular-nums">
@@ -298,19 +298,19 @@ export default function HomePage() {
                 <div className="my-3 h-px w-full bg-zinc-200" />
 
                 <div className="grid grid-cols-3 gap-2">
-                  <p className="text-center text-xs font-semibold text-zinc-500">
-                    HOME
+                  <p className={`text-center text-xs font-semibold ${getTeamTextColorClass(awayTeamName)}`}>
+                    {awayTeamName}
                   </p>
                   <p className="text-center text-xs font-semibold text-zinc-500">
-                    AWAY
+                    무승부
                   </p>
-                  <p className="text-center text-xs font-semibold text-zinc-500">
-                    DRAW
+                  <p className={`text-center text-xs font-semibold ${getTeamTextColorClass(homeTeamName)}`}>
+                    {homeTeamName}
                   </p>
 
-                  {renderPrice("HOME")}
                   {renderPrice("AWAY")}
                   {renderPrice("DRAW")}
+                  {renderPrice("HOME")}
                 </div>
 
                 <div className="mt-4 flex justify-center">
