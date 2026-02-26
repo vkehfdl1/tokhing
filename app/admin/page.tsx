@@ -1094,7 +1094,26 @@ function MarketSettlementManagement() {
       return result;
     }
 
+    if (
+      market.gameStatus === "FINISHED" &&
+      market.homeScore != null &&
+      market.awayScore != null
+    ) {
+      if (market.homeScore > market.awayScore) return "HOME";
+      if (market.awayScore > market.homeScore) return "AWAY";
+      return "DRAW";
+    }
+
     return "HOME";
+  };
+
+  const isAutoDetected = (market: MarketListItem): boolean => {
+    if (market.result) return false;
+    return (
+      market.gameStatus === "FINISHED" &&
+      market.homeScore != null &&
+      market.awayScore != null
+    );
   };
 
   const fetchMarkets = async () => {
@@ -1290,32 +1309,85 @@ function MarketSettlementManagement() {
             const isClosed = market.marketStatus === "CLOSED";
             const isOpen = market.marketStatus === "OPEN";
             const isActionLoading = activeMarketId === market.id;
+            const autoDetected = isAutoDetected(market);
+            const hasScore =
+              market.homeScore != null && market.awayScore != null;
+
+            const statusColor = isSettled
+              ? "bg-green-100 text-green-800"
+              : isClosed
+                ? "bg-amber-100 text-amber-800"
+                : isCanceled
+                  ? "bg-red-100 text-red-800"
+                  : "bg-gray-100 text-gray-700";
 
             return (
               <Card key={market.id} className={isMobile ? "p-4" : "p-6"}>
                 <div className="space-y-4">
-                  <div>
-                    <div className="font-semibold text-black">
-                      {market.homeTeamName} vs {market.awayTeamName}
+                  {/* Header: teams + score + status badge */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-black text-base">
+                        {market.homeTeamName} vs {market.awayTeamName}
+                      </span>
+                      {hasScore ? (
+                        <span className="inline-flex items-center rounded bg-blue-100 px-2 py-0.5 text-sm font-bold text-blue-800">
+                          {market.homeScore} : {market.awayScore}
+                        </span>
+                      ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatDateTimeLabel(market.gameDate, market.gameTime)} | 상태:{" "}
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor}`}
+                    >
                       {market.marketStatus}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      현재가 HOME {market.prices.HOME.toFixed(1)} / AWAY{" "}
-                      {market.prices.AWAY.toFixed(1)} / DRAW{" "}
-                      {market.prices.DRAW.toFixed(1)}
-                    </p>
+                    </span>
                   </div>
 
+                  {/* Date/time */}
+                  <p className="text-sm text-muted-foreground">
+                    {formatDateTimeLabel(market.gameDate, market.gameTime)}
+                  </p>
+
+                  {/* Price grid */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {(["HOME", "AWAY", "DRAW"] as const).map((outcome) => (
+                      <div
+                        key={outcome}
+                        className="rounded-lg border bg-gray-50 p-2 text-center"
+                      >
+                        <div className="text-xs text-muted-foreground">
+                          {outcome}
+                        </div>
+                        <div className="text-sm font-semibold text-black">
+                          {market.prices[outcome].toFixed(1)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="border-t" />
+
+                  {/* Auto-detected notice */}
+                  {autoDetected ? (
+                    <p className="text-xs text-blue-600">
+                      경기 결과({market.homeScore} : {market.awayScore})에서 자동 감지됨
+                    </p>
+                  ) : null}
+
+                  {/* Settlement controls */}
                   <div
                     className={`${
-                      isMobile ? "space-y-2" : "grid grid-cols-4 gap-2 items-end"
+                      isMobile
+                        ? "space-y-2"
+                        : "flex items-end gap-2"
                     }`}
                   >
-                    <div className={`${isMobile ? "" : "col-span-2"}`}>
-                      <Label htmlFor={`settle-result-${market.id}`} className="mb-2 block">
+                    <div className="flex-1">
+                      <Label
+                        htmlFor={`settle-result-${market.id}`}
+                        className="mb-2 block"
+                      >
                         정산 결과
                       </Label>
                       <Select

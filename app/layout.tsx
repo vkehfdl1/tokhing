@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
-import Navigation from "@/components/navigation"; // Import the new component
-import AppHeader from "@/components/app-header";
+import LayoutShell from "@/components/layout-shell";
 import "./globals.css";
 import localFont from "next/font/local";
 
@@ -66,13 +65,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen bg-[#111111]">
-            <div className="mx-auto flex min-h-screen w-full max-w-[430px] flex-col bg-white px-4 pb-28">
-              <AppHeader />
-              <div className="w-full flex-1">{children}</div>
-            </div>
-            <Navigation />
-          </main>
+          <LayoutShell>{children}</LayoutShell>
         </ThemeProvider>
       </body>
     </html>

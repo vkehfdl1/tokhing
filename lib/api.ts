@@ -97,6 +97,8 @@ interface GameForMarketListRow {
   game_date: string;
   game_time: string | null;
   game_status: string;
+  home_score: number | null;
+  away_score: number | null;
   home_team: TeamRelation;
   away_team: TeamRelation;
 }
@@ -236,6 +238,8 @@ export interface MarketListItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
   prices: Record<MarketOutcome, number>;
   initialPrices: Record<MarketOutcome, number | null>;
 }
@@ -720,6 +724,8 @@ export const getMarketListForDate = async (
       game_date,
       game_time,
       game_status,
+      home_score,
+      away_score,
       home_team:teams!home_team_id(id, name, short_name),
       away_team:teams!away_team_id(id, name, short_name)
     `
@@ -823,6 +829,8 @@ export const getMarketListForDate = async (
         awayTeamName: awayTeam.name,
         homeTeamShortName: homeTeam.short_name ?? null,
         awayTeamShortName: awayTeam.short_name ?? null,
+        homeScore: game.home_score ?? null,
+        awayScore: game.away_score ?? null,
         prices,
         initialPrices: {
           HOME: toNumberOrNull(market.initial_home_price),
