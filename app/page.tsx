@@ -1,617 +1,328 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import {
-  getUserByStudentId,
-  getTodaysGamesWithPredictions,
-  getGamesWithPredictionsForDate,
-  submitMultiplePredictions,
   getISODate,
+  getMarkets,
+  isMarketClosedHours,
+  type MarketListItem,
 } from "@/lib/api";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/lib/hooks/useResponsive";
+import { useUserSession } from "@/lib/hooks/useUserSession";
 
-// --- TYPE DEFINITIONS ---
-type Team = { id: number; name: string };
-type Game = {
-  id: number;
-  home_team: Team;
-  away_team: Team;
-  home_pitcher: string | null;
-  away_pitcher: string | null;
-  game_status: "SCHEDULED" | "IN_PROGRESS" | "CANCELED" | "FINISHED";
-  home_score: number | null;
-  away_score: number | null;
-  // prediction is what's already saved in the DB
-  prediction: { predicted_winner_team_id: number } | null;
-};
-type User = { id: string; student_number: string; name: string };
-// selectedPick is for UI interaction before submission
-type SelectedPick = {
-  gameId: number;
-  predictedTeamId: number;
-  teamName: string;
+type MarketOutcome = "HOME" | "AWAY" | "DRAW";
+type MarketDateLabel = "today" | "tomorrow";
+type DisplayMarketStatus = "OPEN" | "CLOSED" | "SETTLED" | "CANCELED";
+
+const KOREAN_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+const MARKET_STATUS_BADGE_CLASSES: Record<DisplayMarketStatus, string> = {
+  OPEN: "bg-tokhin-green/10 text-tokhin-green",
+  CLOSED: "bg-zinc-200 text-zinc-600",
+  SETTLED: "bg-blue-100 text-blue-600",
+  CANCELED: "bg-red-100 text-red-500",
 };
 
-function translateGameStatus(status: string): string {
-  switch (status) {
-    case "SCHEDULED":
-      return "경기 전";
-    case "IN_PROGRESS":
-      return "예측 마감";
-    case "CANCELED":
-      return "경기 취소";
-    case "FINISHED":
-      return "경기 종료";
-    default:
-      return status;
-  }
-}
+const PRICE_TREND_CLASSES = {
+  up: "text-green-500",
+  down: "text-red-500",
+  flat: "text-gray-500",
+} as const;
 
-function selectTeamColor(teamName: string): {
-  backgroundColor: string;
-  textColor: string;
-} {
-  switch (teamName) {
-    case "KIA 타이거즈":
-      return { backgroundColor: "bg-kia", textColor: "text-kia" };
-    case "NC 다이노스":
-      return { backgroundColor: "bg-nc", textColor: "text-nc" };
-    case "키움 히어로즈":
-      return { backgroundColor: "bg-kiwoom", textColor: "text-kiwoom" };
-    case "두산 베어스":
-      return { backgroundColor: "bg-doosan", textColor: "text-doosan" };
-    case "KT 위즈":
-      return { backgroundColor: "bg-kt", textColor: "text-kt" };
-    case "삼성 라이온즈":
-      return { backgroundColor: "bg-samsung", textColor: "text-samsung" };
-    case "SSG 랜더스":
-      return { backgroundColor: "bg-ssg", textColor: "text-ssg" };
-    case "롯데 자이언츠":
-      return { backgroundColor: "bg-lotte", textColor: "text-lotte" };
-    case "LG 트윈스":
-      return { backgroundColor: "bg-lg-twins", textColor: "text-lg-twins" };
-    case "한화 이글스":
-      return { backgroundColor: "bg-hanhwa", textColor: "text-hanhwa" };
-    default:
-      return { backgroundColor: "bg-gray-500", textColor: "text-black" };
+const formatGameTime = (gameTime: string | null): string => {
+  if (!gameTime) {
+    return "--:--";
   }
-}
 
-// --- COMPONENT ---
+  const [hour = "", minute = ""] = gameTime.split(":");
+
+  if (!hour || !minute) {
+    return gameTime;
+  }
+
+  return `${hour.padStart(2, "0")}:${minute.padStart(2, "0")}`;
+};
+
+const formatMarketDateTitle = (
+  isoDate: string,
+  label: MarketDateLabel
+): string => {
+  const [year, month, day] = isoDate.split("-").map(Number);
+  const safeDate = new Date(year, (month || 1) - 1, day || 1);
+  const weekday = KOREAN_WEEKDAYS[safeDate.getDay()] ?? "-";
+  const suffix = label === "tomorrow" ? "내일의 마켓" : "오늘의 마켓";
+
+  return `${year}.${String(month).padStart(2, "0")}.${String(day).padStart(
+    2,
+    "0"
+  )} (${weekday}) ${suffix}`;
+};
+
+const getDisplayTeamName = (
+  shortName: string | null,
+  fullName: string
+): string => {
+  if (shortName && shortName.trim().length > 0) {
+    return shortName;
+  }
+
+  return fullName;
+};
+
+const getTeamTextColorClass = (teamName: string): string => {
+  const normalized = teamName.toUpperCase();
+
+  if (normalized.includes("KIA")) return "text-kia";
+  if (normalized.includes("NC")) return "text-nc";
+  if (teamName.includes("키움")) return "text-kiwoom";
+  if (teamName.includes("두산")) return "text-doosan";
+  if (normalized.includes("KT")) return "text-kt";
+  if (teamName.includes("삼성")) return "text-samsung";
+  if (normalized.includes("SSG")) return "text-ssg";
+  if (teamName.includes("롯데")) return "text-lotte";
+  if (normalized.includes("LG")) return "text-lg-twins";
+  if (teamName.includes("한화")) return "text-hanhwa";
+
+  return "text-black";
+};
+
+const getDisplayMarketStatus = (
+  gameStatus: string,
+  marketStatus: string
+): DisplayMarketStatus => {
+  const normalizedGameStatus = gameStatus.toUpperCase();
+  const normalizedMarketStatus = marketStatus.toUpperCase();
+
+  if (normalizedMarketStatus === "SETTLED") {
+    return "SETTLED";
+  }
+
+  if (
+    normalizedMarketStatus === "CANCELED" ||
+    normalizedGameStatus === "CANCELED"
+  ) {
+    return "CANCELED";
+  }
+
+  if (normalizedMarketStatus === "CLOSED" || normalizedGameStatus === "FINISHED") {
+    return "CLOSED";
+  }
+
+  if (
+    normalizedGameStatus === "SCHEDULED" ||
+    normalizedGameStatus === "IN_PROGRESS" ||
+    normalizedGameStatus === "LIVE"
+  ) {
+    return "OPEN";
+  }
+
+  return "OPEN";
+};
+
+const getPriceTrendClass = (
+  currentPrice: number,
+  baselinePrice: number | null
+): string => {
+  if (baselinePrice === null) {
+    return PRICE_TREND_CLASSES.flat;
+  }
+
+  if (currentPrice > baselinePrice) {
+    return PRICE_TREND_CLASSES.up;
+  }
+
+  if (currentPrice < baselinePrice) {
+    return PRICE_TREND_CLASSES.down;
+  }
+
+  return PRICE_TREND_CLASSES.flat;
+};
+
+const isGameEnded = (status: string): boolean => {
+  const normalizedStatus = status.toUpperCase();
+  return normalizedStatus === "FINISHED" || normalizedStatus === "CANCELED";
+};
+
 export default function HomePage() {
-  const router = useRouter();
-  const isMobile = useIsMobile();
-  const [studentId, setStudentId] = useState("");
-  const [user, setUser] = useState<User | null>(null);
-  const [todaysGames, setTodaysGames] = useState<Game[]>([]);
-  const [selectedPicks, setSelectedPicks] = useState<Map<number, SelectedPick>>(
-    new Map()
-  );
+  const { session, isLoading: isSessionLoading } = useUserSession({
+    requireAuth: true,
+  });
+  const [markets, setMarkets] = useState<MarketListItem[]>([]);
+  const [displayDate, setDisplayDate] = useState<string>(getISODate());
+  const [displayDateLabel, setDisplayDateLabel] =
+    useState<MarketDateLabel>("today");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [closedHours, setClosedHours] = useState(isMarketClosedHours);
 
-  // --- DATA FETCHING & LOGIN ---
-  const fetchAndSetGames = useCallback(async () => {
-    if (!user) return;
-
-    setIsLoading(true);
-
-    // First, get today's games
-    const todayGamesData = await getTodaysGamesWithPredictions(user.id);
-
-    // Check if all today's games are finished
-    const allTodayGamesFinished =
-      todayGamesData.length > 0 &&
-      todayGamesData.every(
-        (game) =>
-          game.game_status === "FINISHED" || game.game_status === "CANCELED"
-      );
-
-    if (allTodayGamesFinished || todayGamesData.length === 0) {
-      // Get tomorrow's date
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const tomorrowDateString = getISODate(tomorrow);
-
-      // Fetch tomorrow's games
-      const tomorrowGamesData = await getGamesWithPredictionsForDate(
-        user.id,
-        tomorrowDateString
-      );
-
-      // If tomorrow has games, use tomorrow's data; otherwise use today's data
-      if (tomorrowGamesData.length > 0) {
-        // @ts-expect-error - Ignoring type mismatch for gamesData
-        setTodaysGames(tomorrowGamesData);
-      } else {
-        // @ts-expect-error - Ignoring type mismatch for gamesData
-        setTodaysGames(todayGamesData);
-      }
-    } else {
-      // Not all games finished, use today's data
-      // @ts-expect-error - Ignoring type mismatch for gamesData
-      setTodaysGames(todayGamesData);
-    }
-
-    setIsLoading(false);
-  }, [user]);
-
-  const handleLogin = async () => {
-    if (!studentId) {
-      setError("Please enter your student ID.");
+  const fetchAndSetMarkets = useCallback(async () => {
+    if (!session?.user_id) {
       return;
     }
+
     setIsLoading(true);
     setError(null);
-    try {
-      const userData = await getUserByStudentId(studentId);
-      setUser(userData);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (err: any) {
-      setError(err.message);
-      setUser(null);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    if (user) {
-      const fetchGames = async () => {
-        await fetchAndSetGames();
-        // Clear old picks when a new user logs in
-        setSelectedPicks(new Map());
-      };
-      fetchGames();
-    }
-  }, [user, fetchAndSetGames]);
-
-  // --- UI HANDLERS ---
-  const handleSelectPick = (
-    gameId: number,
-    predictedTeamId: number,
-    teamName: string
-  ) => {
-    const newPicks = new Map(selectedPicks);
-    newPicks.set(gameId, { gameId, predictedTeamId, teamName });
-    setSelectedPicks(newPicks);
-  };
-
-  const handleConfirmSubmission = async () => {
-    if (!user || selectedPicks.size === 0) return;
-
-    const predictionsToSubmit = Array.from(selectedPicks.values()).map((p) => ({
-      game_id: p.gameId,
-      predicted_winner_team_id: p.predictedTeamId,
-    }));
-
-    setShowConfirmation(false);
 
     try {
-      await submitMultiplePredictions(user.id, predictionsToSubmit);
+      const today = getISODate();
+      const todayMarkets = await getMarkets(today);
 
-      // Refresh data from server to show the submitted picks
-      await fetchAndSetGames();
+      const allTodayGamesEnded =
+        todayMarkets.length > 0 &&
+        todayMarkets.every((market) => isGameEnded(market.gameStatus));
 
-      setSelectedPicks(new Map()); // Clear selections
-    } catch (err) {
-      setError("Failed to save predictions. Please try again." + err);
+      if (allTodayGamesEnded || todayMarkets.length === 0) {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowDate = getISODate(tomorrow);
+        const tomorrowMarkets = await getMarkets(tomorrowDate);
+
+        if (tomorrowMarkets.length > 0) {
+          setMarkets(tomorrowMarkets);
+          setDisplayDate(tomorrowDate);
+          setDisplayDateLabel("tomorrow");
+        } else {
+          setMarkets(todayMarkets);
+          setDisplayDate(today);
+          setDisplayDateLabel("today");
+        }
+      } else {
+        setMarkets(todayMarkets);
+        setDisplayDate(today);
+        setDisplayDateLabel("today");
+      }
+    } catch (fetchError) {
+      console.error("Error loading market list:", fetchError);
+      setError("마켓 목록을 불러오는 중 오류가 발생했습니다");
+    } finally {
       setIsLoading(false);
     }
-  };
+  }, [session?.user_id]);
 
-  // --- RENDER ---
+  useEffect(() => {
+    if (!session?.user_id) {
+      return;
+    }
+
+    void fetchAndSetMarkets();
+  }, [fetchAndSetMarkets, session?.user_id]);
+
+  useEffect(() => {
+    const checkClosed = () => setClosedHours(isMarketClosedHours());
+    checkClosed();
+    const id = window.setInterval(checkClosed, 30000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  if (isSessionLoading) {
+    return <p className="py-20 text-center text-zinc-500">로딩 중...</p>;
+  }
+
+  if (!session?.user_id) {
+    return null;
+  }
+
   return (
-    <div className={`w-full mx-auto ${isMobile ? "p-4" : "p-8"}`}>
-      <h1
-        className={`font-bold text-center text-black mb-3 ${
-          isMobile ? "text-xl" : "text-4xl"
-        }`}
-      >
-        오늘의 토킹 승부 예측
+    <div className="w-full pt-1">
+      {closedHours ? (
+        <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+          <p className="text-sm font-semibold text-amber-700">
+            폐장 시간 (01:00~09:00)
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            오전 9시 이후에 거래해주세요.
+          </p>
+        </div>
+      ) : null}
+
+      <h1 className="mb-4 text-lg font-bold text-black">
+        {formatMarketDateTitle(displayDate, displayDateLabel)}
       </h1>
 
-      {/* --- LOGIN FORM -- */}
-      {!user ? (
-        <div>
-          <div
-            className={`flex gap-4 mb-8 ${isMobile ? "flex-col" : "flex-row"}`}
-          >
-            <Input
-              type="text"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-              placeholder="학번을 입력해 주세요"
-              className="flex-grow text-black"
-            />
-            <Button
-              onClick={handleLogin}
-              disabled={isLoading}
-              className={`px-6 text-base ${isMobile ? "w-full" : ""}`}
-            >
-              {isLoading ? "로딩 중..." : "로그인"}
-            </Button>
-          </div>
+      {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
-          {/* Tutorial Button */}
-          <div className="text-center mb-8">
-            <Button
-              variant="ghost"
-              onClick={() => router.push("/tutorial")}
-              className="text-zinc-500 text-xs underline p-0 h-auto bg-transparent hover:bg-transparent"
-            >
-              토킹이 처음이라면?
-            </Button>
-          </div>
+      {isLoading ? (
+        <p className="py-20 text-center text-zinc-500">마켓 목록을 불러오는 중...</p>
+      ) : markets.length === 0 ? (
+        <div className="rounded-2xl bg-white p-5 text-center shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">
+          <p className="text-sm text-zinc-500">표시할 마켓이 없습니다.</p>
         </div>
       ) : (
-        <div className="text-center mb-8">
-          <h2
-            className={`font-semibold text-gray-800 ${
-              isMobile ? "text-base" : "text-2xl"
-            }`}
-          >
-            {user.name}님 환영합니다.
-          </h2>
-        </div>
-      )}
+        <div className="space-y-4">
+          {markets.map((market) => {
+            const homeTeamName = getDisplayTeamName(
+              market.homeTeamShortName,
+              market.homeTeamName
+            );
+            const awayTeamName = getDisplayTeamName(
+              market.awayTeamShortName,
+              market.awayTeamName
+            );
+            const marketStatus = getDisplayMarketStatus(
+              market.gameStatus,
+              market.marketStatus
+            );
 
-      {error && <p className="text-red-500 text-center mb-4">{error}</p>}
-      {user && isLoading && (
-        <p className="text-center text-gray-800">Loading games...</p>
-      )}
-
-      {/* --- GAMES LIST -- */}
-      {user && !isLoading && (
-        <div className="space-y-6">
-          {todaysGames.map((game) => {
-            const hasSubmitted = !!game.prediction;
-            const currentPick = selectedPicks.get(game.id);
-            const submittedPick = game.prediction?.predicted_winner_team_id;
+            const renderPrice = (outcome: MarketOutcome) => (
+              <p
+                className={`text-center text-2xl font-bold tabular-nums ${getPriceTrendClass(
+                  market.prices[outcome],
+                  market.initialPrices[outcome]
+                )}`}
+              >
+                {market.prices[outcome].toFixed(1)}
+              </p>
+            );
 
             return (
-              <div
-                key={game.id}
-                className={`${
-                  isMobile ? "p-5 pb-6 pt-3" : "p-6"
-                } rounded-2xl shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)] ${
-                  game.game_status === "CANCELED"
-                    ? "bg-red-50 border-2 border-red-200"
-                    : "bg-white"
-                }`}
+              <Link
+                key={market.id}
+                href={`/market/${market.id}`}
+                className="block rounded-2xl bg-white p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)] transition-transform active:scale-[0.995]"
               >
-                {isMobile ? (
-                  // Mobile Layout - 4 Rows
-                  <div className="flex flex-col space-y-2 text-gray-800 mb-5">
-                    {/* Row 1: Game Status at center */}
-                    <div className="text-center mb-2">
-                      <span className="text-xs text-zinc-500">
-                        {translateGameStatus(game.game_status)}
-                      </span>
-                      {game.game_status === "CANCELED" && (
-                        <div className="font-bold text-red-500 text-xs mt-1">
-                          경기 취소
-                        </div>
-                      )}
-                    </div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-base font-bold text-black">
+                    <span className={getTeamTextColorClass(awayTeamName)}>
+                      {awayTeamName}
+                    </span>
+                    <span className="px-1 text-zinc-400">vs</span>
+                    <span className={getTeamTextColorClass(homeTeamName)}>
+                      {homeTeamName}
+                    </span>
+                  </p>
+                  <p className="text-sm text-zinc-500 tabular-nums">
+                    {formatGameTime(market.gameTime)}
+                  </p>
+                </div>
 
-                    {/* Row 2: Team Names - Away (left) vs Home (right) */}
-                    <div className="flex items-center">
-                      <span
-                        className={`font-bold text-xl flex-1 text-left ${
-                          selectTeamColor(game.away_team.name).textColor
-                        }`}
-                      >
-                        {game.away_team.name}
-                      </span>
-                      <span className="font-light text-base text-black px-3">
-                        VS
-                      </span>
-                      <span
-                        className={`font-bold text-xl flex-1 text-right ${
-                          selectTeamColor(game.home_team.name).textColor
-                        }`}
-                      >
-                        {game.home_team.name}
-                      </span>
-                    </div>
+                <div className="my-3 h-px w-full bg-zinc-200" />
 
-                    {/* Row 3: Pitchers or Scores - Away (left) vs Home (right with 홈 badge) */}
-                    <div className="flex justify-between items-center">
-                      {game.game_status === "IN_PROGRESS" ||
-                      game.game_status === "FINISHED" ? (
-                        <>
-                          <span className="text-base text-neutral-700 font-medium">
-                            {game.away_score}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
-                              <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
-                                홈
-                              </div>
-                            </div>
-                            <span className="text-base text-neutral-700 font-medium">
-                              {game.home_score}
-                            </span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="text-base text-neutral-700 font-medium">
-                            {game.away_pitcher || "미정"}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 py-1 bg-zinc-100 rounded inline-flex flex-col justify-center items-center gap-2">
-                              <div className="self-stretch text-center justify-start text-neutral-700 text-xs font-medium">
-                                홈
-                              </div>
-                            </div>
-                            <span className="text-base text-neutral-700 font-medium">
-                              {game.home_pitcher || "미정"}
-                            </span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  // Desktop Layout (unchanged)
-                  <div className="grid grid-cols-3 items-center text-center text-gray-800">
-                    {/* Home Team */}
-                    <div className="flex flex-col">
-                      <span className="font-bold text-2xl">
-                        {game.home_team.name}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {game.home_pitcher}
-                      </span>
-                    </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <p className={`text-center text-xs font-semibold ${getTeamTextColorClass(awayTeamName)}`}>
+                    {awayTeamName}
+                  </p>
+                  <p className="text-center text-xs font-semibold text-zinc-500">
+                    무승부
+                  </p>
+                  <p className={`text-center text-xs font-semibold ${getTeamTextColorClass(homeTeamName)}`}>
+                    {homeTeamName}
+                  </p>
 
-                    {/* Score/VS */}
-                    <div className="flex flex-col items-center">
-                      <span className="text-sm text-gray-500">
-                        {translateGameStatus(game.game_status)}
-                      </span>
-                      {game.game_status === "IN_PROGRESS" ||
-                      game.game_status === "FINISHED" ? (
-                        <span className="font-extrabold text-3xl">
-                          {game.home_score} - {game.away_score}
-                        </span>
-                      ) : game.game_status === "CANCELED" ? (
-                        <span className="font-bold text-red-500 text-xl">
-                          경기 취소
-                        </span>
-                      ) : (
-                        <span className="font-extrabold text-3xl">VS</span>
-                      )}
-                    </div>
+                  {renderPrice("AWAY")}
+                  {renderPrice("DRAW")}
+                  {renderPrice("HOME")}
+                </div>
 
-                    {/* Away Team */}
-                    <div className="flex flex-col">
-                      <span className="font-bold text-2xl">
-                        {game.away_team.name}
-                      </span>
-                      <span className="text-sm text-gray-500">
-                        {game.away_pitcher}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {game.game_status === "CANCELED" ? (
-                  <div className="mt-6 text-center">
-                    <p
-                      className={`text-gray-800 ${
-                        isMobile ? "text-base" : "text-lg"
-                      }`}
-                    >
-                      해당 경기는 취소되었습니다.
-                    </p>
-                  </div>
-                ) : hasSubmitted ? (
-                  <div className="flex gap-3">
-                    <div
-                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
-                        submittedPick === game.away_team.id
-                          ? selectTeamColor(game.away_team.name).backgroundColor // Predicted team: full color
-                          : `${
-                              selectTeamColor(game.away_team.name)
-                                .backgroundColor
-                            } opacity-50` // Non-predicted: 50% opacity
-                      } text-sm text-center`}
-                    >
-                      {game.away_team.name}
-                    </div>
-                    <div
-                      className={`flex-1 py-3 font-light text-base rounded-lg text-white ${
-                        submittedPick === game.home_team.id
-                          ? selectTeamColor(game.home_team.name).backgroundColor // Predicted team: full color
-                          : `${
-                              selectTeamColor(game.home_team.name)
-                                .backgroundColor
-                            } opacity-50` // Non-predicted: 50% opacity
-                      } text-sm text-center`}
-                    >
-                      {game.home_team.name}
-                    </div>
-                  </div>
-                ) : game.game_status === "SCHEDULED" ? (
-                  <div className="mt-6">
-                    {isMobile ? (
-                      // Mobile: Row 4 - Team selection buttons
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() =>
-                            handleSelectPick(
-                              game.id,
-                              game.away_team.id,
-                              game.away_team.name
-                            )
-                          }
-                          className={`flex-1 py-3 font-light text-base rounded-lg transition text-white ${
-                            currentPick?.predictedTeamId === game.away_team.id
-                              ? selectTeamColor(game.away_team.name)
-                                  .backgroundColor // Selected: full team color
-                              : `${
-                                  selectTeamColor(game.away_team.name)
-                                    .backgroundColor
-                                } opacity-50` // Unselected: 50% opacity
-                          } text-sm`}
-                        >
-                          {game.away_team.name}
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleSelectPick(
-                              game.id,
-                              game.home_team.id,
-                              game.home_team.name
-                            )
-                          }
-                          className={`flex-1 py-3 font-light text-base rounded-lg transition text-white ${
-                            currentPick?.predictedTeamId === game.home_team.id
-                              ? selectTeamColor(game.home_team.name)
-                                  .backgroundColor // Selected: full team color
-                              : `${
-                                  selectTeamColor(game.home_team.name)
-                                    .backgroundColor
-                                } opacity-50` // Unselected: 50% opacity
-                          } text-sm`}
-                        >
-                          {game.home_team.name}
-                        </button>
-                      </div>
-                    ) : (
-                      // Desktop: Horizontal buttons
-                      <div className="flex justify-center gap-4">
-                        <button
-                          onClick={() =>
-                            handleSelectPick(
-                              game.id,
-                              game.home_team.id,
-                              game.home_team.name
-                            )
-                          }
-                          className={`w-full py-3 font-bold rounded-lg transition ${
-                            currentPick?.predictedTeamId === game.home_team.id
-                              ? "bg-green-600 text-white"
-                              : "bg-green-200 text-green-800"
-                          } text-base`}
-                        >
-                          {game.home_team.name}
-                        </button>
-                        <button
-                          onClick={() =>
-                            handleSelectPick(
-                              game.id,
-                              game.away_team.id,
-                              game.away_team.name
-                            )
-                          }
-                          className={`w-full py-3 font-bold rounded-lg transition ${
-                            currentPick?.predictedTeamId === game.away_team.id
-                              ? "bg-red-600 text-white"
-                              : "bg-red-200 text-red-800"
-                          } text-base`}
-                        >
-                          {game.away_team.name}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-6 text-center">
-                    <p
-                      className={`text-gray-800 ${
-                        isMobile ? "text-base" : "text-lg"
-                      }`}
-                    >
-                      이 경기에 대한 예측은 마감되었습니다.
-                    </p>
-                  </div>
-                )}
-              </div>
+                <div className="mt-4 flex justify-center">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${MARKET_STATUS_BADGE_CLASSES[marketStatus]}`}
+                  >
+                    {marketStatus}
+                  </span>
+                </div>
+              </Link>
             );
           })}
-
-          {/* --- SUBMIT BUTTON -- */}
-          {selectedPicks.size > 0 && (
-            <div className="mt-8 text-center">
-              <button
-                onClick={() => setShowConfirmation(true)}
-                className={`px-8 py-4 bg-blue-600 text-white font-bold rounded-lg shadow-lg ${
-                  isMobile ? "w-full text-base" : "text-lg"
-                }`}
-              >
-                Submit {selectedPicks.size} Prediction(s)
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* --- CONFIRMATION MODAL -- */}
-      {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center p-4 z-50">
-          <div
-            className={`bg-white rounded-lg shadow-2xl max-w-md w-full ${
-              isMobile ? "p-6 pr-4 pl-4 pb-3" : "p-8"
-            }`}
-          >
-            <h3 className={`font-bold mb-5 text-black text-center text-xl`}>
-              예측을 제출하시겠습니까?
-            </h3>
-            <div
-              className={`mb-7 text-black font-light text-base text-center space-y-2`}
-            >
-              {Array.from(selectedPicks.values()).map((pick) => {
-                const game = todaysGames.find((g) => g.id === pick.gameId);
-                if (!game) return null;
-
-                return (
-                  <div key={pick.gameId}>
-                    <span
-                      className={
-                        pick.predictedTeamId === game.away_team.id
-                          ? "font-bold text-blue-600"
-                          : ""
-                      }
-                    >
-                      {game.away_team.name}
-                    </span>
-                    {" vs "}
-                    <span
-                      className={
-                        pick.predictedTeamId === game.home_team.id
-                          ? "font-bold text-blue-600"
-                          : ""
-                      }
-                    >
-                      {game.home_team.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowConfirmation(false)}
-                className="flex-1 px-6 py-2 bg-gray-300 text-gray-800 rounded-lg"
-              >
-                취소
-              </button>
-              <button
-                onClick={handleConfirmSubmission}
-                className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg"
-              >
-                제출
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>

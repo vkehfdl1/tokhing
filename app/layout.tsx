@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ThemeProvider } from "next-themes";
-import Image from "next/image";
-import Navigation from "@/components/navigation"; // Import the new component
+import LayoutShell from "@/components/layout-shell";
 import "./globals.css";
 import localFont from "next/font/local";
 
@@ -59,28 +58,14 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${pretendard.variable}`}
     >
-      <body className={`${pretendard.className} bg-white antialiased`}>
+      <body className={`${pretendard.className} bg-[#111111] antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <main className="min-h-screen flex flex-col items-center px-4 sm:px-6 lg:px-8 pb-20 sm:pb-0">
-            {/* Logo at the top center */}
-            <div className="w-full flex justify-center py-4">
-              <Image
-                src="/toKHin.svg"
-                alt="ToKHin' Logo"
-                width={120}
-                height={60}
-                priority
-                className="h-auto"
-              />
-            </div>
-            <Navigation />
-            <div className="w-full max-w-4xl mx-auto">{children}</div>
-          </main>
+          <LayoutShell>{children}</LayoutShell>
         </ThemeProvider>
       </body>
     </html>
