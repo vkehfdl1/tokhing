@@ -651,23 +651,7 @@ export const changePassword = async (userId: string, newPassword: string) => {
   return data;
 };
 
-// 1. Fetch User by Student ID
-export const getUserByStudentId = async (studentId: string) => {
-  const { data, error } = await supabase
-    .from("users_public")
-    .select("id, student_number, username")
-    .eq("student_number", studentId)
-    .single();
-
-  if (error) {
-    console.error("Error fetching user:", error);
-    throw new Error("User not found or connection issue.");
-  }
-  // Map to frontend-expected fields if necessary, e.g., name
-  return { ...data, name: data.username };
-};
-
-// 2. Fetch Leaderboard (US-008)
+// Fetch Leaderboard (US-008)
 export const getLeaderboardBalance = async (): Promise<
   LeaderboardBalanceItem[]
 > => {
