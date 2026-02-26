@@ -654,7 +654,7 @@ export const changePassword = async (userId: string, newPassword: string) => {
 // 1. Fetch User by Student ID
 export const getUserByStudentId = async (studentId: string) => {
   const { data, error } = await supabase
-    .from("users")
+    .from("users_public")
     .select("id, student_number, username")
     .eq("student_number", studentId)
     .single();
@@ -1877,7 +1877,7 @@ export const adminGrantCoins = async (userId: string, amount: number) => {
 
 export const getUsersForAdmin = async (): Promise<AdminUser[]> => {
   const { data, error } = await supabase
-    .from("users")
+    .from("users_public")
     .select("id, student_number, username")
     .order("student_number", { ascending: true });
 
