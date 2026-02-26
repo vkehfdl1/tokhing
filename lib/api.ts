@@ -1829,7 +1829,7 @@ export const getWalletBalance = async (userId: string): Promise<number> => {
   return Number(rpcResult.balance ?? 0);
 };
 
-export const distributeWeeklyCoins = async (amount = 1000) => {
+export const distributeWeeklyCoins = async (amount = 300) => {
   const { data, error } = await supabase.rpc("distribute_weekly_coins", {
     p_amount: amount,
   });
