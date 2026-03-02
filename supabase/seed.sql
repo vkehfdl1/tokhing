@@ -19,18 +19,18 @@ DELETE FROM public.games;
 DELETE FROM public.users;
 
 -- 1) 팀 데이터 (users FK 참조 대상이므로 먼저 삽입)
-INSERT INTO public.teams (id, name, short_name, created_at)
+INSERT INTO public.teams (id, name, short_name, team_color, created_at)
 VALUES
-  (1, 'KIA 타이거즈', 'KIA', NOW()),
-  (2, 'NC 다이노스', 'NC', NOW()),
-  (3, '키움 히어로즈', '키움', NOW()),
-  (4, '두산 베어스', '두산', NOW()),
-  (5, 'KT 위즈', 'KT', NOW()),
-  (6, '삼성 라이온즈', '삼성', NOW()),
-  (7, 'SSG 랜더스', 'SSG', NOW()),
-  (8, '롯데 자이언츠', '롯데', NOW()),
-  (9, 'LG 트윈스', 'LG', NOW()),
-  (10, '한화 이글스', '한화', NOW())
+  (1, 'KIA 타이거즈', 'KIA', '#E92020', NOW()),
+  (2, 'NC 다이노스', 'NC', '#284579', NOW()),
+  (3, '키움 히어로즈', '키움', '#A5085D', NOW()),
+  (4, '두산 베어스', '두산', '#2A2378', NOW()),
+  (5, 'KT 위즈', 'KT', '#221E1F', NOW()),
+  (6, '삼성 라이온즈', '삼성', '#0065B3', NOW()),
+  (7, 'SSG 랜더스', 'SSG', '#CF112E', NOW()),
+  (8, '롯데 자이언츠', '롯데', '#60B0E3', NOW()),
+  (9, 'LG 트윈스', 'LG', '#C30137', NOW()),
+  (10, '한화 이글스', '한화', '#F37321', NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- 2) 테스트 유저 3명
