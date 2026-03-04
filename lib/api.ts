@@ -84,6 +84,25 @@ export interface AdminUser {
 
 export type MarketOutcome = "HOME" | "AWAY" | "DRAW";
 
+export type CrawledGameStatus =
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "FINISHED"
+  | "CANCELED";
+
+export interface CrawledMatch {
+  homeTeam: string;
+  awayTeam: string;
+  startTime: string;
+  homePitcher?: string;
+  awayPitcher?: string;
+  score?: {
+    home: number;
+    away: number;
+  };
+  status: CrawledGameStatus;
+}
+
 interface TeamWithShortName {
   id: number;
   name: string;
@@ -1481,7 +1500,7 @@ export const deleteGame = async (gameId: number) => {
 };
 
 // Fetch game data from external source via API route to avoid CORS issues
-export const getGameData = async (date: Date) => {
+export const getGameData = async (date: Date): Promise<CrawledMatch[] | null> => {
   try {
     const response = await fetch("/api/crawl-games", {
       method: "POST",
@@ -1503,9 +1522,48 @@ export const getGameData = async (date: Date) => {
       throw new Error(result.error || "Failed to fetch game data");
     }
 
-    return result.data;
+    if (!Array.isArray(result.data)) {
+      throw new Error("Invalid game data format");
+    }
+
+    return result.data as CrawledMatch[];
   } catch (error) {
     console.error("Error fetching game data:", error);
+    return null;
+  }
+};
+
+export const getNaverWbcGameData = async (
+  date: Date
+): Promise<CrawledMatch[] | null> => {
+  try {
+    const response = await fetch("/api/crawl-naver-wbc-games", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        date: date.toISOString(),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || "Failed to fetch naver game data");
+    }
+
+    if (!Array.isArray(result.data)) {
+      throw new Error("Invalid naver game data format");
+    }
+
+    return result.data as CrawledMatch[];
+  } catch (error) {
+    console.error("Error fetching naver game data:", error);
     return null;
   }
 };

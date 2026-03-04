@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Game as CrawledGame } from "kbo-game";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -17,6 +16,7 @@ import {
   closeMarket,
   distributeWeeklyCoins,
   ensureMarketsForGames,
+  getNaverWbcGameData,
   getGameData,
   getLiquidityB,
   getMarkets,
@@ -25,6 +25,7 @@ import {
   settleMarket,
   updateLiquidityB,
   type AdminUser,
+  type CrawledMatch,
   type MarketListItem,
   type MarketOutcome,
 } from "@/lib/api";
@@ -34,6 +35,7 @@ interface Team {
   id: number;
   name: string;
   short_name: string;
+  team_color?: string;
 }
 
 interface Game {
@@ -91,11 +93,47 @@ const formatDateTimeLabel = (date: string, time: string | null) => {
   return `${formatDateLabel(date)} ${safeTime}`.trim();
 };
 
+const normalizeTeamKey = (value: string) => value.trim().toLowerCase();
+
+const createUniqueShortName = (
+  teamName: string,
+  usedShortNames: Set<string>
+): string => {
+  const sanitized = teamName.replace(/\s+/g, "").replace(/[^0-9A-Za-z가-힣]/g, "");
+  const base = (sanitized || "TEAM").slice(0, 10);
+
+  let candidate = base;
+  let suffix = 2;
+  while (usedShortNames.has(normalizeTeamKey(candidate))) {
+    const suffixText = String(suffix);
+    const prefix = base.slice(0, Math.max(1, 10 - suffixText.length));
+    candidate = `${prefix}${suffixText}`.slice(0, 10);
+    suffix += 1;
+  }
+
+  usedShortNames.add(normalizeTeamKey(candidate));
+  return candidate;
+};
+
+const createUniqueRandomColor = (usedColors: Set<string>): string => {
+  for (let attempt = 0; attempt < 2000; attempt += 1) {
+    const random = Math.floor(Math.random() * 0xffffff);
+    const color = `#${random.toString(16).toUpperCase().padStart(6, "0")}`;
+    if (!usedColors.has(color)) {
+      usedColors.add(color);
+      return color;
+    }
+  }
+  throw new Error("고유한 팀 컬러 생성에 실패했습니다.");
+};
+
 // Match Management Component
 function MatchManagement({
   selectedDate,
+  onDateChange,
 }: {
-  selectedDate: "today" | "tomorrow" | "yesterday";
+  selectedDate: string;
+  onDateChange: (date: string) => void;
 }) {
   const [games, setGames] = useState<Game[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -110,13 +148,7 @@ function MatchManagement({
   const supabase = createClient();
   const isMobile = useIsMobile();
 
-  // Calculate target date based on selected period
-  const targetDate =
-    selectedDate === "yesterday"
-      ? getKSTDate(-1)
-      : selectedDate === "tomorrow"
-      ? getKSTDate(1)
-      : getKSTDate(0);
+  const targetDate = selectedDate || getKSTDate(0);
 
   const fetchTeams = async () => {
     const { data, error } = await supabase
@@ -223,26 +255,24 @@ function MatchManagement({
     };
   };
 
-  const autoFillMatches = async () => {
+  const autoFillMatchesBySource = async (
+    sourceLabel: string,
+    fetchMatches: () => Promise<CrawledMatch[] | null>
+  ) => {
     try {
       setLoading(true);
-
-      console.log(new Date(targetDate));
-      // Call the API function to get game data
-      const crawledData: CrawledGame[] | null = await getGameData(
-        new Date(targetDate)
-      );
+      const crawledData = await fetchMatches();
 
       if (!crawledData) {
-        console.error("Error calling getGameData function");
-        alert("Error fetching match data. Please try again.");
+        console.error(`${sourceLabel} auto-fill failed: no data`);
+        alert(`${sourceLabel} 경기 정보를 불러오지 못했습니다.`);
         return;
       }
 
       // First, get team name to ID mappings
       const { data: teamsData, error: teamsError } = await supabase
         .from("teams")
-        .select("id, name, short_name");
+        .select("id, name, short_name, team_color");
 
       if (teamsError) {
         console.error("Error fetching teams:", teamsError);
@@ -250,19 +280,83 @@ function MatchManagement({
         return;
       }
 
+      const currentTeams: Team[] = (teamsData ?? []) as Team[];
       const teamNameToId = new Map<string, number>();
-      teamsData.forEach((team) => {
-        teamNameToId.set(team.name, team.id);
-        teamNameToId.set(team.short_name, team.id);
-      });
+      const registerTeamAliases = (team: Team) => {
+        teamNameToId.set(normalizeTeamKey(team.name), team.id);
+        teamNameToId.set(normalizeTeamKey(team.short_name), team.id);
+      };
+
+      currentTeams.forEach(registerTeamAliases);
+
+      const missingTeamNames = [
+        ...new Set(
+          crawledData
+            .flatMap((match) => [match.homeTeam, match.awayTeam])
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0)
+            .filter((name) => !teamNameToId.has(normalizeTeamKey(name)))
+        ),
+      ];
+
+      let insertedTeamsCount = 0;
+      if (missingTeamNames.length > 0) {
+        const usedShortNames = new Set(
+          currentTeams.map((team) => normalizeTeamKey(team.short_name))
+        );
+        const usedColors = new Set(
+          currentTeams
+            .map((team) => team.team_color)
+            .filter(
+              (color): color is string =>
+                typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)
+            )
+            .map((color) => color.toUpperCase())
+        );
+
+        const newTeamsPayload = missingTeamNames.map((name) => ({
+          name,
+          short_name: createUniqueShortName(name, usedShortNames),
+          team_color: createUniqueRandomColor(usedColors),
+        }));
+
+        const { data: insertedTeams, error: insertTeamsError } = await supabase
+          .from("teams")
+          .insert(newTeamsPayload)
+          .select("id, name, short_name, team_color");
+
+        if (insertTeamsError) {
+          console.error("Error auto-mapping missing teams:", insertTeamsError);
+          alert(
+            `누락 팀 자동 매핑 중 오류가 발생했습니다: ${insertTeamsError.message}`
+          );
+          return;
+        }
+
+        const inserted = (insertedTeams ?? []) as Team[];
+        insertedTeamsCount = inserted.length;
+        inserted.forEach(registerTeamAliases);
+
+        if (inserted.length > 0) {
+          setTeams((prev) => {
+            const byId = new Map<number, Team>();
+            [...prev, ...inserted].forEach((team) => {
+              byId.set(team.id, team);
+            });
+            return Array.from(byId.values()).sort((a, b) =>
+              a.name.localeCompare(b.name, "ko-KR")
+            );
+          });
+        }
+      }
 
       // Convert crawled data to Game objects
       const crawledGames: Game[] = [];
       const unmatchedTeams: string[] = [];
 
-      crawledData.forEach((match: CrawledGame) => {
-        const homeTeamId = teamNameToId.get(match.homeTeam);
-        const awayTeamId = teamNameToId.get(match.awayTeam);
+      crawledData.forEach((match) => {
+        const homeTeamId = teamNameToId.get(normalizeTeamKey(match.homeTeam));
+        const awayTeamId = teamNameToId.get(normalizeTeamKey(match.awayTeam));
 
         if (!homeTeamId) {
           unmatchedTeams.push(match.homeTeam);
@@ -288,6 +382,14 @@ function MatchManagement({
       const updatedGames = [...games];
 
       crawledGames.forEach((crawledGame) => {
+        const hasMappedTeams =
+          crawledGame.home_team_id > 0 && crawledGame.away_team_id > 0;
+
+        if (!hasMappedTeams) {
+          updatedGames.push(crawledGame);
+          return;
+        }
+
         // Find if there's an existing game with same home and away teams
         const existingIndex = updatedGames.findIndex(
           (game) =>
@@ -316,6 +418,8 @@ function MatchManagement({
 
       const newMatchesCount = crawledGames.length;
       const updatedMatchesCount = crawledGames.filter((crawledGame) =>
+        crawledGame.home_team_id > 0 &&
+        crawledGame.away_team_id > 0 &&
         games.some(
           (game) =>
             game.home_team_id === crawledGame.home_team_id &&
@@ -323,13 +427,17 @@ function MatchManagement({
         )
       ).length;
 
-      let message = `자동 채우기 완료! ${
+      let message = `${sourceLabel} 자동 채우기 완료! ${
         newMatchesCount - updatedMatchesCount
       }개의 새로운 경기가 추가되었고, ${updatedMatchesCount}개의 기존 경기가 업데이트되었습니다.`;
 
+      if (insertedTeamsCount > 0) {
+        message += `\n\n팀 자동 매핑: ${insertedTeamsCount}개 팀을 teams에 신규 등록했습니다.`;
+      }
+
       if (unmatchedTeams.length > 0) {
         const uniqueUnmatchedTeams = [...new Set(unmatchedTeams)];
-        message += `\n\n경고: 일부 팀이 데이터베이스에서 찾을 수 없었고 ID 0으로 설정되었습니다: ${uniqueUnmatchedTeams.join(
+        message += `\n\n경고: 자동 매핑 이후에도 일부 팀을 찾을 수 없어 ID 0으로 설정했습니다: ${uniqueUnmatchedTeams.join(
           ", "
         )}`;
       }
@@ -337,11 +445,21 @@ function MatchManagement({
       message += "\n\n변경 사항을 검토하고 저장해 주세요.";
       alert(message);
     } catch (error) {
-      console.error("Error auto-filling matches:", error);
-      alert("Error auto-filling matches. Please try again.");
+      console.error(`Error auto-filling matches from ${sourceLabel}:`, error);
+      alert(`${sourceLabel} 자동 채우기 중 오류가 발생했습니다.`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const autoFillMatches = async () => {
+    await autoFillMatchesBySource("KBO", () => getGameData(new Date(targetDate)));
+  };
+
+  const autoFillMatchesFromNaverSports = async () => {
+    await autoFillMatchesBySource("네이버 스포츠", () =>
+      getNaverWbcGameData(new Date(targetDate))
+    );
   };
 
   const saveGames = async () => {
@@ -423,23 +541,32 @@ function MatchManagement({
     return <div className="text-center">Loading...</div>;
   }
 
-  const matchLabel =
-    selectedDate === "today"
-      ? "Today's"
-      : selectedDate === "tomorrow"
-      ? "Tomorrow's"
-      : "Yesterday's";
-
   return (
     <div className="space-y-6">
       <div
         className={`${
-          isMobile ? "space-y-4" : "flex justify-between items-center"
+          isMobile ? "space-y-4" : "flex justify-between items-end gap-4"
         }`}
       >
-        <h2 className={`font-bold ${isMobile ? "text-xl" : "text-2xl"}`}>
-          {matchLabel} Matches ({targetDate})
-        </h2>
+        <div className="space-y-2">
+          <h2 className={`font-bold ${isMobile ? "text-xl" : "text-2xl"}`}>
+            경기 관리 ({targetDate})
+          </h2>
+          <div className={isMobile ? "w-full" : "w-64"}>
+            <Label htmlFor="match-management-date" className="text-sm">
+              조회 날짜
+            </Label>
+            <Input
+              id="match-management-date"
+              type="date"
+              value={targetDate}
+              onChange={(event) =>
+                onDateChange(event.target.value || getKSTDate(0))
+              }
+              className="mt-1 text-black"
+            />
+          </div>
+        </div>
         <div
           className={`${
             isMobile ? "flex flex-col space-y-2" : "flex space-x-2"
@@ -452,6 +579,14 @@ function MatchManagement({
             className={isMobile ? "w-full" : ""}
           >
             {loading ? "Auto-filling..." : "자동 채우기"}
+          </Button>
+          <Button
+            onClick={autoFillMatchesFromNaverSports}
+            variant="secondary"
+            disabled={loading}
+            className={isMobile ? "w-full" : ""}
+          >
+            {loading ? "Auto-filling..." : "네이버 스포츠"}
           </Button>
           <Button
             onClick={addNewGame}
@@ -553,6 +688,13 @@ function MatchManagement({
               className={isMobile ? "w-full" : ""}
             >
               {loading ? "Auto-filling..." : "자동 채우기"}
+            </Button>
+            <Button
+              onClick={autoFillMatchesFromNaverSports}
+              disabled={loading}
+              className={isMobile ? "w-full" : ""}
+            >
+              {loading ? "Auto-filling..." : "네이버 스포츠"}
             </Button>
             <Button
               onClick={addNewGame}
@@ -1881,14 +2023,13 @@ function AdminDashboard() {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
-    | "today"
-    | "tomorrow"
-    | "yesterday"
+    | "matches"
     | "coins"
     | "markets"
     | "liquidity"
     | "password"
   >("dashboard");
+  const [selectedMatchDate, setSelectedMatchDate] = useState(getKSTDate(0));
 
   const getCurrentKSTTime = () => {
     const now = new Date();
@@ -1921,10 +2062,13 @@ function AdminDashboard() {
           <MarketSettlementManagement />
         ) : currentView === "liquidity" ? (
           <LiquiditySettingsManagement />
-        ) : (
+        ) : currentView === "matches" ? (
           <MatchManagement
-            selectedDate={currentView as "today" | "tomorrow" | "yesterday"}
+            selectedDate={selectedMatchDate}
+            onDateChange={setSelectedMatchDate}
           />
+        ) : (
+          <div className="text-sm text-muted-foreground">잘못된 메뉴 상태입니다.</div>
         )}
 
         <div
@@ -1976,47 +2120,13 @@ function AdminDashboard() {
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
           >
-            어제의 경기
+            경기 관리
           </h3>
           <p className="text-muted-foreground mb-4">
-            어제 경기 정보를 관리합니다.
+            날짜를 직접 선택해 경기 정보를 조회/수정합니다.
           </p>
           <Button
-            onClick={() => setCurrentView("yesterday")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            오늘의 경기
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            오늘 경기 정보를 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("today")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            내일의 경기
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            내일 경기 정보를 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("tomorrow")}
+            onClick={() => setCurrentView("matches")}
             className={isMobile ? "w-full" : ""}
           >
             접속
