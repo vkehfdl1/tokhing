@@ -6,6 +6,7 @@ import {
   getISODate,
   getMarkets,
   isMarketClosedHours,
+  isMarketPastTradeDeadline,
   type MarketListItem,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -88,7 +89,8 @@ const getTeamTextColorClass = (teamName: string): string => {
 
 const getDisplayMarketStatus = (
   gameStatus: string,
-  marketStatus: string
+  marketStatus: string,
+  isTradeDeadlinePassed: boolean
 ): DisplayMarketStatus => {
   const normalizedGameStatus = gameStatus.toUpperCase();
   const normalizedMarketStatus = marketStatus.toUpperCase();
@@ -104,7 +106,11 @@ const getDisplayMarketStatus = (
     return "CANCELED";
   }
 
-  if (normalizedMarketStatus === "CLOSED" || normalizedGameStatus === "FINISHED") {
+  if (
+    normalizedMarketStatus === "CLOSED" ||
+    normalizedGameStatus === "FINISHED" ||
+    isTradeDeadlinePassed
+  ) {
     return "CLOSED";
   }
 
@@ -154,6 +160,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [closedHours, setClosedHours] = useState(isMarketClosedHours);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const fetchAndSetMarkets = useCallback(async () => {
     if (!session?.user_id) {
@@ -208,7 +215,10 @@ export default function HomePage() {
   }, [fetchAndSetMarkets, session?.user_id]);
 
   useEffect(() => {
-    const checkClosed = () => setClosedHours(isMarketClosedHours());
+    const checkClosed = () => {
+      setClosedHours(isMarketClosedHours());
+      setCurrentTime(Date.now());
+    };
     checkClosed();
     const id = window.setInterval(checkClosed, 30000);
     return () => window.clearInterval(id);
@@ -260,7 +270,12 @@ export default function HomePage() {
             );
             const marketStatus = getDisplayMarketStatus(
               market.gameStatus,
-              market.marketStatus
+              market.marketStatus,
+              isMarketPastTradeDeadline(
+                market.gameDate,
+                market.gameTime,
+                new Date(currentTime)
+              )
             );
 
             const renderPrice = (outcome: MarketOutcome) => (

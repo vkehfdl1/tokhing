@@ -189,6 +189,25 @@ export default function TutorialPage() {
           </div>
         </section>
 
+        <section className="border-l-4 border-amber-400 pl-4">
+          <h2 className="mb-3 text-base font-bold text-black">거래 가능 시간 안내</h2>
+          <div className="rounded-2xl bg-amber-50 p-5 space-y-2">
+            <p className="text-xs leading-relaxed text-zinc-700">
+              거래 시간은 모두 <strong>KST(한국 시간)</strong> 기준입니다.
+            </p>
+            <div className="rounded-lg bg-white px-3 py-2">
+              <p className="text-xs text-zinc-700">
+                매일 <strong>01:00~09:00</strong>에는 전체 마켓의 매수/매도가 일시 중단됩니다.
+              </p>
+            </div>
+            <div className="rounded-lg bg-white px-3 py-2">
+              <p className="text-xs text-zinc-700">
+                각 경기는 <strong>경기 시작 후 2시간</strong>이 지나면 해당 마켓의 매수/매도가 자동으로 마감됩니다.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* 화면 안내 */}
         <section className="rounded-2xl bg-zinc-100 p-5 space-y-3">
           <h2 className="text-sm font-bold text-black">화면별 안내</h2>

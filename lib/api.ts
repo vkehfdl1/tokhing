@@ -618,6 +618,38 @@ export const getISODate = (date = new Date()) => {
   return kstDate.toISOString().slice(0, 10);
 };
 
+export const getMarketTradeDeadline = (
+  gameDate: string,
+  gameTime: string | null
+): Date | null => {
+  if (!gameTime) {
+    return null;
+  }
+
+  const normalizedTime = gameTime.length === 5 ? `${gameTime}:00` : gameTime;
+  const gameStartAt = new Date(`${gameDate}T${normalizedTime}+09:00`);
+
+  if (Number.isNaN(gameStartAt.getTime())) {
+    return null;
+  }
+
+  return new Date(gameStartAt.getTime() + 2 * 60 * 60 * 1000);
+};
+
+export const isMarketPastTradeDeadline = (
+  gameDate: string,
+  gameTime: string | null,
+  now = new Date()
+): boolean => {
+  const deadline = getMarketTradeDeadline(gameDate, gameTime);
+
+  if (!deadline) {
+    return false;
+  }
+
+  return now.getTime() >= deadline.getTime();
+};
+
 export const isMarketClosedHours = (): boolean => {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60 * 1000;

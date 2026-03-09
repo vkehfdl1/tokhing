@@ -14,6 +14,7 @@ import {
   getPriceSnapshots,
   getWalletBalance,
   isMarketClosedHours,
+  isMarketPastTradeDeadline,
   type MarketDetailItem,
   type MarketOutcome,
   type MarketPositionsByOutcome,
@@ -123,7 +124,8 @@ const getTeamTextColorClass = (teamName: string): string => {
 
 const getDisplayMarketStatus = (
   gameStatus: string,
-  marketStatus: string
+  marketStatus: string,
+  isTradeDeadlinePassed: boolean
 ): DisplayMarketStatus => {
   const normalizedGameStatus = gameStatus.toUpperCase();
   const normalizedMarketStatus = marketStatus.toUpperCase();
@@ -139,7 +141,11 @@ const getDisplayMarketStatus = (
     return "CANCELED";
   }
 
-  if (normalizedMarketStatus === "CLOSED" || normalizedGameStatus === "FINISHED") {
+  if (
+    normalizedMarketStatus === "CLOSED" ||
+    normalizedGameStatus === "FINISHED" ||
+    isTradeDeadlinePassed
+  ) {
     return "CLOSED";
   }
 
@@ -485,6 +491,7 @@ export default function MarketDetailPage() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [closedHours, setClosedHours] = useState(isMarketClosedHours);
   const [cooldownRemaining, setCooldownRemaining] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   const loadMarketData = useCallback(async () => {
     if (!session?.user_id || !isMarketIdValid) {
@@ -555,7 +562,10 @@ export default function MarketDetailPage() {
   }, [positions, selectedOutcome, tradeSide]);
 
   useEffect(() => {
-    const checkClosed = () => setClosedHours(isMarketClosedHours());
+    const checkClosed = () => {
+      setClosedHours(isMarketClosedHours());
+      setCurrentTime(Date.now());
+    };
     checkClosed();
     const id = window.setInterval(checkClosed, 30000);
     return () => window.clearInterval(id);
@@ -600,14 +610,53 @@ export default function MarketDetailPage() {
       return "OPEN";
     }
 
-    return getDisplayMarketStatus(marketDetail.gameStatus, marketDetail.status);
-  }, [marketDetail]);
+    return getDisplayMarketStatus(
+      marketDetail.gameStatus,
+      marketDetail.status,
+      isMarketPastTradeDeadline(
+        marketDetail.gameDate,
+        marketDetail.gameTime,
+        new Date(currentTime)
+      )
+    );
+  }, [currentTime, marketDetail]);
+
+  const isTradeDeadlinePassed = useMemo(() => {
+    if (!marketDetail) {
+      return false;
+    }
+
+    return isMarketPastTradeDeadline(
+      marketDetail.gameDate,
+      marketDetail.gameTime,
+      new Date(currentTime)
+    );
+  }, [currentTime, marketDetail]);
 
   const isTradingClosed =
     closedHours ||
+    isTradeDeadlinePassed ||
     displayStatus === "CLOSED" ||
     displayStatus === "SETTLED" ||
     displayStatus === "CANCELED";
+
+  const tradingClosedNotice = useMemo(() => {
+    if (closedHours) {
+      return {
+        title: "폐장 시간 (01:00~09:00)",
+        description: "오전 9시 이후에 거래해주세요.",
+      };
+    }
+
+    if (isTradeDeadlinePassed) {
+      return {
+        title: "거래 마감",
+        description: "KST 기준 경기 시작 2시간이 지나 매수/매도가 종료되었습니다.",
+      };
+    }
+
+    return null;
+  }, [closedHours, isTradeDeadlinePassed]);
 
   const hasAnyPosition = OUTCOMES.some(
     (outcome) => positions[outcome].quantity > 0
@@ -706,6 +755,10 @@ export default function MarketDetailPage() {
       return "폐장 시간 (01:00~09:00)";
     }
 
+    if (isTradeDeadlinePassed) {
+      return "경기 시작 2시간 후 거래 마감";
+    }
+
     if (isTradingClosed) {
       return "거래 마감";
     }
@@ -758,6 +811,7 @@ export default function MarketDetailPage() {
     buyInputMode,
     closedHours,
     cooldownRemaining,
+    isTradeDeadlinePassed,
     isTradingClosed,
     marketDetail,
     positions,
@@ -816,6 +870,15 @@ export default function MarketDetailPage() {
 
   const handleConfirmOrder = async () => {
     if (!session?.user_id || !marketDetail || !tradePreview) {
+      return;
+    }
+
+    if (isTradingClosed) {
+      setIsConfirmOpen(false);
+      setToast({
+        type: "error",
+        message: "거래 가능 시간이 지나 주문할 수 없습니다",
+      });
       return;
     }
 
@@ -1096,13 +1159,13 @@ export default function MarketDetailPage() {
               : "border-red-100 bg-red-50/60"
           }`}
         >
-          {closedHours ? (
+          {tradingClosedNotice ? (
             <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-center">
               <p className="text-sm font-semibold text-amber-700">
-                폐장 시간 (01:00~09:00)
+                {tradingClosedNotice.title}
               </p>
               <p className="mt-1 text-xs text-amber-600">
-                오전 9시 이후에 거래해주세요.
+                {tradingClosedNotice.description}
               </p>
             </div>
           ) : null}
@@ -1327,7 +1390,7 @@ export default function MarketDetailPage() {
               <Button
                 type="button"
                 onClick={handleConfirmOrder}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isTradingClosed}
                 className={
                   tradeSide === "BUY"
                     ? "bg-green-500 hover:bg-green-600"
