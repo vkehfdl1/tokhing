@@ -4,6 +4,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { getGame } from "npm:kbo-game@0.0.2";
 
 type SyncMode = "daily_seed" | "hourly_refresh";
+type MarketStatus = "OPEN" | "CLOSED" | "SETTLED" | "CANCELED";
+type GameStatus = "SCHEDULED" | "IN_PROGRESS" | "FINISHED" | "CANCELED";
 
 interface RequestBody {
   mode?: SyncMode;
@@ -13,6 +15,12 @@ interface RequestBody {
     AWAY?: number;
     DRAW?: number;
   };
+}
+
+interface SyncedGameState {
+  game_date: string;
+  game_time: string | null;
+  game_status: GameStatus;
 }
 
 const json = (status: number, body: unknown) =>
@@ -29,6 +37,8 @@ const DEFAULT_INITIAL_PRICES = {
   DRAW: 5,
 } as const;
 
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 const normalizeTeamKey = (value: string) => value.trim().toLowerCase();
 
 const formatKstDate = (date = new Date()) => {
@@ -42,6 +52,18 @@ const formatKstDate = (date = new Date()) => {
   return formatter.format(date);
 };
 
+const createKboQueryDate = (targetDate: string) => {
+  if (!ISO_DATE_PATTERN.test(targetDate)) {
+    throw new Error("동기화 대상 날짜 형식이 올바르지 않습니다.");
+  }
+
+  const [year, month, day] = targetDate.split("-").map(Number);
+
+  // kbo-game uses local date getters internally, so use UTC noon to keep the
+  // requested calendar date stable in the UTC edge runtime.
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+};
+
 const parseNumericScore = (value?: number) => {
   return Number.isFinite(value) ? value : null;
 };
@@ -49,6 +71,41 @@ const parseNumericScore = (value?: number) => {
 const sanitizeText = (value?: string) => {
   const trimmed = value?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : "";
+};
+
+const normalizeTimeText = (value?: string | null) => {
+  if (!value) {
+    return null;
+  }
+
+  return value.length === 5 ? `${value}:00` : value;
+};
+
+const getTradeDeadline = (gameDate: string, gameTime?: string | null) => {
+  const normalizedTime = normalizeTimeText(gameTime);
+
+  if (!normalizedTime) {
+    return null;
+  }
+
+  const startAt = new Date(`${gameDate}T${normalizedTime}+09:00`);
+  if (Number.isNaN(startAt.getTime())) {
+    return null;
+  }
+
+  return new Date(startAt.getTime() + 2 * 60 * 60 * 1000);
+};
+
+const shouldAutoCloseMarket = (
+  game: SyncedGameState,
+  now = new Date()
+) => {
+  if (game.game_status === "FINISHED" || game.game_status === "CANCELED") {
+    return true;
+  }
+
+  const deadline = getTradeDeadline(game.game_date, game.game_time);
+  return deadline ? now.getTime() >= deadline.getTime() : false;
 };
 
 const hasGameChanged = (
@@ -90,7 +147,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     DRAW: body.initialPrices?.DRAW ?? DEFAULT_INITIAL_PRICES.DRAW,
   };
 
-  const crawledGames = await getGame(new Date(`${targetDate}T00:00:00+09:00`));
+  const crawledGames = await getGame(createKboQueryDate(targetDate));
 
   if (!crawledGames || crawledGames.length === 0) {
     return {
@@ -146,6 +203,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
 
   const unmatchedTeams = new Set<string>();
   const syncedGameIds: number[] = [];
+  const syncedGamesById = new Map<number, SyncedGameState>();
   let insertedCount = 0;
   let updatedCount = 0;
   let unchangedCount = 0;
@@ -181,7 +239,13 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     const existing = existingByMatchup.get(key);
 
     if (existing) {
-      syncedGameIds.push(Number(existing.id));
+      const existingGameId = Number(existing.id);
+      syncedGameIds.push(existingGameId);
+      syncedGamesById.set(existingGameId, {
+        game_date: nextGame.game_date,
+        game_time: nextGame.game_time ?? null,
+        game_status: nextGame.game_status,
+      });
 
       if (!hasGameChanged(existing, nextGame)) {
         unchangedCount += 1;
@@ -224,15 +288,21 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     }
 
     syncedGameIds.push(gameId);
+    syncedGamesById.set(gameId, {
+      game_date: nextGame.game_date,
+      game_time: nextGame.game_time ?? null,
+      game_status: nextGame.game_status,
+    });
     insertedCount += 1;
   }
 
   let marketCreatedCount = 0;
+  let marketClosedCount = 0;
   if (syncedGameIds.length > 0) {
     const uniqueGameIds = Array.from(new Set(syncedGameIds));
     const { data: existingMarkets, error: existingMarketsError } = await supabase
       .from("markets")
-      .select("game_id")
+      .select("id, game_id, status")
       .in("game_id", uniqueGameIds);
 
     if (existingMarketsError) {
@@ -267,6 +337,52 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       }
 
       marketCreatedCount += 1;
+
+      const gameState = syncedGamesById.get(gameId);
+      if (gameState && shouldAutoCloseMarket(gameState)) {
+        const { error: closeError } = await supabase
+          .from("markets")
+          .update({ status: "CLOSED" })
+          .eq("id", marketId)
+          .eq("status", "OPEN");
+
+        if (closeError) {
+          throw new Error(
+            `신규 마켓 자동 종료 실패(market_id=${marketId}): ${closeError.message}`
+          );
+        }
+
+        marketClosedCount += 1;
+      }
+    }
+
+    const closableMarkets = (existingMarkets ?? []).filter((market) => {
+      const currentStatus = String(market.status ?? "").toUpperCase() as MarketStatus;
+
+      if (currentStatus !== "OPEN") {
+        return false;
+      }
+
+      const gameState = syncedGamesById.get(Number(market.game_id));
+      if (!gameState) {
+        return false;
+      }
+
+      return shouldAutoCloseMarket(gameState);
+    });
+
+    for (const market of closableMarkets) {
+      const { error } = await supabase
+        .from("markets")
+        .update({ status: "CLOSED" })
+        .eq("id", market.id)
+        .eq("status", "OPEN");
+
+      if (error) {
+        throw new Error(`마켓 자동 종료 실패(market_id=${market.id}): ${error.message}`);
+      }
+
+      marketClosedCount += 1;
     }
   }
 
@@ -281,6 +397,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     updatedCount,
     unchangedCount,
     marketCreatedCount,
+    marketClosedCount,
     unmatchedTeams: unmatchedList,
     message: [
       `KBO 동기화 완료 (${targetDate})`,
@@ -289,6 +406,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       `업데이트 ${updatedCount}건`,
       `변경 없음 ${unchangedCount}건`,
       `마켓 생성 ${marketCreatedCount}건`,
+      `마켓 종료 ${marketClosedCount}건`,
       unmatchedList.length > 0
         ? `매핑 실패 팀: ${unmatchedList.join(", ")}`
         : null,

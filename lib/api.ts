@@ -1,3 +1,4 @@
+import { formatKstDate, normalizeToKstDateString } from "@/lib/kst";
 import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
@@ -612,10 +613,7 @@ const getKstDayRangeAsUtcIso = (date: string) => {
 
 // Helper to get today's date string in YYYY-MM-DD format for KST
 export const getISODate = (date = new Date()) => {
-  const offset = date.getTimezoneOffset() * 60 * 1000; // Convert minutes to milliseconds
-  const kstOffset = 9 * 60 * 60 * 1000; // KST is UTC+9
-  const kstDate = new Date(date.getTime() + kstOffset + offset);
-  return kstDate.toISOString().slice(0, 10);
+  return formatKstDate(date);
 };
 
 export const getMarketTradeDeadline = (
@@ -1532,15 +1530,24 @@ export const deleteGame = async (gameId: number) => {
 };
 
 // Fetch game data from external source via API route to avoid CORS issues
-export const getGameData = async (date: Date): Promise<CrawledMatch[] | null> => {
+export const getGameData = async (
+  date: Date | string
+): Promise<CrawledMatch[] | null> => {
   try {
+    const targetDate =
+      date instanceof Date ? getISODate(date) : normalizeToKstDateString(date);
+
+    if (!targetDate) {
+      throw new Error("Invalid game date");
+    }
+
     const response = await fetch("/api/crawl-games", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        date: date.toISOString(),
+        date: targetDate,
       }),
     });
 
@@ -1566,16 +1573,23 @@ export const getGameData = async (date: Date): Promise<CrawledMatch[] | null> =>
 };
 
 export const getNaverWbcGameData = async (
-  date: Date
+  date: Date | string
 ): Promise<CrawledMatch[] | null> => {
   try {
+    const targetDate =
+      date instanceof Date ? getISODate(date) : normalizeToKstDateString(date);
+
+    if (!targetDate) {
+      throw new Error("Invalid naver game date");
+    }
+
     const response = await fetch("/api/crawl-naver-wbc-games", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        date: date.toISOString(),
+        date: targetDate,
       }),
     });
 

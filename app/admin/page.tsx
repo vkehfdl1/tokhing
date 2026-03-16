@@ -18,6 +18,7 @@ import {
   ensureMarketsForGames,
   getNaverWbcGameData,
   getGameData,
+  getISODate,
   getLiquidityB,
   getMarkets,
   getWeeklyCoinCronStatus,
@@ -51,13 +52,10 @@ interface Game {
   game_status: "SCHEDULED" | "IN_PROGRESS" | "FINISHED" | "CANCELED";
 }
 
-// Utility function to get KST date
 const getKSTDate = (offsetDays = 0): string => {
   const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const kst = new Date(utc + 9 * 3600000); // KST is UTC+9
-  kst.setDate(kst.getDate() + offsetDays);
-  return kst.toISOString().split("T")[0];
+  now.setDate(now.getDate() + offsetDays);
+  return getISODate(now);
 };
 
 interface InitialPricesFormState {
@@ -453,12 +451,12 @@ function MatchManagement({
   };
 
   const autoFillMatches = async () => {
-    await autoFillMatchesBySource("KBO", () => getGameData(new Date(targetDate)));
+    await autoFillMatchesBySource("KBO", () => getGameData(targetDate));
   };
 
   const autoFillMatchesFromNaverSports = async () => {
     await autoFillMatchesBySource("네이버 스포츠", () =>
-      getNaverWbcGameData(new Date(targetDate))
+      getNaverWbcGameData(targetDate)
     );
   };
 

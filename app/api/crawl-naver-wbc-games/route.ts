@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { normalizeToKstDateString } from "@/lib/kst";
 
 type GameStatus = "SCHEDULED" | "IN_PROGRESS" | "FINISHED" | "CANCELED";
 
@@ -22,15 +23,6 @@ interface NaverTodayGamesResponse {
 }
 
 const NAVER_API_BASE_URL = "https://api-gw.sports.naver.com";
-
-const toDateString = (value: string): string | null => {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed.toISOString().slice(0, 10);
-};
 
 const toStartTime = (value: string | undefined): string => {
   if (!value) {
@@ -84,7 +76,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const targetDate = toDateString(date);
+    const targetDate = normalizeToKstDateString(date);
     if (!targetDate) {
       return NextResponse.json(
         { success: false, error: "유효하지 않은 날짜입니다." },
