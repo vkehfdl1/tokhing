@@ -107,6 +107,12 @@ Please file feedback and issues over on the [Supabase GitHub org](https://github
 - [Cookie-based Auth and the Next.js 13 App Router (free course)](https://youtube.com/playlist?list=PL5S4mPUpp4OtMhpnp93EFSo42iQ40XjbF)
 - [Supabase Auth and the Next.js App Router](https://github.com/supabase/supabase/tree/master/examples/auth/nextjs)
 
-## 시즌 바꾸는 법
+## 시즌 관리
 
-`app/leaderboard/page.tsx`에서 `await getLeaderboard();` 함수 안의 시작 날짜와 종료 날짜를 수정만 하면 됩니다!
+시즌 시스템이 데이터베이스 레벨에서 구현되어 있습니다 (US-012).
+
+- **시즌 조회**: `/leaderboard` 페이지의 시즌 드롭다운에서 과거/현재 시즌 순위 조회 가능
+- **시즌 생성 및 활성화**: `/admin` → "시즌 관리" 카드에서 새 시즌 생성(DRAFT) → "시즌 시작" 버튼으로 활성화
+  - 이전 시즌에 정산되지 않은 마켓이 있으면 활성화가 차단됩니다 (한국어 에러로 안내)
+  - 활성화 시 전체 사용자에게 1000코인 자동 지급
+- **상세 동작**: `AGENTS.md`의 "Season System (US-012)" 섹션 참고

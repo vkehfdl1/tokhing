@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  getActiveSeason,
   getOrderHistory,
   getPositions,
   getSettlementHistory,
+  listSeasons,
   type OpenPositionHistoryItem,
   type OrderHistoryItem,
+  type Season,
   type SettlementHistoryItem,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -205,6 +208,33 @@ const formatPositionsSummary = (
   return summaryItems.length > 0 ? summaryItems.join(" · ") : "보유 포지션 없음";
 };
 
+const formatSeasonOptionLabel = (season: Season) => {
+  const statusLabel =
+    season.status === "ACTIVE"
+      ? "활성"
+      : season.status === "ARCHIVED"
+      ? "보관"
+      : "준비 중";
+  return `${season.name} (${statusLabel})`;
+};
+
+type SeasonBadgeProps = {
+  seasonName: string;
+  isActiveSeason: boolean;
+};
+
+const SeasonBadge = ({ seasonName, isActiveSeason }: SeasonBadgeProps) => {
+  if (!seasonName) {
+    return null;
+  }
+
+  const className = isActiveSeason
+    ? "rounded-md bg-tokhin-green/10 px-2 py-0.5 text-xs font-medium text-tokhin-green"
+    : "rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700";
+
+  return <span className={className}>{seasonName}</span>;
+};
+
 export default function HistoryPage() {
   const { session, isLoading: isSessionLoading } = useUserSession({
     requireAuth: true,
@@ -231,6 +261,12 @@ export default function HistoryPage() {
   const [positionsError, setPositionsError] = useState<string | null>(null);
   const [ordersError, setOrdersError] = useState<string | null>(null);
   const [settlementsError, setSettlementsError] = useState<string | null>(null);
+
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [activeSeason, setActiveSeason] = useState<Season | null>(null);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | undefined>(
+    undefined
+  );
 
   const calendarRef = useRef<HTMLDivElement>(null);
 
@@ -261,6 +297,35 @@ export default function HistoryPage() {
   }, [showCalendar]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    const fetchSeasonsMeta = async () => {
+      try {
+        const [seasonList, active] = await Promise.all([
+          listSeasons(),
+          getActiveSeason(),
+        ]);
+
+        if (!isCancelled) {
+          setSeasons(seasonList);
+          setActiveSeason(active);
+        }
+      } catch {
+        if (!isCancelled) {
+          setSeasons([]);
+          setActiveSeason(null);
+        }
+      }
+    };
+
+    void fetchSeasonsMeta();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!session?.user_id) {
       return;
     }
@@ -272,7 +337,7 @@ export default function HistoryPage() {
       setPositionsError(null);
 
       try {
-        const data = await getPositions(session.user_id);
+        const data = await getPositions(session.user_id, activeSeason?.id);
 
         if (!isCancelled) {
           setOpenPositions(data);
@@ -297,7 +362,7 @@ export default function HistoryPage() {
     return () => {
       isCancelled = true;
     };
-  }, [session?.user_id]);
+  }, [session?.user_id, activeSeason?.id]);
 
   useEffect(() => {
     if (!session?.user_id) {
@@ -311,7 +376,11 @@ export default function HistoryPage() {
       setOrdersError(null);
 
       try {
-        const data = await getOrderHistory(session.user_id, selectedDate);
+        const data = await getOrderHistory(
+          session.user_id,
+          selectedDate,
+          selectedSeasonId
+        );
 
         if (!isCancelled) {
           setOrderHistory(data);
@@ -336,7 +405,7 @@ export default function HistoryPage() {
     return () => {
       isCancelled = true;
     };
-  }, [selectedDate, session?.user_id]);
+  }, [selectedDate, session?.user_id, selectedSeasonId]);
 
   useEffect(() => {
     if (!session?.user_id) {
@@ -350,7 +419,10 @@ export default function HistoryPage() {
       setSettlementsError(null);
 
       try {
-        const data = await getSettlementHistory(session.user_id);
+        const data = await getSettlementHistory(
+          session.user_id,
+          selectedSeasonId
+        );
 
         if (!isCancelled) {
           setSettlementHistory(data);
@@ -375,7 +447,7 @@ export default function HistoryPage() {
     return () => {
       isCancelled = true;
     };
-  }, [session?.user_id]);
+  }, [session?.user_id, selectedSeasonId]);
 
   const groupedOrderHistory = useMemo(() => {
     const groups = new Map<string, OrderHistoryItem[]>();
@@ -470,6 +542,29 @@ export default function HistoryPage() {
         </div>
       </div>
 
+      {(activeTab === "ORDERS" || activeTab === "SETTLEMENTS") && (
+        <div className="mb-4 flex items-center justify-end">
+          <label className="flex items-center gap-2 text-xs text-stone-500">
+            <span>시즌</span>
+            <select
+              value={selectedSeasonId ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                setSelectedSeasonId(value === "" ? undefined : Number(value));
+              }}
+              className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-xs font-medium text-zinc-700 transition-colors focus:border-tokhin-green focus:outline-none"
+            >
+              <option value="">전체</option>
+              {seasons.map((season) => (
+                <option key={season.id} value={season.id}>
+                  {formatSeasonOptionLabel(season)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       {activeTab === "ORDERS" && (
         <div className="mb-5 mt-1 flex flex-col items-center">
           <div className="relative mb-1 flex items-center justify-center gap-1">
@@ -559,6 +654,10 @@ export default function HistoryPage() {
 
       {activeTab === "OPEN_POSITIONS" && (
         <div className="space-y-3">
+          <p className="text-xs text-stone-500">
+            현재 활성 시즌의 포지션만 표시됩니다
+            {activeSeason ? ` · ${activeSeason.name}` : ""}
+          </p>
           {isPositionsLoading ? (
             <p className="py-12 text-center text-zinc-500">포지션을 불러오는 중...</p>
           ) : positionsError ? (
@@ -593,9 +692,15 @@ export default function HistoryPage() {
                         {homeTeamName}
                       </span>
                     </p>
-                    <p className="text-xs text-zinc-500">
-                      {formatGameDate(position.gameDate)} {formatGameTime(position.gameTime)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <SeasonBadge
+                        seasonName={position.seasonName}
+                        isActiveSeason={position.seasonId === activeSeason?.id}
+                      />
+                      <p className="text-xs text-zinc-500">
+                        {formatGameDate(position.gameDate)} {formatGameTime(position.gameTime)}
+                      </p>
+                    </div>
                   </div>
 
                   <p className="text-sm font-semibold text-zinc-700">
@@ -654,10 +759,16 @@ export default function HistoryPage() {
                         key={order.orderId}
                         className="rounded-2xl bg-white p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]"
                       >
-                        <div className="mb-2 flex items-center justify-between">
-                          <p className="text-xs text-zinc-500">
-                            {formatKstDateTime(order.createdAt)}
-                          </p>
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-zinc-500">
+                              {formatKstDateTime(order.createdAt)}
+                            </p>
+                            <SeasonBadge
+                              seasonName={order.seasonName}
+                              isActiveSeason={order.seasonId === activeSeason?.id}
+                            />
+                          </div>
                           <span
                             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${sideClass}`}
                           >
@@ -725,9 +836,15 @@ export default function HistoryPage() {
                         {homeTeamName}
                       </span>
                     </p>
-                    <p className="text-xs text-zinc-500">
-                      {formatKstDateTime(settlement.settledAt)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <SeasonBadge
+                        seasonName={settlement.seasonName}
+                        isActiveSeason={settlement.seasonId === activeSeason?.id}
+                      />
+                      <p className="text-xs text-zinc-500">
+                        {formatKstDateTime(settlement.settledAt)}
+                      </p>
+                    </div>
                   </div>
 
                   <p className="text-sm text-zinc-700">

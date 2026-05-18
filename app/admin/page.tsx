@@ -30,6 +30,7 @@ import {
   type MarketListItem,
   type MarketOutcome,
 } from "@/lib/api";
+import { SeasonManagement } from "./SeasonManagement";
 
 // Interface definitions
 interface Team {
@@ -2021,6 +2022,7 @@ function AdminDashboard() {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
+    | "seasons"
     | "matches"
     | "coins"
     | "markets"
@@ -2052,7 +2054,9 @@ function AdminDashboard() {
           </div>
         </div>
 
-        {currentView === "coins" ? (
+        {currentView === "seasons" ? (
+          <SeasonManagement />
+        ) : currentView === "coins" ? (
           <CoinGrantManagement />
         ) : currentView === "password" ? (
           <PasswordResetManagement />
@@ -2114,6 +2118,23 @@ function AdminDashboard() {
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
         }`}
       >
+        <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
+          <h3
+            className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            시즌 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            시즌 생성, 활성화, 종료를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("seasons")}
+            className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
+          >
+            접속
+          </Button>
+        </Card>
+
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}

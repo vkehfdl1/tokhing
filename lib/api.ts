@@ -26,6 +26,7 @@ interface LoginRpcResponse {
 interface WalletBalanceRpcResponse {
   success: boolean;
   balance?: number | string;
+  season_id?: number | string | null;
   error?: string;
 }
 
@@ -128,6 +129,7 @@ interface MarketForListRow {
   game_id: number;
   status: string;
   result: string | null;
+  season_id: number | null;
   initial_home_price: number | string | null;
   initial_away_price: number | string | null;
   initial_draw_price: number | string | null;
@@ -151,6 +153,8 @@ interface MarketDetailRpcPayload {
     initial_home_price: number | string | null;
     initial_away_price: number | string | null;
     initial_draw_price: number | string | null;
+    season_id?: number | string | null;
+    season_name?: string | null;
   };
   prices?: LmsrPriceRow[] | null;
   game?: {
@@ -190,6 +194,8 @@ interface UserOpenPositionRpcRow {
   outcome: string;
   quantity: number | string;
   avg_entry_price: number | string;
+  season_id: number | string;
+  season_name: string;
   updated_at: string;
 }
 
@@ -201,6 +207,8 @@ interface UserOrderByDateRpcRow {
   quantity: number | string;
   total_cost: number | string;
   avg_price: number | string;
+  season_id: number | string;
+  season_name: string;
   created_at: string;
 }
 
@@ -213,6 +221,8 @@ interface UserSettlementHistoryRpcRow {
   home_quantity: number | string;
   away_quantity: number | string;
   draw_quantity: number | string;
+  season_id: number | string;
+  season_name: string;
 }
 
 interface MarketForHistoryContextRow {
@@ -246,6 +256,61 @@ interface LeaderboardRoiRpcRow {
   total_granted: number | string;
 }
 
+interface LeaderboardBalanceRpcResponse {
+  success: boolean;
+  season_id?: number | string | null;
+  ranks?: LeaderboardBalanceRpcRow[];
+  error?: string;
+}
+
+interface LeaderboardRoiRpcResponse {
+  success: boolean;
+  season_id?: number | string | null;
+  ranks?: LeaderboardRoiRpcRow[];
+  error?: string;
+}
+
+interface SeasonRpcShape {
+  id: number | string;
+  name: string;
+  start_date: string | null;
+  end_date: string | null;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  created_at?: string;
+}
+
+interface GetActiveSeasonRpcResponse {
+  success: boolean;
+  season?: SeasonRpcShape | null;
+  error?: string;
+}
+
+interface ListSeasonsRpcResponse {
+  success: boolean;
+  seasons?: SeasonRpcShape[];
+  error?: string;
+}
+
+interface CreateSeasonRpcResponse {
+  success: boolean;
+  season?: SeasonRpcShape;
+  error?: string;
+}
+
+interface ActivateSeasonRpcResponse {
+  success: boolean;
+  season_id?: number | string;
+  users_granted?: number | string;
+  error?: string;
+}
+
+interface EndSeasonRpcResponse {
+  success: boolean;
+  season_id?: number | string;
+  status?: "ARCHIVED";
+  error?: string;
+}
+
 export interface MarketListItem {
   id: number;
   gameId: number;
@@ -260,6 +325,7 @@ export interface MarketListItem {
   awayTeamShortName: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  seasonId: number | null;
   prices: Record<MarketOutcome, number>;
   initialPrices: Record<MarketOutcome, number | null>;
 }
@@ -296,6 +362,8 @@ export interface MarketDetailItem {
   awayPitcher: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  seasonId: number | null;
+  seasonName: string | null;
 }
 
 export interface MarketPosition {
@@ -329,6 +397,8 @@ export interface OpenPositionHistoryItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+  seasonId: number;
+  seasonName: string;
 }
 
 export interface OrderHistoryItem {
@@ -346,6 +416,8 @@ export interface OrderHistoryItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+  seasonId: number;
+  seasonName: string;
 }
 
 export interface SettlementHistoryItem {
@@ -362,6 +434,8 @@ export interface SettlementHistoryItem {
   awayTeamName: string;
   homeTeamShortName: string | null;
   awayTeamShortName: string | null;
+  seasonId: number;
+  seasonName: string;
 }
 
 export interface LeaderboardBalanceItem {
@@ -369,6 +443,7 @@ export interface LeaderboardBalanceItem {
   userId: string;
   username: string;
   balance: number;
+  seasonId?: number;
 }
 
 export interface LeaderboardRoiItem {
@@ -378,6 +453,34 @@ export interface LeaderboardRoiItem {
   roiPercent: number;
   currentBalance: number;
   totalGranted: number;
+  seasonId?: number;
+}
+
+export type SeasonStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+
+export interface Season {
+  id: number;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  status: SeasonStatus;
+  createdAt?: string;
+}
+
+export interface SeasonInput {
+  name: string;
+  startDate: string;
+  endDate: string;
+}
+
+export interface SeasonActivationResult {
+  seasonId: number;
+  usersGranted: number;
+}
+
+export interface SeasonEndResult {
+  seasonId: number;
+  status: "ARCHIVED";
 }
 
 export interface PriceSnapshotItem {
@@ -705,35 +808,58 @@ export const changePassword = async (userId: string, newPassword: string) => {
 };
 
 // Fetch Leaderboard (US-008)
-export const getLeaderboardBalance = async (): Promise<
-  LeaderboardBalanceItem[]
-> => {
-  const { data, error } = await supabase.rpc("get_leaderboard_balance");
+export const getLeaderboardBalance = async (
+  seasonId?: number
+): Promise<LeaderboardBalanceItem[]> => {
+  const { data, error } = await supabase.rpc("get_leaderboard_balance", {
+    p_season_id: seasonId ?? null,
+  });
 
   if (error) {
     console.error("Error calling get_leaderboard_balance RPC:", error);
     throw new Error("리더보드 잔고 순위 조회 중 오류가 발생했습니다");
   }
 
-  const rows = (data ?? []) as LeaderboardBalanceRpcRow[];
+  const rpcResult = data as LeaderboardBalanceRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(
+      rpcResult?.error || "리더보드 잔고 순위 조회에 실패했습니다"
+    );
+  }
+
+  const responseSeasonId = toNumberOrNull(rpcResult.season_id ?? null);
+  const rows = (rpcResult.ranks ?? []) as LeaderboardBalanceRpcRow[];
 
   return rows.map((entry) => ({
     rank: Math.trunc(toNumberOrNull(entry.rank) ?? 0),
     userId: entry.user_id,
     username: entry.username,
     balance: toNumberOrNull(entry.balance) ?? 0,
+    seasonId: responseSeasonId ?? undefined,
   }));
 };
 
-export const getLeaderboardRoi = async (): Promise<LeaderboardRoiItem[]> => {
-  const { data, error } = await supabase.rpc("get_leaderboard_roi");
+export const getLeaderboardRoi = async (
+  seasonId?: number
+): Promise<LeaderboardRoiItem[]> => {
+  const { data, error } = await supabase.rpc("get_leaderboard_roi", {
+    p_season_id: seasonId ?? null,
+  });
 
   if (error) {
     console.error("Error calling get_leaderboard_roi RPC:", error);
     throw new Error("리더보드 수익률 순위 조회 중 오류가 발생했습니다");
   }
 
-  const rows = (data ?? []) as LeaderboardRoiRpcRow[];
+  const rpcResult = data as LeaderboardRoiRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(
+      rpcResult?.error || "리더보드 수익률 순위 조회에 실패했습니다"
+    );
+  }
+
+  const responseSeasonId = toNumberOrNull(rpcResult.season_id ?? null);
+  const rows = (rpcResult.ranks ?? []) as LeaderboardRoiRpcRow[];
 
   return rows.map((entry) => ({
     rank: Math.trunc(toNumberOrNull(entry.rank) ?? 0),
@@ -742,7 +868,152 @@ export const getLeaderboardRoi = async (): Promise<LeaderboardRoiItem[]> => {
     roiPercent: toNumberOrNull(entry.roi_percent) ?? 0,
     currentBalance: toNumberOrNull(entry.current_balance) ?? 0,
     totalGranted: toNumberOrNull(entry.total_granted) ?? 0,
+    seasonId: responseSeasonId ?? undefined,
   }));
+};
+
+// Season Management Functions (US-001, US-002)
+
+const parseSeasonFromRpc = (raw: SeasonRpcShape): Season => {
+  const parsedId = Number(raw.id);
+  if (!Number.isFinite(parsedId) || parsedId < 0) {
+    throw new Error("시즌 데이터 형식이 올바르지 않습니다");
+  }
+
+  return {
+    id: parsedId,
+    name: raw.name,
+    startDate: raw.start_date ?? null,
+    endDate: raw.end_date ?? null,
+    status: raw.status,
+    createdAt: raw.created_at,
+  };
+};
+
+export const getActiveSeason = async (): Promise<Season | null> => {
+  const { data, error } = await supabase.rpc("get_active_season");
+
+  if (error) {
+    console.error("Error calling get_active_season RPC:", error);
+    throw new Error("활성 시즌 조회 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as GetActiveSeasonRpcResponse | null;
+  if (!rpcResult?.success || !rpcResult.season) {
+    return null;
+  }
+
+  return parseSeasonFromRpc(rpcResult.season);
+};
+
+export const listSeasons = async (): Promise<Season[]> => {
+  const { data, error } = await supabase.rpc("list_seasons");
+
+  if (error) {
+    console.error("Error calling list_seasons RPC:", error);
+    throw new Error("시즌 목록 조회 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as ListSeasonsRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "시즌 목록 조회에 실패했습니다");
+  }
+
+  return (rpcResult.seasons ?? []).map(parseSeasonFromRpc);
+};
+
+export const createSeason = async (input: SeasonInput): Promise<Season> => {
+  if (!input.name || !input.name.trim()) {
+    throw new Error("시즌 이름이 비어 있습니다");
+  }
+
+  if (!input.startDate || !input.endDate) {
+    throw new Error("시즌 시작/종료 날짜가 비어 있습니다");
+  }
+
+  const { data, error } = await supabase.rpc("create_season", {
+    p_name: input.name,
+    p_start_date: input.startDate,
+    p_end_date: input.endDate,
+  });
+
+  if (error) {
+    console.error("Error calling create_season RPC:", error);
+    throw new Error("시즌 생성 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as CreateSeasonRpcResponse | null;
+  if (!rpcResult?.success || !rpcResult.season) {
+    throw new Error(rpcResult?.error || "시즌 생성에 실패했습니다");
+  }
+
+  return parseSeasonFromRpc(rpcResult.season);
+};
+
+export const activateSeason = async (
+  seasonId: number
+): Promise<SeasonActivationResult> => {
+  if (!Number.isFinite(seasonId) || seasonId <= 0) {
+    throw new Error("유효하지 않은 시즌 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("activate_season", {
+    p_season_id: seasonId,
+  });
+
+  if (error) {
+    console.error("Error calling activate_season RPC:", error);
+    throw new Error("시즌 활성화 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as ActivateSeasonRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "시즌 활성화에 실패했습니다");
+  }
+
+  const parsedSeasonId = Number(rpcResult.season_id ?? seasonId);
+  const usersGranted = Number(rpcResult.users_granted ?? 0);
+
+  if (!Number.isFinite(parsedSeasonId) || !Number.isFinite(usersGranted)) {
+    throw new Error("시즌 활성화 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    seasonId: parsedSeasonId,
+    usersGranted,
+  };
+};
+
+export const endSeason = async (
+  seasonId: number
+): Promise<SeasonEndResult> => {
+  if (!Number.isFinite(seasonId) || seasonId <= 0) {
+    throw new Error("유효하지 않은 시즌 ID입니다");
+  }
+
+  const { data, error } = await supabase.rpc("end_season", {
+    p_season_id: seasonId,
+  });
+
+  if (error) {
+    console.error("Error calling end_season RPC:", error);
+    throw new Error("시즌 종료 중 오류가 발생했습니다");
+  }
+
+  const rpcResult = data as EndSeasonRpcResponse | null;
+  if (!rpcResult?.success) {
+    throw new Error(rpcResult?.error || "시즌 종료에 실패했습니다");
+  }
+
+  const parsedSeasonId = Number(rpcResult.season_id ?? seasonId);
+  if (!Number.isFinite(parsedSeasonId)) {
+    throw new Error("시즌 종료 응답 형식이 올바르지 않습니다");
+  }
+
+  return {
+    seasonId: parsedSeasonId,
+    status: "ARCHIVED",
+  };
 };
 
 // Admin Functions for Game Management
@@ -796,7 +1067,7 @@ export const getMarketListForDate = async (
   const { data: marketRows, error: marketsError } = await supabase
     .from("markets")
     .select(
-      "id, game_id, status, result, initial_home_price, initial_away_price, initial_draw_price"
+      "id, game_id, status, result, season_id, initial_home_price, initial_away_price, initial_draw_price"
     )
     .in("game_id", gameIds);
 
@@ -880,6 +1151,7 @@ export const getMarketListForDate = async (
         awayTeamShortName: awayTeam.short_name ?? null,
         homeScore: game.home_score ?? null,
         awayScore: game.away_score ?? null,
+        seasonId: market.season_id ?? null,
         prices,
         initialPrices: {
           HOME: toNumberOrNull(market.initial_home_price),
@@ -1046,6 +1318,8 @@ export const getMarketDetail = async (
     awayPitcher: game.away_pitcher ?? null,
     homeScore: toNumberOrNull(game.home_score),
     awayScore: toNumberOrNull(game.away_score),
+    seasonId: toNumberOrNull(market.season_id),
+    seasonName: market.season_name ?? null,
   };
 };
 
@@ -1134,7 +1408,8 @@ export const getPriceSnapshots = async (
 };
 
 export const getOpenPositionsHistory = async (
-  userId: string
+  userId: string,
+  seasonId?: number
 ): Promise<OpenPositionHistoryItem[]> => {
   if (!userId) {
     throw new Error("사용자 정보가 올바르지 않습니다");
@@ -1142,6 +1417,7 @@ export const getOpenPositionsHistory = async (
 
   const { data, error } = await supabase.rpc("get_user_open_positions", {
     p_user_id: userId,
+    p_season_id: seasonId ?? null,
   });
 
   if (error) {
@@ -1209,6 +1485,8 @@ export const getOpenPositionsHistory = async (
       awayTeamName: awayTeam.name,
       homeTeamShortName: homeTeam.short_name ?? null,
       awayTeamShortName: awayTeam.short_name ?? null,
+      seasonId: toNumberOrNull(row.season_id) ?? 0,
+      seasonName: row.season_name ?? "",
     });
   });
 
@@ -1218,14 +1496,16 @@ export const getOpenPositionsHistory = async (
 };
 
 export const getPositions = async (
-  userId: string
+  userId: string,
+  seasonId?: number
 ): Promise<OpenPositionHistoryItem[]> => {
-  return getOpenPositionsHistory(userId);
+  return getOpenPositionsHistory(userId, seasonId);
 };
 
 export const getOrderHistoryByDate = async (
   userId: string,
-  date: string
+  date: string,
+  seasonId?: number
 ): Promise<OrderHistoryItem[]> => {
   if (!userId) {
     throw new Error("사용자 정보가 올바르지 않습니다");
@@ -1236,6 +1516,7 @@ export const getOrderHistoryByDate = async (
     p_user_id: userId,
     p_start_at: startAtIso,
     p_end_at: endAtIso,
+    p_season_id: seasonId ?? null,
   });
 
   if (error) {
@@ -1303,6 +1584,8 @@ export const getOrderHistoryByDate = async (
       awayTeamName: awayTeam.name,
       homeTeamShortName: homeTeam.short_name ?? null,
       awayTeamShortName: awayTeam.short_name ?? null,
+      seasonId: toNumberOrNull(row.season_id) ?? 0,
+      seasonName: row.season_name ?? "",
     });
   });
 
@@ -1313,13 +1596,15 @@ export const getOrderHistoryByDate = async (
 
 export const getOrderHistory = async (
   userId: string,
-  date = getISODate()
+  date = getISODate(),
+  seasonId?: number
 ): Promise<OrderHistoryItem[]> => {
-  return getOrderHistoryByDate(userId, date);
+  return getOrderHistoryByDate(userId, date, seasonId);
 };
 
 export const getSettlementHistory = async (
-  userId: string
+  userId: string,
+  seasonId?: number
 ): Promise<SettlementHistoryItem[]> => {
   if (!userId) {
     throw new Error("사용자 정보가 올바르지 않습니다");
@@ -1327,6 +1612,7 @@ export const getSettlementHistory = async (
 
   const { data, error } = await supabase.rpc("get_user_settlement_history", {
     p_user_id: userId,
+    p_season_id: seasonId ?? null,
   });
 
   if (error) {
@@ -1394,6 +1680,8 @@ export const getSettlementHistory = async (
       awayTeamName: awayTeam.name,
       homeTeamShortName: homeTeam.short_name ?? null,
       awayTeamShortName: awayTeam.short_name ?? null,
+      seasonId: toNumberOrNull(row.season_id) ?? 0,
+      seasonName: row.season_name ?? "",
     });
   });
 
@@ -1907,9 +2195,13 @@ export const getWeeklyCoinCronStatus =
     };
   };
 
-export const getWalletBalance = async (userId: string): Promise<number> => {
+export const getWalletBalance = async (
+  userId: string,
+  seasonId?: number
+): Promise<number> => {
   const { data, error } = await supabase.rpc("get_wallet_balance", {
     p_user_id: userId,
+    p_season_id: seasonId ?? null,
   });
 
   if (error) {
