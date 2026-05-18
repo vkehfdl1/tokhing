@@ -2,12 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  getActiveSeason,
   getLeaderboardBalance,
   getLeaderboardRoi,
+  listSeasons,
   type LeaderboardBalanceItem,
   type LeaderboardRoiItem,
+  type Season,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
+import { Select } from "@/components/ui/select";
 
 type LeaderboardTab = "BALANCE" | "ROI";
 
@@ -48,6 +52,16 @@ const getRankBackgroundClass = (rank: number) => {
   return rank === 1 ? "bg-tokhin-green" : "bg-neutral-50";
 };
 
+const getSeasonLabel = (season: Season) => {
+  const suffix =
+    season.status === "ACTIVE"
+      ? "활성"
+      : season.status === "ARCHIVED"
+        ? "보관"
+        : "준비";
+  return `${season.name} (${suffix})`;
+};
+
 export default function LeaderboardPage() {
   const { session, isLoading: isSessionLoading } = useUserSession({
     requireAuth: true,
@@ -58,11 +72,63 @@ export default function LeaderboardPage() {
     LeaderboardBalanceItem[]
   >([]);
   const [roiLeaderboard, setRoiLeaderboard] = useState<LeaderboardRoiItem[]>([]);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.user_id) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const fetchSeasons = async () => {
+      try {
+        const [allSeasons, activeSeason] = await Promise.all([
+          listSeasons(),
+          getActiveSeason(),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        const selectable = allSeasons.filter((s) => s.status !== "DRAFT");
+        setSeasons(selectable);
+
+        const defaultId =
+          activeSeason?.id ?? selectable[0]?.id ?? null;
+        setSelectedSeasonId(defaultId);
+
+        if (defaultId === null) {
+          setIsLoading(false);
+        }
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        const message =
+          error instanceof Error
+            ? error.message
+            : "시즌 목록을 불러오지 못했습니다";
+
+        setErrorMessage(message);
+        setIsLoading(false);
+      }
+    };
+
+    fetchSeasons();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [session?.user_id]);
+
+  useEffect(() => {
+    if (!session?.user_id || selectedSeasonId === null) {
       return;
     }
 
@@ -73,8 +139,8 @@ export default function LeaderboardPage() {
 
       try {
         const [balanceData, roiData] = await Promise.all([
-          getLeaderboardBalance(),
-          getLeaderboardRoi(),
+          getLeaderboardBalance(selectedSeasonId),
+          getLeaderboardRoi(selectedSeasonId),
         ]);
 
         if (isCancelled) {
@@ -108,7 +174,7 @@ export default function LeaderboardPage() {
     return () => {
       isCancelled = true;
     };
-  }, [session?.user_id]);
+  }, [session?.user_id, selectedSeasonId]);
 
   const displayRows = useMemo<LeaderboardDisplayRow[]>(() => {
     if (activeTab === "BALANCE") {
@@ -140,6 +206,35 @@ export default function LeaderboardPage() {
     <div className="w-full pt-1">
       <h1 className="mb-6 text-center text-xl font-bold text-black">리더보드</h1>
 
+      <div className="mb-4 flex items-center gap-3 rounded-lg bg-neutral-50 px-3 py-2 shadow-[0px_0px_8px_0px_rgba(0,0,0,0.06)]">
+        <label
+          htmlFor="season-select"
+          className="text-sm font-semibold text-zinc-700"
+        >
+          시즌
+        </label>
+        <Select
+          id="season-select"
+          value={selectedSeasonId ?? ""}
+          onChange={(event) => {
+            const nextValue = event.target.value;
+            setSelectedSeasonId(nextValue === "" ? null : Number(nextValue));
+          }}
+          disabled={seasons.length === 0}
+          className="h-10 flex-1 rounded-lg border-zinc-200 bg-white text-sm font-medium text-black"
+        >
+          {seasons.length === 0 ? (
+            <option value="">선택 가능한 시즌이 없습니다</option>
+          ) : (
+            seasons.map((season) => (
+              <option key={season.id} value={season.id}>
+                {getSeasonLabel(season)}
+              </option>
+            ))
+          )}
+        </Select>
+      </div>
+
       <div className="mb-5 border-b border-zinc-200">
         <div className="grid grid-cols-2">
           {LEADERBOARD_TABS.map((tab) => (
@@ -164,9 +259,8 @@ export default function LeaderboardPage() {
       ) : errorMessage ? (
         <p className="text-center text-red-500">{errorMessage}</p>
       ) : displayRows.length === 0 ? (
-        <p className="text-center text-gray-600">
-          아직 {activeTab === "BALANCE" ? "잔고" : "수익률"} 순위표를 볼 수
-          없습니다.
+        <p className="py-10 text-center text-gray-600">
+          이 시즌에 거래 기록이 없습니다
         </p>
       ) : (
         <div>

@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
+  getActiveSeason,
   getISODate,
   getMarkets,
   isMarketClosedHours,
   isMarketPastTradeDeadline,
   type MarketListItem,
+  type Season,
 } from "@/lib/api";
 import { useUserSession } from "@/lib/hooks/useUserSession";
 
@@ -154,6 +156,7 @@ export default function HomePage() {
     requireAuth: true,
   });
   const [markets, setMarkets] = useState<MarketListItem[]>([]);
+  const [activeSeason, setActiveSeason] = useState<Season | null>(null);
   const [displayDate, setDisplayDate] = useState<string>(getISODate());
   const [displayDateLabel, setDisplayDateLabel] =
     useState<MarketDateLabel>("today");
@@ -171,8 +174,21 @@ export default function HomePage() {
     setError(null);
 
     try {
+      const season = await getActiveSeason();
+      setActiveSeason(season);
+
+      if (!season) {
+        setMarkets([]);
+        setDisplayDate(getISODate());
+        setDisplayDateLabel("today");
+        return;
+      }
+
+      const filterBySeason = (list: MarketListItem[]) =>
+        list.filter((market) => market.seasonId === season.id);
+
       const today = getISODate();
-      const todayMarkets = await getMarkets(today);
+      const todayMarkets = filterBySeason(await getMarkets(today));
 
       const allTodayGamesEnded =
         todayMarkets.length > 0 &&
@@ -182,7 +198,7 @@ export default function HomePage() {
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
         const tomorrowDate = getISODate(tomorrow);
-        const tomorrowMarkets = await getMarkets(tomorrowDate);
+        const tomorrowMarkets = filterBySeason(await getMarkets(tomorrowDate));
 
         if (tomorrowMarkets.length > 0) {
           setMarkets(tomorrowMarkets);
@@ -245,14 +261,25 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      <h1 className="mb-4 text-lg font-bold text-black">
-        {formatMarketDateTitle(displayDate, displayDateLabel)}
-      </h1>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <h1 className="text-lg font-bold text-black">
+          {formatMarketDateTitle(displayDate, displayDateLabel)}
+        </h1>
+        {activeSeason ? (
+          <span className="shrink-0 rounded-full bg-tokhin-green/10 px-2.5 py-0.5 text-xs font-semibold text-tokhin-green">
+            {activeSeason.name} 활성
+          </span>
+        ) : null}
+      </div>
 
       {error && <p className="mb-4 text-sm text-red-500">{error}</p>}
 
       {isLoading ? (
         <p className="py-20 text-center text-zinc-500">마켓 목록을 불러오는 중...</p>
+      ) : !activeSeason ? (
+        <div className="rounded-2xl bg-white p-5 text-center shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">
+          <p className="text-sm text-zinc-500">현재 활성 시즌이 없습니다</p>
+        </div>
       ) : markets.length === 0 ? (
         <div className="rounded-2xl bg-white p-5 text-center shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)]">
           <p className="text-sm text-zinc-500">표시할 마켓이 없습니다.</p>

@@ -14,7 +14,6 @@ DELETE FROM public.orders;
 DELETE FROM public.positions;
 DELETE FROM public.wallets;
 DELETE FROM public.markets;
-DELETE FROM public.predictions;
 DELETE FROM public.games;
 DELETE FROM public.users;
 
@@ -68,18 +67,18 @@ SELECT create_market(905, 47.5, 47.5, 5.0);  -- SSG vs 한화 (CANCELED)
 UPDATE public.markets SET status = 'CLOSED' WHERE game_id = 904;
 UPDATE public.markets SET status = 'CANCELED' WHERE game_id = 905;
 
--- 6) 지갑 생성 + 초기 코인 지급 (각 5000코인)
-INSERT INTO public.wallets (id, user_id, balance, created_at, updated_at)
+-- 6) 지갑 생성 + 초기 코인 지급 (각 5000코인) - active 시즌(Season 1) 기준
+INSERT INTO public.wallets (id, user_id, season_id, balance, created_at, updated_at)
 VALUES
-  (gen_random_uuid(), 'a1111111-1111-1111-1111-111111111111', 5000, NOW(), NOW()),
-  (gen_random_uuid(), 'a2222222-2222-2222-2222-222222222222', 5000, NOW(), NOW()),
-  (gen_random_uuid(), 'a3333333-3333-3333-3333-333333333333', 5000, NOW(), NOW());
+  (gen_random_uuid(), 'a1111111-1111-1111-1111-111111111111', 1, 5000, NOW(), NOW()),
+  (gen_random_uuid(), 'a2222222-2222-2222-2222-222222222222', 1, 5000, NOW(), NOW()),
+  (gen_random_uuid(), 'a3333333-3333-3333-3333-333333333333', 1, 5000, NOW(), NOW());
 
-INSERT INTO public.transactions (user_id, type, amount, balance_after, description, created_at)
+INSERT INTO public.transactions (user_id, season_id, type, amount, balance_after, description, created_at)
 VALUES
-  ('a1111111-1111-1111-1111-111111111111', 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
-  ('a2222222-2222-2222-2222-222222222222', 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
-  ('a3333333-3333-3333-3333-333333333333', 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW());
+  ('a1111111-1111-1111-1111-111111111111', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
+  ('a2222222-2222-2222-2222-222222222222', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
+  ('a3333333-3333-3333-3333-333333333333', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW());
 
 -- 7) 테스트 거래: 김테스트가 KIA vs 삼성에서 HOME 10주 매수
 SELECT execute_buy_order(

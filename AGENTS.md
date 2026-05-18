@@ -89,3 +89,37 @@ KBO 야구 승부예측 앱(ToKHin')을 LMSR 기반 예측시장으로 전환하
 - API 함수는 `lib/api.ts`에 집중
 - 새 페이지는 `app/` 디렉토리 내 폴더 기반 라우팅
 - 에러 메시지는 한국어
+
+## Season System (US-012)
+
+ToKHin' 은 시즌 단위로 코인이 격리된다. 각 시즌은 독립된 잔고/거래/포지션을 갖고, 시즌이 바뀌면 이전 시즌은 보관(ARCHIVED) 상태로 잠긴다.
+
+### Tables
+- `seasons(id, name, start_date, end_date, status)` — `status IN ('DRAFT','ACTIVE','ARCHIVED')`
+  - partial unique index: ACTIVE 1개, DRAFT 1개만 허용
+- `wallets`, `markets`, `orders`, `positions`, `transactions` — 전부 `season_id NOT NULL` FK 추가
+- `wallets` UNIQUE 제약: `(user_id, season_id)` → 사용자당 시즌별 지갑 1개
+
+### Initial seeded seasons
+- Season 0 (id=0, ARCHIVED): ~2026-03-27 — 레거시 데이터 버킷
+- Season 1 (id=1, ACTIVE): 2026-03-28 ~ — 현재 활성
+- Season 2 (id=2, DRAFT): 2026-05-19 ~ 2026-06-21 — 관리자가 수동 활성화 대기
+
+### Lifecycle (admin-controlled)
+1. **CREATE** → `create_season(name, start, end)` 으로 DRAFT 생성 (DRAFT 동시 1개만)
+2. **ACTIVATE** → `activate_season(id)` 호출. 이전 ACTIVE 시즌에 미정산(OPEN/CLOSED) 마켓이 있으면 차단. 성공 시: 이전 시즌 ARCHIVED + 새 시즌 ACTIVE + 전 사용자에게 1000코인 SEASON_GRANT 발행
+3. **END** → `end_season(id)` 로 명시적 종료 (활성→보관). 다음 시즌 activate 시 자동 종료도 가능
+
+### Rules
+- 모든 거래/정산은 active 시즌에서만 가능. 마켓의 `season_id`가 active와 다르면 RPC가 `'이 시즌은 더 이상 거래할 수 없습니다'` 로 차단
+- 신규 마켓 생성 시 자동으로 active 시즌의 id 부여 (`create_market` 내부에서 lookup)
+- 신규 회원가입 시 active 시즌의 지갑 자동 생성 (1000코인 + SEASON_GRANT 트랜잭션)
+- 리더보드/히스토리는 시즌별 조회 가능. 메인 페이지는 active 시즌 마켓만 노출
+- 마켓 상세에서 archived 시즌 마켓은 read-only (포지션은 표시, 거래 UI는 banner로 대체)
+
+### Transaction types
+`BUY, SELL, SETTLEMENT, WEEKLY_GRANT, ADMIN_GRANT, SEASON_GRANT` — SEASON_GRANT는 시즌 시작 시 일괄 지급
+
+### Migrations
+- `20260518000000_us_seasons_schema.sql` — 테이블, 컬럼, 백필, UNIQUE swap, SEASON_GRANT 합성
+- `20260518000001_us_seasons_rpcs.sql` — 시즌 라이프사이클 RPC 5개 + 기존 RPC 17개 시즌-인식 업데이트

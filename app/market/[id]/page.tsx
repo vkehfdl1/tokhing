@@ -9,6 +9,7 @@ import {
   executeBuyByAmount,
   executeBuyOrder,
   executeSellOrder,
+  getActiveSeason,
   getMarketDetail,
   getMarketPositions,
   getPriceSnapshots,
@@ -19,6 +20,7 @@ import {
   type MarketOutcome,
   type MarketPositionsByOutcome,
   type PriceSnapshotItem,
+  type Season,
 } from "@/lib/api";
 import { notifyWalletBalanceRefresh } from "@/lib/events";
 import { useUserSession } from "@/lib/hooks/useUserSession";
@@ -475,6 +477,7 @@ export default function MarketDetailPage() {
     createEmptyPositionsByOutcome
   );
   const [walletBalance, setWalletBalance] = useState(0);
+  const [activeSeason, setActiveSeason] = useState<Season | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -502,17 +505,20 @@ export default function MarketDetailPage() {
     setError(null);
 
     try {
-      const [detail, userPositions, balance, snapshots] = await Promise.all([
-        getMarketDetail(marketId),
-        getMarketPositions(session.user_id, marketId),
-        getWalletBalance(session.user_id),
-        getPriceSnapshots(marketId),
-      ]);
+      const [detail, userPositions, balance, snapshots, season] =
+        await Promise.all([
+          getMarketDetail(marketId),
+          getMarketPositions(session.user_id, marketId),
+          getWalletBalance(session.user_id),
+          getPriceSnapshots(marketId),
+          getActiveSeason(),
+        ]);
 
       setMarketDetail(detail);
       setPositions(userPositions);
       setWalletBalance(balance);
       setPriceSnapshots(snapshots);
+      setActiveSeason(season);
     } catch (loadError) {
       console.error("Failed to load market detail page data:", loadError);
       setError("마켓 정보를 불러오는 중 오류가 발생했습니다");
@@ -633,9 +639,18 @@ export default function MarketDetailPage() {
     );
   }, [currentTime, marketDetail]);
 
+  const isArchivedSeasonMarket = useMemo<boolean>(() => {
+    if (!marketDetail) {
+      return false;
+    }
+
+    return marketDetail.seasonId !== (activeSeason?.id ?? null);
+  }, [activeSeason, marketDetail]);
+
   const isTradingClosed =
     closedHours ||
     isTradeDeadlinePassed ||
+    isArchivedSeasonMarket ||
     displayStatus === "CLOSED" ||
     displayStatus === "SETTLED" ||
     displayStatus === "CANCELED";
@@ -873,6 +888,15 @@ export default function MarketDetailPage() {
       return;
     }
 
+    if (isArchivedSeasonMarket) {
+      setIsConfirmOpen(false);
+      setToast({
+        type: "error",
+        message: "보관된 시즌의 마켓은 거래할 수 없습니다",
+      });
+      return;
+    }
+
     if (isTradingClosed) {
       setIsConfirmOpen(false);
       setToast({
@@ -989,11 +1013,24 @@ export default function MarketDetailPage() {
           <Link href="/" className="text-sm font-semibold text-zinc-600">
             ← 마켓 목록
           </Link>
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE_CLASSES[displayStatus]}`}
-          >
-            {displayStatus}
-          </span>
+          <div className="flex items-center gap-2">
+            {marketDetail.seasonName ? (
+              <span
+                className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                  isArchivedSeasonMarket
+                    ? "bg-stone-100 text-stone-700"
+                    : "bg-tokhin-green/10 text-tokhin-green"
+                }`}
+              >
+                {marketDetail.seasonName}
+              </span>
+            ) : null}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE_CLASSES[displayStatus]}`}
+            >
+              {displayStatus}
+            </span>
+          </div>
         </div>
 
         {error ? <p className="text-sm text-red-500">{error}</p> : null}
@@ -1152,6 +1189,16 @@ export default function MarketDetailPage() {
           )}
         </section>
 
+        {isArchivedSeasonMarket ? (
+          <section className="rounded-2xl border border-stone-200 bg-stone-100 p-4 text-center">
+            <p className="text-sm font-semibold text-stone-700">
+              보관된 시즌의 마켓입니다
+            </p>
+            <p className="mt-1 text-sm text-stone-500">
+              {marketDetail.seasonName ?? "지난 시즌"}의 거래는 종료되었습니다
+            </p>
+          </section>
+        ) : (
         <section
           className={`rounded-2xl border p-5 shadow-[0px_2px_12px_0px_rgba(0,0,0,0.12)] ${
             tradeSide === "BUY"
@@ -1356,6 +1403,7 @@ export default function MarketDetailPage() {
             {tradeSide === "BUY" ? "매수 주문하기" : "매도 주문하기"}
           </Button>
         </section>
+        )}
       </div>
 
       {isConfirmOpen && tradePreview ? (
