@@ -876,7 +876,7 @@ export const getLeaderboardRoi = async (
 
 const parseSeasonFromRpc = (raw: SeasonRpcShape): Season => {
   const parsedId = Number(raw.id);
-  if (!Number.isFinite(parsedId) || parsedId <= 0) {
+  if (!Number.isFinite(parsedId) || parsedId < 0) {
     throw new Error("시즌 데이터 형식이 올바르지 않습니다");
   }
 
