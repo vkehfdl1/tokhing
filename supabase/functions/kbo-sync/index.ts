@@ -223,6 +223,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       continue;
     }
 
+    const isCanceledGame = game.status === "CANCELED";
     const nextGame = {
       game_date: targetDate,
       game_time: game.startTime,
@@ -230,8 +231,9 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       away_team_id: awayTeamId,
       home_pitcher: sanitizeText(game.homePitcher),
       away_pitcher: sanitizeText(game.awayPitcher),
-      home_score: parseNumericScore(game.score?.home),
-      away_score: parseNumericScore(game.score?.away),
+      // Canceled games must not keep partial scores that look like a HOME win.
+      home_score: isCanceledGame ? 0 : parseNumericScore(game.score?.home),
+      away_score: isCanceledGame ? 0 : parseNumericScore(game.score?.away),
       game_status: game.status,
     };
 
@@ -298,6 +300,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
 
   let marketCreatedCount = 0;
   let marketClosedCount = 0;
+  let marketCanceledCount = 0;
   if (syncedGameIds.length > 0) {
     const uniqueGameIds = Array.from(new Set(syncedGameIds));
     const { data: existingMarkets, error: existingMarketsError } = await supabase
@@ -320,6 +323,13 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     );
 
     for (const gameId of missingMarketGameIds) {
+      const gameState = syncedGamesById.get(gameId);
+
+      // Do not open a brand-new market for an already-canceled game.
+      if (gameState?.game_status === "CANCELED") {
+        continue;
+      }
+
       const { data, error } = await supabase.rpc("create_market", {
         p_game_id: gameId,
         p_initial_home: initialPrices.HOME,
@@ -338,7 +348,6 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
 
       marketCreatedCount += 1;
 
-      const gameState = syncedGamesById.get(gameId);
       if (gameState && shouldAutoCloseMarket(gameState)) {
         const { error: closeError } = await supabase
           .from("markets")
@@ -356,8 +365,58 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       }
     }
 
-    const closableMarkets = (existingMarkets ?? []).filter((market) => {
-      const currentStatus = String(market.status ?? "").toUpperCase() as MarketStatus;
+    // Refresh market list after creates so cancel/close passes see current rows.
+    const { data: marketsForLifecycle, error: lifecycleMarketsError } =
+      await supabase
+        .from("markets")
+        .select("id, game_id, status")
+        .in("game_id", uniqueGameIds);
+
+    if (lifecycleMarketsError) {
+      throw new Error(
+        `마켓 라이프사이클 조회 실패: ${lifecycleMarketsError.message}`
+      );
+    }
+
+    const cancelableMarkets = (marketsForLifecycle ?? []).filter((market) => {
+      const currentStatus = String(
+        market.status ?? ""
+      ).toUpperCase() as MarketStatus;
+      if (currentStatus === "SETTLED" || currentStatus === "CANCELED") {
+        return false;
+      }
+
+      const gameState = syncedGamesById.get(Number(market.game_id));
+      return gameState?.game_status === "CANCELED";
+    });
+
+    for (const market of cancelableMarkets) {
+      const { data, error } = await supabase.rpc("cancel_market", {
+        p_market_id: market.id,
+      });
+
+      if (error) {
+        throw new Error(
+          `취소 경기 마켓 자동 취소 실패(market_id=${market.id}): ${error.message}`
+        );
+      }
+
+      const rpcResult = data as { success?: boolean; error?: string } | null;
+      if (rpcResult && rpcResult.success === false) {
+        throw new Error(
+          `취소 경기 마켓 자동 취소 실패(market_id=${market.id}): ${
+            rpcResult.error ?? "unknown"
+          }`
+        );
+      }
+
+      marketCanceledCount += 1;
+    }
+
+    const closableMarkets = (marketsForLifecycle ?? []).filter((market) => {
+      const currentStatus = String(
+        market.status ?? ""
+      ).toUpperCase() as MarketStatus;
 
       if (currentStatus !== "OPEN") {
         return false;
@@ -365,6 +424,11 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
 
       const gameState = syncedGamesById.get(Number(market.game_id));
       if (!gameState) {
+        return false;
+      }
+
+      // Canceled games are handled by cancel_market above.
+      if (gameState.game_status === "CANCELED") {
         return false;
       }
 
@@ -379,7 +443,9 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
         .eq("status", "OPEN");
 
       if (error) {
-        throw new Error(`마켓 자동 종료 실패(market_id=${market.id}): ${error.message}`);
+        throw new Error(
+          `마켓 자동 종료 실패(market_id=${market.id}): ${error.message}`
+        );
       }
 
       marketClosedCount += 1;
@@ -398,6 +464,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
     unchangedCount,
     marketCreatedCount,
     marketClosedCount,
+    marketCanceledCount,
     unmatchedTeams: unmatchedList,
     message: [
       `KBO 동기화 완료 (${targetDate})`,
@@ -407,6 +474,7 @@ const syncKboGames = async (supabase: ReturnType<typeof createServiceRoleClient>
       `변경 없음 ${unchangedCount}건`,
       `마켓 생성 ${marketCreatedCount}건`,
       `마켓 종료 ${marketClosedCount}건`,
+      `마켓 취소 ${marketCanceledCount}건`,
       unmatchedList.length > 0
         ? `매핑 실패 팀: ${unmatchedList.join(", ")}`
         : null,

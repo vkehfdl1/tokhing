@@ -1229,7 +1229,11 @@ function MarketSettlementManagement() {
     text: string;
   } | null>(null);
 
-  const getDefaultOutcome = (market: MarketListItem): MarketOutcome => {
+  const getDefaultOutcome = (market: MarketListItem): MarketOutcome | null => {
+    if (market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED") {
+      return null;
+    }
+
     const result = market.result?.toUpperCase();
     if (result === "HOME" || result === "AWAY" || result === "DRAW") {
       return result;
@@ -1245,17 +1249,21 @@ function MarketSettlementManagement() {
       return "DRAW";
     }
 
-    return "HOME";
+    return null;
   };
 
   const isAutoDetected = (market: MarketListItem): boolean => {
     if (market.result) return false;
+    if (market.gameStatus === "CANCELED") return false;
     return (
       market.gameStatus === "FINISHED" &&
       market.homeScore != null &&
       market.awayScore != null
     );
   };
+
+  const isGameCanceled = (market: MarketListItem): boolean =>
+    market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED";
 
   const fetchMarkets = async () => {
     try {
@@ -1266,7 +1274,10 @@ function MarketSettlementManagement() {
         const next = { ...prev };
         marketList.forEach((market) => {
           if (!next[market.id]) {
-            next[market.id] = getDefaultOutcome(market);
+            const detected = getDefaultOutcome(market);
+            if (detected) {
+              next[market.id] = detected;
+            }
           }
         });
         return next;
@@ -1305,7 +1316,19 @@ function MarketSettlementManagement() {
     setMessage(null);
     setActiveMarketId(market.id);
     try {
-      const targetResult = selectedResults[market.id] ?? "HOME";
+      if (isGameCanceled(market)) {
+        throw new Error(
+          "취소된 경기는 정산할 수 없습니다. CANCEL(원가 환급)을 사용하세요."
+        );
+      }
+
+      const targetResult = selectedResults[market.id];
+      if (!targetResult) {
+        throw new Error(
+          "정산 결과를 선택하세요. 경기 결과가 자동 감지되지 않았습니다."
+        );
+      }
+
       const result = await settleMarket(market.id, targetResult);
       setMessage({
         type: "success",
@@ -1447,12 +1470,15 @@ function MarketSettlementManagement() {
           {markets.map((market) => {
             const isSettled = market.marketStatus === "SETTLED";
             const isCanceled = market.marketStatus === "CANCELED";
+            const gameCanceled = isGameCanceled(market);
             const isClosed = market.marketStatus === "CLOSED";
             const isOpen = market.marketStatus === "OPEN";
             const isActionLoading = activeMarketId === market.id;
             const autoDetected = isAutoDetected(market);
             const hasScore =
               market.homeScore != null && market.awayScore != null;
+            const canSettle =
+              !isSettled && !isCanceled && !gameCanceled && !isActionLoading;
 
             const statusColor = isSettled
               ? "bg-green-100 text-green-800"
@@ -1509,7 +1535,12 @@ function MarketSettlementManagement() {
                   {/* Divider */}
                   <div className="border-t" />
 
-                  {/* Auto-detected notice */}
+                  {gameCanceled ? (
+                    <p className="text-xs text-red-600">
+                      경기가 취소되었습니다. 정산하지 말고 CANCEL(원가 환급)을
+                      사용하세요.
+                    </p>
+                  ) : null}
                   {autoDetected ? (
                     <p className="text-xs text-blue-600">
                       경기 결과({market.homeScore} : {market.awayScore})에서 자동 감지됨
@@ -1533,12 +1564,15 @@ function MarketSettlementManagement() {
                       </Label>
                       <Select
                         id={`settle-result-${market.id}`}
-                        value={selectedResults[market.id] ?? "HOME"}
+                        value={selectedResults[market.id] ?? ""}
                         onChange={(event) =>
                           updateSelectedResult(market.id, event.target.value)
                         }
-                        disabled={isSettled || isCanceled || isActionLoading}
+                        disabled={!canSettle}
                       >
+                        <option value="" disabled>
+                          결과 선택
+                        </option>
                         <option value="HOME">HOME</option>
                         <option value="AWAY">AWAY</option>
                         <option value="DRAW">DRAW</option>
@@ -1547,7 +1581,7 @@ function MarketSettlementManagement() {
                     <Button
                       type="button"
                       onClick={() => void runSettle(market)}
-                      disabled={isSettled || isCanceled || isActionLoading}
+                      disabled={!canSettle || !selectedResults[market.id]}
                       className="h-12 rounded-lg"
                     >
                       {isActionLoading ? "처리 중..." : "정산 실행"}
@@ -1556,7 +1590,7 @@ function MarketSettlementManagement() {
                       type="button"
                       variant="outline"
                       onClick={() => void runClose(market)}
-                      disabled={!isOpen || isActionLoading}
+                      disabled={!isOpen || isActionLoading || gameCanceled}
                       className="h-12 rounded-lg"
                     >
                       CLOSE
@@ -1570,10 +1604,14 @@ function MarketSettlementManagement() {
                     disabled={isSettled || isCanceled || isActionLoading}
                     className="h-12 w-full rounded-lg"
                   >
-                    {isActionLoading ? "처리 중..." : "CANCEL (원가 환급)"}
+                    {isActionLoading
+                      ? "처리 중..."
+                      : gameCanceled
+                        ? "CANCEL (취소 경기 원가 환급)"
+                        : "CANCEL (원가 환급)"}
                   </Button>
 
-                  {isClosed ? (
+                  {isClosed && !gameCanceled ? (
                     <p className="text-xs text-amber-600">
                       CLOSED 상태입니다. 결과를 선택해 정산하거나 필요 시 취소할 수
                       있습니다.

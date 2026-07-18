@@ -2019,6 +2019,35 @@ export const settleMarket = async (
     throw new Error("정산 결과는 HOME, AWAY, DRAW 중 하나여야 합니다");
   }
 
+  // Defense-in-depth: never settle a canceled game even if UI is bypassed.
+  const { data: marketRow, error: marketLookupError } = await supabase
+    .from("markets")
+    .select("id, status, games!inner(game_status)")
+    .eq("id", marketId)
+    .maybeSingle();
+
+  if (marketLookupError) {
+    console.error("Error loading market before settle:", marketLookupError);
+    throw new Error("마켓 정보를 확인하는 중 오류가 발생했습니다");
+  }
+
+  type NestedGame = { game_status?: string } | { game_status?: string }[] | null;
+  const nestedGame = (marketRow as { games?: NestedGame; status?: string } | null)
+    ?.games;
+  const nestedStatus = Array.isArray(nestedGame)
+    ? nestedGame[0]?.game_status
+    : nestedGame?.game_status;
+  const resolvedGameStatus = String(nestedStatus ?? "").toUpperCase();
+  const marketStatus = String(
+    (marketRow as { status?: string } | null)?.status ?? ""
+  ).toUpperCase();
+
+  if (resolvedGameStatus === "CANCELED" || marketStatus === "CANCELED") {
+    throw new Error(
+      "취소된 경기는 정산할 수 없습니다. 마켓 취소(원가 환급)를 사용하세요"
+    );
+  }
+
   const { data, error } = await supabase.rpc("settle_market", {
     p_market_id: marketId,
     p_result: result,
