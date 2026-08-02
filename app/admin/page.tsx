@@ -6,6 +6,7 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import WalletRecovery from "@/components/admin/WalletRecovery";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -2133,6 +2134,8 @@ function AdminDashboard({
           현재 시각: {getCurrentKSTTime()}
         </div>
       </div>
+
+      <WalletRecovery onReauthenticate={controls.reauthenticate} />
 
       <div
         className={`grid gap-6 ${

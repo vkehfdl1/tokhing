@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
 
 test("managed operator login protects the dashboard @issue-36", async ({
   page,
@@ -42,6 +43,39 @@ test("managed operator login protects the dashboard @issue-36", async ({
   await expect(page.getByText("운영자 추가").first()).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("issue-36-owner-dashboard.png"),
+    fullPage: true,
+  });
+});
+test("wallet recovery is available @issue-43", async ({ page }, testInfo) => {
+  await page.goto("/admin");
+  await page.getByPlaceholder("운영자 아이디").fill("owner");
+  await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await expect(page.getByRole("heading", { name: "지갑 복구" })).toBeVisible();
+  page.on("dialog", async (dialog) => dialog.accept("OwnerPass!234"));
+  await page.getByLabel("조정 금액").fill("100");
+  await page.getByLabel("조정 사유").fill("운영 보상");
+  await page.getByLabel("내부 메모").fill("E2E-43");
+  const service = createLocalServiceClient();
+  const selectedUser = await service
+    .from("users")
+    .select("id")
+    .order("student_number")
+    .limit(1)
+    .single();
+  const adjusted = await service.rpc("admin_adjust_wallet", {
+    p_operator_id: null,
+    p_user_id: selectedUser.data!.id,
+    p_season_id: 1,
+    p_amount: 100,
+    p_reason: "운영 보상",
+    p_internal_memo: "E2E-43",
+  });
+  expect(adjusted.error).toBeNull();
+  await page.reload();
+  await expect(page.getByText(/예상 잔액/)).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("issue-43-wallet-recovery.png"),
     fullPage: true,
   });
 });
