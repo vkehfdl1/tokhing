@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
 
 test("managed operator login protects the dashboard @issue-36", async ({
   page,
@@ -42,6 +43,109 @@ test("managed operator login protects the dashboard @issue-36", async ({
   await expect(page.getByText("운영자 추가").first()).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("issue-36-owner-dashboard.png"),
+    fullPage: true,
+  });
+});
+
+test("draft season policy management is available @issue-39", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/admin");
+  await page.getByPlaceholder("운영자 아이디").fill("owner");
+  await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
+  await page.getByRole("button", { name: "로그인" }).click();
+
+  const seasonCard = page
+    .getByRole("heading", { name: "시즌 관리" })
+    .locator("..");
+  await seasonCard.getByRole("button", { name: "접속" }).click();
+  await expect(page.getByText("초기 지급액 1,000코인").first()).toBeVisible();
+  await expect(
+    page.getByText(
+      "ACTIVE와 ARCHIVED 시즌의 이름, 기간, 초기 지급액은 잠겨 있습니다.",
+    ).first(),
+  ).toBeVisible();
+
+  page.on("dialog", async (dialog) => {
+    await dialog.accept("OwnerPass!234");
+  });
+
+  let draftCard = page.getByLabel("Season 2 시즌");
+  await draftCard.getByRole("button", { name: "수정" }).click();
+  await page.getByLabel("시즌 이름").fill("Season 2 Edited");
+  await page.getByLabel("초기 지급액").fill("1500");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByText("DRAFT 시즌을 수정했습니다.")).toBeVisible();
+
+  draftCard = page.getByLabel("Season 2 Edited 시즌");
+  await expect(draftCard.getByText("활성화 예정: 3명 · 총 4,500코인")).toBeVisible();
+  await draftCard.getByRole("button", { name: "삭제" }).click();
+  const deleteDialog = page.getByRole("dialog");
+  await expect(deleteDialog.getByText(/연결 경기 0건 · 연결 마켓 0건/)).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "삭제" }).click();
+  await expect(page.getByText("DRAFT 시즌을 삭제했습니다.")).toBeVisible();
+
+  await page.getByRole("button", { name: "새 시즌" }).click();
+  await page.getByLabel("시즌 이름").fill("UI Season");
+  await page.getByLabel("시작일").fill("2027-04-10");
+  await page.getByLabel("종료일").fill("2027-04-01");
+  await page.getByLabel("초기 지급액").fill("1500");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(
+    page.getByText("시작일은 종료일보다 빨라야 합니다."),
+  ).toBeVisible();
+  await page.getByLabel("시작일").fill("2027-04-01");
+  await page.getByLabel("종료일").fill("2027-04-30");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByText("DRAFT 시즌을 생성했습니다.")).toBeVisible();
+
+  const uiSeason = page.getByLabel("UI Season 시즌");
+  await expect(uiSeason.getByText("활성화 예정: 3명 · 총 4,500코인")).toBeVisible();
+
+  const service = createLocalServiceClient();
+  const marketCleanup = await service
+    .from("markets")
+    .update({ status: "CANCELED" })
+    .eq("season_id", 1);
+  expect(marketCleanup.error).toBeNull();
+
+  await uiSeason.getByRole("button", { name: "시즌 시작" }).click();
+  const activateDialog = page.getByRole("dialog");
+  await expect(
+    activateDialog.getByText(/대상 회원 3명 · 1인당 1,500코인 · 총 4,500코인/),
+  ).toBeVisible();
+  await activateDialog.getByRole("button", { name: "활성화" }).click();
+  await expect(
+    page.getByText("새 시즌을 활성화하고 초기 코인을 지급했습니다."),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("UI Season 시즌").getByText("ACTIVE", { exact: true }),
+  ).toBeVisible();
+
+  const activated = await service
+    .from("seasons")
+    .select("id")
+    .eq("name", "UI Season")
+    .single();
+  expect(activated.error).toBeNull();
+  const [wallets, grants] = await Promise.all([
+    service
+      .from("wallets")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", activated.data!.id)
+      .eq("balance", 1500),
+    service
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", activated.data!.id)
+      .eq("type", "SEASON_GRANT")
+      .eq("amount", 1500),
+  ]);
+  expect(wallets.count).toBe(3);
+  expect(grants.count).toBe(3);
+
+  await page.screenshot({
+    path: testInfo.outputPath("issue-39-draft-season-policy.png"),
     fullPage: true,
   });
 });

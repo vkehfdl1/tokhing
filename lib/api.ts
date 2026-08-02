@@ -292,19 +292,6 @@ interface ListSeasonsRpcResponse {
   error?: string;
 }
 
-interface CreateSeasonRpcResponse {
-  success: boolean;
-  season?: SeasonRpcShape;
-  error?: string;
-}
-
-interface ActivateSeasonRpcResponse {
-  success: boolean;
-  season_id?: number | string;
-  users_granted?: number | string;
-  error?: string;
-}
-
 interface EndSeasonRpcResponse {
   success: boolean;
   season_id?: number | string;
@@ -921,58 +908,6 @@ export const listSeasons = async (): Promise<Season[]> => {
   }
 
   return (rpcResult.seasons ?? []).map(parseSeasonFromRpc);
-};
-
-export const createSeason = async (input: SeasonInput): Promise<Season> => {
-  if (!input.name || !input.name.trim()) {
-    throw new Error("시즌 이름이 비어 있습니다");
-  }
-
-  if (!input.startDate || !input.endDate) {
-    throw new Error("시즌 시작/종료 날짜가 비어 있습니다");
-  }
-
-  const data = await callAdminRpc("create_season", {
-    p_name: input.name,
-    p_start_date: input.startDate,
-    p_end_date: input.endDate,
-  });
-
-  const rpcResult = data as CreateSeasonRpcResponse | null;
-  if (!rpcResult?.success || !rpcResult.season) {
-    throw new Error(rpcResult?.error || "시즌 생성에 실패했습니다");
-  }
-
-  return parseSeasonFromRpc(rpcResult.season);
-};
-
-export const activateSeason = async (
-  seasonId: number
-): Promise<SeasonActivationResult> => {
-  if (!Number.isFinite(seasonId) || seasonId <= 0) {
-    throw new Error("유효하지 않은 시즌 ID입니다");
-  }
-
-  const data = await callAdminRpc("activate_season", {
-    p_season_id: seasonId,
-  });
-
-  const rpcResult = data as ActivateSeasonRpcResponse | null;
-  if (!rpcResult?.success) {
-    throw new Error(rpcResult?.error || "시즌 활성화에 실패했습니다");
-  }
-
-  const parsedSeasonId = Number(rpcResult.season_id ?? seasonId);
-  const usersGranted = Number(rpcResult.users_granted ?? 0);
-
-  if (!Number.isFinite(parsedSeasonId) || !Number.isFinite(usersGranted)) {
-    throw new Error("시즌 활성화 응답 형식이 올바르지 않습니다");
-  }
-
-  return {
-    seasonId: parsedSeasonId,
-    usersGranted,
-  };
 };
 
 export const endSeason = async (

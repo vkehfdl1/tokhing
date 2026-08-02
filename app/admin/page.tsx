@@ -2081,7 +2081,7 @@ function AdminDashboard({
         </div>
 
         {currentView === "seasons" ? (
-          <SeasonManagement />
+          <SeasonManagement onReauthenticate={controls.reauthenticate} />
         ) : currentView === "coins" ? (
           <CoinGrantManagement />
         ) : currentView === "password" ? (
