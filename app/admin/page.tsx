@@ -6,6 +6,7 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import WeeklyGrantManagement from "@/components/admin/WeeklyGrantManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -1698,7 +1699,11 @@ function PasswordResetManagement() {
   );
 }
 
-function CoinGrantManagement() {
+function CoinGrantManagement({
+  onReauthenticate,
+}: {
+  onReauthenticate: () => Promise<boolean>;
+}) {
   const isMobile = useIsMobile();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -1904,7 +1909,9 @@ function CoinGrantManagement() {
         </div>
       ) : null}
 
-      <Card className={isMobile ? "p-4" : "p-6"}>
+      <WeeklyGrantManagement onReauthenticate={onReauthenticate} />
+
+      <Card className="hidden">
         <div className={`${isMobile ? "space-y-3" : "flex items-center justify-between"}`}>
           <div>
             <h3 className="font-semibold text-black mb-2">pg_cron 자동 지급 상태</h3>
@@ -1937,7 +1944,7 @@ function CoinGrantManagement() {
         </div>
       </Card>
 
-      <Card className={isMobile ? "p-4" : "p-6"}>
+      <Card className="hidden">
         <h3 className="font-semibold text-black mb-2">전체 유저 코인 지급</h3>
         <p className="text-sm text-muted-foreground mb-4">
           distribute_weekly_coins(p_amount) RPC를 즉시 실행합니다.
@@ -2083,7 +2090,7 @@ function AdminDashboard({
         {currentView === "seasons" ? (
           <SeasonManagement />
         ) : currentView === "coins" ? (
-          <CoinGrantManagement />
+          <CoinGrantManagement onReauthenticate={controls.reauthenticate} />
         ) : currentView === "password" ? (
           <PasswordResetManagement />
         ) : currentView === "markets" ? (
