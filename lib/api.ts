@@ -1011,6 +1011,7 @@ export const getAllTeams = async () => {
   const { data, error } = await supabase
     .from("teams")
     .select("*")
+    .eq("is_active", true)
     .order("name");
 
   if (error) {
