@@ -8,6 +8,7 @@ delete process.env.NO_COLOR;
 export default defineConfig({
   testDir: "./tests/e2e",
   globalSetup: "./tests/e2e/global-setup.ts",
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,

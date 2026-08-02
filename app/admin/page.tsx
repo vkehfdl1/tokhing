@@ -5,6 +5,7 @@ import AdminAuditLog from "@/components/admin/AdminAuditLog";
 import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
+import MemberManagement from "@/components/admin/MemberManagement";
 import OperatorManagement from "@/components/admin/OperatorManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -2034,6 +2035,7 @@ function AdminDashboard({
     | "dashboard"
     | "operators"
     | "audit"
+    | "members"
     | "seasons"
     | "matches"
     | "coins"
@@ -2062,6 +2064,16 @@ function AdminDashboard({
 
   if (currentView === "audit") {
     return <AdminAuditLog onBack={() => setCurrentView("dashboard")} />;
+  }
+
+  if (currentView === "members") {
+    return (
+      <MemberManagement
+        operator={operator}
+        onBack={() => setCurrentView("dashboard")}
+        onReauthenticate={controls.reauthenticate}
+      />
+    );
   }
 
   if (currentView !== "dashboard") {
@@ -2176,6 +2188,23 @@ function AdminDashboard({
             </Button>
           </Card>
         )}
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            회원 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            회원 검색, 등록, 비활성화, CSV 반영, 지갑 복구를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("members")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
 
         <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
           <h3

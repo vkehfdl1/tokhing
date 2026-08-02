@@ -21,6 +21,7 @@ interface LoginRpcResponse {
   user_id?: string;
   username?: string;
   password_changed?: boolean;
+  session_version?: number;
   error?: string;
 }
 
@@ -787,6 +788,7 @@ export const login = async (
     user_id: data.user_id,
     username: data.username,
     password_changed: data.password_changed,
+    session_version: data.session_version,
   };
 };
 
