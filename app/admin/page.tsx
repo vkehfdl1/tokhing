@@ -7,6 +7,7 @@ import AdminAuthGate, {
 } from "@/components/admin/AdminAuthGate";
 import MemberManagement from "@/components/admin/MemberManagement";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import KboSyncManagement from "@/components/admin/KboSyncManagement";
 import TeamManagement from "@/components/admin/TeamManagement";
 import WeeklyGrantManagement from "@/components/admin/WeeklyGrantManagement";
 import { Input } from "@/components/ui/input";
@@ -2261,6 +2262,10 @@ function AdminDashboard({
             접속
           </Button>
         </Card>
+      </div>
+
+      <div className="mt-8">
+        <KboSyncManagement onReauthenticate={controls.reauthenticate} />
       </div>
 
       <div
