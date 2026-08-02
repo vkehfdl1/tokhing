@@ -9,6 +9,7 @@ import MemberManagement from "@/components/admin/MemberManagement";
 import OperatorManagement from "@/components/admin/OperatorManagement";
 import KboSyncManagement from "@/components/admin/KboSyncManagement";
 import TeamManagement from "@/components/admin/TeamManagement";
+import WalletRecovery from "@/components/admin/WalletRecovery";
 import WeeklyGrantManagement from "@/components/admin/WeeklyGrantManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -2083,6 +2084,8 @@ function AdminDashboard({
           현재 시각: {getCurrentKSTTime()}
         </div>
       </div>
+
+      <WalletRecovery onReauthenticate={controls.reauthenticate} />
 
       <div
         className={`grid gap-6 ${
