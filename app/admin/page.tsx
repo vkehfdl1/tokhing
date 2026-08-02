@@ -6,6 +6,7 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import TeamManagement from "@/components/admin/TeamManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -14,10 +15,8 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
-import {
-  createAdminTeams,
-  saveAdminGames,
-} from "@/lib/admin/client";
+import { saveAdminGames } from "@/lib/admin/client";
+import { resolveAdminTeamMappings } from "@/lib/admin/team-client";
 import type { AdminOperator } from "@/lib/admin/types";
 import {
   adminGrantCoins,
@@ -104,38 +103,6 @@ const formatDateTimeLabel = (date: string, time: string | null) => {
 
 const normalizeTeamKey = (value: string) => value.trim().toLowerCase();
 
-const createUniqueShortName = (
-  teamName: string,
-  usedShortNames: Set<string>
-): string => {
-  const sanitized = teamName.replace(/\s+/g, "").replace(/[^0-9A-Za-z가-힣]/g, "");
-  const base = (sanitized || "TEAM").slice(0, 10);
-
-  let candidate = base;
-  let suffix = 2;
-  while (usedShortNames.has(normalizeTeamKey(candidate))) {
-    const suffixText = String(suffix);
-    const prefix = base.slice(0, Math.max(1, 10 - suffixText.length));
-    candidate = `${prefix}${suffixText}`.slice(0, 10);
-    suffix += 1;
-  }
-
-  usedShortNames.add(normalizeTeamKey(candidate));
-  return candidate;
-};
-
-const createUniqueRandomColor = (usedColors: Set<string>): string => {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const random = Math.floor(Math.random() * 0xffffff);
-    const color = `#${random.toString(16).toUpperCase().padStart(6, "0")}`;
-    if (!usedColors.has(color)) {
-      usedColors.add(color);
-      return color;
-    }
-  }
-  throw new Error("고유한 팀 컬러 생성에 실패했습니다.");
-};
-
 // Match Management Component
 function MatchManagement({
   selectedDate,
@@ -163,6 +130,7 @@ function MatchManagement({
     const { data, error } = await supabase
       .from("teams")
       .select("*")
+      .eq("is_active", true)
       .order("name");
 
     if (error) {
@@ -265,6 +233,7 @@ function MatchManagement({
   };
 
   const autoFillMatchesBySource = async (
+    sourceCode: "KBO" | "WBC",
     sourceLabel: string,
     fetchMatches: () => Promise<CrawledMatch[] | null>
   ) => {
@@ -278,73 +247,30 @@ function MatchManagement({
         return;
       }
 
-      // First, get team name to ID mappings
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("teams")
-        .select("id, name, short_name, team_color");
-
-      if (teamsError) {
-        console.error("Error fetching teams:", teamsError);
-        alert("Error fetching team data.");
-        return;
-      }
-
-      const currentTeams: Team[] = (teamsData ?? []) as Team[];
-      const teamNameToId = new Map<string, number>();
-      const registerTeamAliases = (team: Team) => {
-        teamNameToId.set(normalizeTeamKey(team.name), team.id);
-        teamNameToId.set(normalizeTeamKey(team.short_name), team.id);
-      };
-
-      currentTeams.forEach(registerTeamAliases);
-
-      const missingTeamNames = [
+      const externalTeamNames = [
         ...new Set(
           crawledData
             .flatMap((match) => [match.homeTeam, match.awayTeam])
             .map((name) => name.trim())
             .filter((name) => name.length > 0)
-            .filter((name) => !teamNameToId.has(normalizeTeamKey(name)))
         ),
       ];
-
-      let insertedTeamsCount = 0;
-      if (missingTeamNames.length > 0) {
-        const usedShortNames = new Set(
-          currentTeams.map((team) => normalizeTeamKey(team.short_name))
-        );
-        const usedColors = new Set(
-          currentTeams
-            .map((team) => team.team_color)
-            .filter(
-              (color): color is string =>
-                typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)
-            )
-            .map((color) => color.toUpperCase())
-        );
-
-        const newTeamsPayload = missingTeamNames.map((name) => ({
-          name,
-          short_name: createUniqueShortName(name, usedShortNames),
-          team_color: createUniqueRandomColor(usedColors),
-        }));
-
-        const inserted = (await createAdminTeams(newTeamsPayload)) as Team[];
-        insertedTeamsCount = inserted.length;
-        inserted.forEach(registerTeamAliases);
-
-        if (inserted.length > 0) {
-          setTeams((prev) => {
-            const byId = new Map<number, Team>();
-            [...prev, ...inserted].forEach((team) => {
-              byId.set(team.id, team);
-            });
-            return Array.from(byId.values()).sort((a, b) =>
-              a.name.localeCompare(b.name, "ko-KR")
-            );
-          });
-        }
-      }
+      const mappings = await resolveAdminTeamMappings(
+        sourceCode,
+        externalTeamNames,
+      );
+      const teamNameToId = new Map(
+        mappings
+          .filter(
+            (mapping): mapping is typeof mapping & { team_id: number } =>
+              mapping.mapping_status === "MAPPED" &&
+              typeof mapping.team_id === "number",
+          )
+          .map((mapping) => [
+            normalizeTeamKey(mapping.external_name),
+            mapping.team_id,
+          ]),
+      );
 
       // Convert crawled data to Game objects
       const crawledGames: Game[] = [];
@@ -360,12 +286,15 @@ function MatchManagement({
         if (!awayTeamId) {
           unmatchedTeams.push(match.awayTeam);
         }
+        if (!homeTeamId || !awayTeamId) {
+          return;
+        }
 
         crawledGames.push({
           game_date: targetDate,
           game_time: match.startTime,
-          home_team_id: homeTeamId || 0,
-          away_team_id: awayTeamId || 0,
+          home_team_id: homeTeamId,
+          away_team_id: awayTeamId,
           home_pitcher: match.homePitcher || "",
           away_pitcher: match.awayPitcher || "",
           home_score: match.score ? match.score.home || 0 : 0,
@@ -427,15 +356,11 @@ function MatchManagement({
         newMatchesCount - updatedMatchesCount
       }개의 새로운 경기가 추가되었고, ${updatedMatchesCount}개의 기존 경기가 업데이트되었습니다.`;
 
-      if (insertedTeamsCount > 0) {
-        message += `\n\n팀 자동 매핑: ${insertedTeamsCount}개 팀을 teams에 신규 등록했습니다.`;
-      }
-
       if (unmatchedTeams.length > 0) {
         const uniqueUnmatchedTeams = [...new Set(unmatchedTeams)];
-        message += `\n\n경고: 자동 매핑 이후에도 일부 팀을 찾을 수 없어 ID 0으로 설정했습니다: ${uniqueUnmatchedTeams.join(
-          ", "
-        )}`;
+        message += `\n\n승인 필요: ${uniqueUnmatchedTeams.join(
+          ", ",
+        )}. 임의 팀을 만들지 않고 팀 관리의 승인 대기 목록으로 보냈으며, 해당 경기는 제외했습니다.`;
       }
 
       message += "\n\n변경 사항을 검토하고 저장해 주세요.";
@@ -449,11 +374,13 @@ function MatchManagement({
   };
 
   const autoFillMatches = async () => {
-    await autoFillMatchesBySource("KBO", () => getGameData(targetDate));
+    await autoFillMatchesBySource("KBO", "KBO", () =>
+      getGameData(targetDate),
+    );
   };
 
   const autoFillMatchesFromNaverSports = async () => {
-    await autoFillMatchesBySource("네이버 스포츠", () =>
+    await autoFillMatchesBySource("WBC", "네이버 스포츠", () =>
       getNaverWbcGameData(targetDate)
     );
   };
@@ -2034,6 +1961,7 @@ function AdminDashboard({
     | "dashboard"
     | "operators"
     | "audit"
+    | "teams"
     | "seasons"
     | "matches"
     | "coins"
@@ -2082,6 +2010,8 @@ function AdminDashboard({
 
         {currentView === "seasons" ? (
           <SeasonManagement />
+        ) : currentView === "teams" ? (
+          <TeamManagement onReauthenticate={controls.reauthenticate} />
         ) : currentView === "coins" ? (
           <CoinGrantManagement />
         ) : currentView === "password" ? (
@@ -2141,6 +2071,23 @@ function AdminDashboard({
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
         }`}
       >
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            팀 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            팀 원장, 소스 별칭, 승인 대기 매핑과 중복 병합을 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("teams")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}

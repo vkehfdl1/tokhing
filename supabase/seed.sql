@@ -32,6 +32,12 @@ VALUES
   (10, '한화 이글스', '한화', '#F37321', NOW())
 ON CONFLICT (id) DO NOTHING;
 
+SELECT setval(
+  pg_get_serial_sequence('public.teams', 'id'),
+  (SELECT MAX(id) FROM public.teams),
+  true
+);
+
 -- 2) 테스트 유저 3명
 INSERT INTO public.users (id, student_number, username, phone_number, department, type, favorite_team_id, password_hash, password_changed, created_at, updated_at)
 VALUES
