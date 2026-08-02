@@ -1,6 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import AdminAuditLog from "@/components/admin/AdminAuditLog";
+import AdminAuthGate, {
+  type AdminControls,
+} from "@/components/admin/AdminAuthGate";
+import OperatorManagement from "@/components/admin/OperatorManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,6 +14,11 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
+import {
+  createAdminTeams,
+  saveAdminGames,
+} from "@/lib/admin/client";
+import type { AdminOperator } from "@/lib/admin/types";
 import {
   adminGrantCoins,
   adminResetPassword,
@@ -319,20 +329,7 @@ function MatchManagement({
           team_color: createUniqueRandomColor(usedColors),
         }));
 
-        const { data: insertedTeams, error: insertTeamsError } = await supabase
-          .from("teams")
-          .insert(newTeamsPayload)
-          .select("id, name, short_name, team_color");
-
-        if (insertTeamsError) {
-          console.error("Error auto-mapping missing teams:", insertTeamsError);
-          alert(
-            `누락 팀 자동 매핑 중 오류가 발생했습니다: ${insertTeamsError.message}`
-          );
-          return;
-        }
-
-        const inserted = (insertedTeams ?? []) as Team[];
+        const inserted = (await createAdminTeams(newTeamsPayload)) as Team[];
         insertedTeamsCount = inserted.length;
         inserted.forEach(registerTeamAliases);
 
@@ -474,41 +471,10 @@ function MatchManagement({
       const existingGameIds = existingGames
         .map((game) => Number(game.id))
         .filter((gameId) => Number.isFinite(gameId) && gameId > 0);
-      const insertedGameIds: number[] = [];
-
-      // Update existing games
-      for (const game of existingGames) {
-        const { id, ...gameData } = game;
-        const { error } = await supabase
-          .from("games")
-          .update(gameData)
-          .eq("id", id);
-
-        if (error) {
-          console.error("Error updating game:", error);
-          throw error;
-        }
-      }
-
-      // Insert new games
-      if (newGames.length > 0) {
-        const { data, error } = await supabase
-          .from("games")
-          .insert(newGames)
-          .select("id");
-
-        if (error) {
-          console.error("Error inserting games:", error);
-          throw error;
-        }
-
-        (data ?? []).forEach((row) => {
-          const parsed = Number((row as { id: number | string }).id);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            insertedGameIds.push(parsed);
-          }
-        });
-      }
+      const insertedGameIds = await saveAdminGames([
+        ...existingGames,
+        ...newGames,
+      ]);
 
       const gameIdsForMarketSync = [...existingGameIds, ...insertedGameIds];
       const marketSyncResult = await ensureMarketsForGames(
@@ -2056,10 +2022,18 @@ function CoinGrantManagement() {
 }
 
 // Admin Dashboard Component
-function AdminDashboard() {
+function AdminDashboard({
+  operator,
+  controls,
+}: {
+  operator: AdminOperator;
+  controls: AdminControls;
+}) {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
+    | "operators"
+    | "audit"
     | "seasons"
     | "matches"
     | "coins"
@@ -2075,6 +2049,20 @@ function AdminDashboard() {
     const kst = new Date(utc + 9 * 3600000);
     return kst.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
   };
+
+  if (currentView === "operators") {
+    return (
+      <OperatorManagement
+        currentOperator={operator}
+        onBack={() => setCurrentView("dashboard")}
+        onReauthenticate={controls.reauthenticate}
+      />
+    );
+  }
+
+  if (currentView === "audit") {
+    return <AdminAuditLog onBack={() => setCurrentView("dashboard")} />;
+  }
 
   if (currentView !== "dashboard") {
     return (
@@ -2118,13 +2106,10 @@ function AdminDashboard() {
         >
           <Button
             variant="outline"
-            onClick={() => {
-              sessionStorage.removeItem("admin_authenticated");
-              window.location.reload();
-            }}
+            onClick={() => void controls.logout()}
             className={isMobile ? "w-full max-w-xs" : ""}
           >
-            Logout
+            로그아웃
           </Button>
         </div>
       </div>
@@ -2139,10 +2124,10 @@ function AdminDashboard() {
             isMobile ? "text-2xl" : "text-3xl"
           }`}
         >
-          ToKHin&apos; 관리자 대시보드
+          운영 대시보드
         </h1>
         <p className="text-muted-foreground">
-          ToKHin&apos; 관리 대시보드에 오신 것을 환영합니다.
+          {operator.displayName} · {operator.role}
         </p>
         <div className="text-sm text-muted-foreground mt-2">
           현재 시각: {getCurrentKSTTime()}
@@ -2156,6 +2141,42 @@ function AdminDashboard() {
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
         }`}
       >
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            운영자 계정 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            운영자 역할, 활성 상태, 임시 비밀번호를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("operators")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        {operator.role !== "VIEWER" && (
+          <Card className={isMobile ? "p-4" : "p-6"}>
+            <h3
+              className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+            >
+              작업 감사 로그
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              운영자 변경 작업의 성공·실패 이력을 확인합니다.
+            </p>
+            <Button
+              onClick={() => setCurrentView("audit")}
+              className={isMobile ? "w-full" : ""}
+            >
+              접속
+            </Button>
+          </Card>
+        )}
+
         <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
           <h3
             className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
@@ -2264,145 +2285,39 @@ function AdminDashboard() {
           isMobile ? "flex justify-center" : "flex justify-end"
         }`}
       >
-        <Button
-          variant="outline"
-          onClick={() => {
-            sessionStorage.removeItem("admin_authenticated");
-            window.location.reload();
-          }}
-          className={isMobile ? "w-full max-w-xs" : ""}
-        >
-          로그아웃
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// Login Form Component
-function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Hash function using Web Crypto API
-  async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hash));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // Hash the input password
-      const hashedInput = await hashPassword(password);
-
-      // Get the stored hash from environment variable
-      // In production, you'll set NEXT_PUBLIC_ADMIN_PASSWORD_HASH in your environment
-      const storedHash = process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH;
-
-      if (!storedHash) {
-        setError("Admin authentication not configured");
-        setIsLoading(false);
-        return;
-      }
-
-      // Compare hashes
-      if (hashedInput === storedHash) {
-        // Store authentication state in session storage
-        sessionStorage.setItem("admin_authenticated", "true");
-        onAuthenticated();
-      } else {
-        setError("Invalid password");
-      }
-    } catch (err) {
-      console.error("Authentication error:", err);
-      setError("Authentication failed");
-    }
-
-    setIsLoading(false);
-    setPassword(""); // Clear password field for security
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">ToKHin&apos; 관리</h1>
-          <p className="text-muted-foreground">
-            프런트 인증을 위해 비밀번호를 입력하세요
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Input
-              type="password"
-              placeholder="운영진 비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-              {error}
-            </div>
-          )}
-
+        <div className="grid w-full max-w-sm grid-cols-3 gap-2">
           <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || !password}
+            variant="outline"
+            onClick={() => void controls.reauthenticate()}
+            className="flex-1"
           >
-            {isLoading ? "인증 중..." : "프런트 인증하기"}
+            재인증
           </Button>
-        </form>
-
-        <div className="mt-6 text-xs text-muted-foreground">
-          <p>⚠️ 이 메뉴는 루킹 프런트만 접근할 수 있습니다.</p>
+          <Button
+            variant="outline"
+            onClick={() => void controls.changePassword()}
+          >
+            비밀번호 변경
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void controls.logout()}
+          >
+            로그아웃
+          </Button>
         </div>
-      </Card>
+      </div>
     </div>
   );
 }
 
 // Main Admin Page Component
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check if user is already authenticated
-    const authenticated =
-      sessionStorage.getItem("admin_authenticated") === "true";
-    setIsAuthenticated(authenticated);
-    setIsLoading(false);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
-
-  return <AdminDashboard />;
+  return (
+    <AdminAuthGate>
+      {(operator, controls) => (
+        <AdminDashboard operator={operator} controls={controls} />
+      )}
+    </AdminAuthGate>
+  );
 }
