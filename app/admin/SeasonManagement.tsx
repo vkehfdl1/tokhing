@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import SeasonCard from "@/components/admin/SeasonCard";
 import SeasonCloseConsole from "@/components/admin/SeasonCloseConsole";
+import SeasonIncidentRecovery from "@/components/admin/SeasonIncidentRecovery";
 import SeasonConfirm, {
   type SeasonConfirmation,
 } from "@/components/admin/SeasonConfirm";
@@ -183,6 +184,7 @@ export function SeasonManagement({ onReauthenticate }: Props) {
           onClose={() => setConfirmation(null)}
         />
       ) : null}
+      <SeasonIncidentRecovery />
     </div>
   );
 }
