@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
 
 test("managed operator login protects the dashboard @issue-36", async ({
   page,
@@ -42,6 +43,61 @@ test("managed operator login protects the dashboard @issue-36", async ({
   await expect(page.getByText("운영자 추가").first()).toBeVisible();
   await page.screenshot({
     path: testInfo.outputPath("issue-36-owner-dashboard.png"),
+    fullPage: true,
+  });
+});
+
+test("KBO sync operations are available @issue-42", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/admin");
+  await page.getByPlaceholder("운영자 아이디").fill("owner");
+  await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
+  await page.getByRole("button", { name: "로그인" }).click();
+  await expect(page.getByRole("heading", { name: "KBO 동기화" })).toBeVisible();
+  await expect(page.getByText("Vault secret: 미설정")).toBeVisible();
+
+  page.on("dialog", async (dialog) => {
+    await dialog.accept("OwnerPass!234");
+  });
+  const seed = page.getByLabel("DAILY_SEED");
+  await seed.getByRole("button", { name: "즉시 실행" }).click();
+  await expect(page.getByText(/MISSING_VAULT_SECRET/)).toBeVisible();
+
+  const service = createLocalServiceClient();
+  const secret = await service
+    .from("kbo_sync_secret_status")
+    .update({ configured: true, last_rotated_at: new Date().toISOString() })
+    .eq("id", true);
+  expect(secret.error).toBeNull();
+  await seed.getByRole("button", { name: "동일 입력 재시도" }).click();
+  await expect(page.getByText("동기화를 완료했습니다.")).toBeVisible();
+
+  const refresh = page.getByLabel("HOURLY_REFRESH");
+  await refresh.getByRole("button", { name: "즉시 실행" }).click();
+  await expect(page.getByText("동기화를 완료했습니다.")).toBeVisible();
+
+  await seed.getByLabel("DAILY_SEED KST 시간").fill("08:30");
+  await seed.getByRole("button", { name: "일시정지" }).click();
+  await expect(seed.getByText(/PAUSED/)).toBeVisible();
+
+  const actions = await service
+    .from("admin_audit_logs")
+    .select("action")
+    .in("action", [
+      "KBO_SYNC_JOB_UPDATE",
+      "KBO_SYNC_MANUAL_RUN",
+      "KBO_SYNC_RETRY",
+    ]);
+  expect(new Set(actions.data?.map((row) => row.action))).toEqual(
+    new Set([
+      "KBO_SYNC_JOB_UPDATE",
+      "KBO_SYNC_MANUAL_RUN",
+      "KBO_SYNC_RETRY",
+    ]),
+  );
+  await page.screenshot({
+    path: testInfo.outputPath("issue-42-kbo-sync.png"),
     fullPage: true,
   });
 });
