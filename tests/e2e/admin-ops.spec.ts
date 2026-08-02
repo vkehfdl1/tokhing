@@ -253,3 +253,88 @@ test("draft season policy management is available @issue-39", async ({
     fullPage: true,
   });
 });
+
+test("season close readiness processing is available @issue-40", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/admin");
+  await page.getByPlaceholder("운영자 아이디").fill("owner");
+  await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
+  await page.getByRole("button", { name: "로그인" }).click();
+
+  const service = createLocalServiceClient();
+  const canceledBlocker = await service
+    .from("markets")
+    .update({ status: "OPEN" })
+    .eq("id", 5);
+  expect(canceledBlocker.error).toBeNull();
+
+  const seasonCard = page
+    .getByRole("heading", { name: "시즌 관리" })
+    .locator("..");
+  await seasonCard.getByRole("button", { name: "접속" }).click();
+  await expect(
+    page.getByRole("heading", { name: "시즌 종료 준비" }),
+  ).toBeVisible();
+
+  await expect(page.getByText("종료 차단: 미정산 마켓 5건")).toBeVisible();
+  await expect(page.getByText("1 / 3")).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "CSV 다운로드" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    "season-1-close-readiness.csv",
+  );
+
+  await page.getByRole("button", { name: "다음" }).click();
+  await page.getByRole("button", { name: "다음" }).click();
+  const canceledCard = page.getByLabel("마켓 5");
+  await expect(canceledCard.getByText("취소 권장")).toBeVisible();
+  await expect(
+    canceledCard.getByLabel("마켓 5 작업").locator("option"),
+  ).toHaveCount(1);
+
+  page.on("dialog", async (dialog) => {
+    await dialog.accept(
+      dialog.type() === "prompt" ? "OwnerPass!234" : undefined,
+    );
+  });
+  await page.getByRole("button", { name: "모든 차단 마켓 처리" }).click();
+  await expect(
+    page.getByText("처리 완료: 성공 5건 · 실패 0건"),
+  ).toBeVisible();
+  await expect(page.getByText("종료 차단: 미정산 마켓 3건")).toBeVisible();
+
+  await page.getByRole("button", { name: "모든 차단 마켓 처리" }).click();
+  await expect(
+    page.getByText("처리 완료: 성공 3건 · 실패 0건"),
+  ).toBeVisible();
+  await expect(page.getByText("종료 및 다음 시즌 활성화 가능")).toBeVisible();
+
+  await page.screenshot({
+    path: testInfo.outputPath("issue-40-close-ready-console.png"),
+    fullPage: true,
+  });
+
+  const closeButton = page.getByRole("button", { name: "시즌 종료 확정" });
+  await expect(closeButton).toBeEnabled();
+  await closeButton.click();
+  await expect(
+    page.getByLabel("Season 1 시즌").getByText("ARCHIVED", { exact: true }),
+  ).toBeVisible();
+
+  const audit = await service
+    .from("admin_audit_logs")
+    .select("action")
+    .in("action", ["SEASON_MARKET_BULK_PROCESS", "SEASON_CLOSE"]);
+  expect(audit.error).toBeNull();
+  expect(
+    new Set(audit.data?.map((row) => row.action)),
+  ).toEqual(new Set(["SEASON_MARKET_BULK_PROCESS", "SEASON_CLOSE"]));
+
+  await page.screenshot({
+    path: testInfo.outputPath("issue-40-season-close-readiness.png"),
+    fullPage: true,
+  });
+});
