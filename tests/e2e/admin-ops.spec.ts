@@ -45,3 +45,4 @@ test("managed operator login protects the dashboard @issue-36", async ({
     fullPage: true,
   });
 });
+test("match correction is available @issue-44",async({page})=>{await page.goto("/admin");await page.getByPlaceholder("운영자 아이디").fill("owner");await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");await page.getByRole("button",{name:"로그인"}).click();await expect(page.getByRole("heading",{name:"경기 수정"})).toBeVisible();});
