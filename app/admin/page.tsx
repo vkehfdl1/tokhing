@@ -6,6 +6,7 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import SettlementRecovery from "@/components/admin/SettlementRecovery";
 import MatchCorrection from "@/components/admin/MatchCorrection";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -2136,6 +2137,7 @@ function AdminDashboard({
       </div>
 
       <MatchCorrection />
+      <SettlementRecovery />
 
       <div
         className={`grid gap-6 ${
