@@ -1,4 +1,5 @@
 import { formatKstDate, normalizeToKstDateString } from "@/lib/kst";
+import { callAdminRpc } from "@/lib/admin/client";
 import { createClient } from "@/lib/supabase/client";
 
 const supabase = createClient();
@@ -931,16 +932,11 @@ export const createSeason = async (input: SeasonInput): Promise<Season> => {
     throw new Error("시즌 시작/종료 날짜가 비어 있습니다");
   }
 
-  const { data, error } = await supabase.rpc("create_season", {
+  const data = await callAdminRpc("create_season", {
     p_name: input.name,
     p_start_date: input.startDate,
     p_end_date: input.endDate,
   });
-
-  if (error) {
-    console.error("Error calling create_season RPC:", error);
-    throw new Error("시즌 생성 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as CreateSeasonRpcResponse | null;
   if (!rpcResult?.success || !rpcResult.season) {
@@ -957,14 +953,9 @@ export const activateSeason = async (
     throw new Error("유효하지 않은 시즌 ID입니다");
   }
 
-  const { data, error } = await supabase.rpc("activate_season", {
+  const data = await callAdminRpc("activate_season", {
     p_season_id: seasonId,
   });
-
-  if (error) {
-    console.error("Error calling activate_season RPC:", error);
-    throw new Error("시즌 활성화 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as ActivateSeasonRpcResponse | null;
   if (!rpcResult?.success) {
@@ -991,14 +982,9 @@ export const endSeason = async (
     throw new Error("유효하지 않은 시즌 ID입니다");
   }
 
-  const { data, error } = await supabase.rpc("end_season", {
+  const data = await callAdminRpc("end_season", {
     p_season_id: seasonId,
   });
-
-  if (error) {
-    console.error("Error calling end_season RPC:", error);
-    throw new Error("시즌 종료 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as EndSeasonRpcResponse | null;
   if (!rpcResult?.success) {
@@ -1972,25 +1958,12 @@ export const ensureMarketsForGames = async (
 
   const createdMarketIds: number[] = [];
   for (const gameId of missingGameIds) {
-    const { data, error } = await supabase.rpc("create_market", {
+    const data = await callAdminRpc("create_market", {
       p_game_id: gameId,
       p_initial_home: homePrice,
       p_initial_away: awayPrice,
       p_initial_draw: drawPrice,
     });
-
-    if (error) {
-      const loweredMessage = error.message.toLowerCase();
-      const isDuplicateError =
-        loweredMessage.includes("duplicate") || loweredMessage.includes("unique");
-
-      if (isDuplicateError) {
-        continue;
-      }
-
-      console.error("Error creating market for game:", { gameId, error });
-      throw new Error("마켓 자동 생성 중 오류가 발생했습니다");
-    }
 
     const marketId = Number(data);
     if (!Number.isFinite(marketId) || marketId <= 0) {
@@ -2048,15 +2021,10 @@ export const settleMarket = async (
     );
   }
 
-  const { data, error } = await supabase.rpc("settle_market", {
+  const data = await callAdminRpc("settle_market", {
     p_market_id: marketId,
     p_result: result,
   });
-
-  if (error) {
-    console.error("Error calling settle_market RPC:", error);
-    throw new Error("마켓 정산 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as SettleMarketRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2086,14 +2054,9 @@ export const closeMarket = async (
     throw new Error("유효하지 않은 마켓 ID입니다");
   }
 
-  const { data, error } = await supabase.rpc("close_market", {
+  const data = await callAdminRpc("close_market", {
     p_market_id: marketId,
   });
-
-  if (error) {
-    console.error("Error calling close_market RPC:", error);
-    throw new Error("마켓 종료 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as MarketStatusRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2118,14 +2081,9 @@ export const cancelMarket = async (
     throw new Error("유효하지 않은 마켓 ID입니다");
   }
 
-  const { data, error } = await supabase.rpc("cancel_market", {
+  const data = await callAdminRpc("cancel_market", {
     p_market_id: marketId,
   });
-
-  if (error) {
-    console.error("Error calling cancel_market RPC:", error);
-    throw new Error("마켓 취소 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as MarketStatusRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2172,14 +2130,9 @@ export const updateLiquidityB = async (
     throw new Error("b값은 0보다 큰 숫자여야 합니다");
   }
 
-  const { data, error } = await supabase.rpc("set_liquidity_b", {
+  const data = await callAdminRpc("set_liquidity_b", {
     p_b: nextB,
   });
-
-  if (error) {
-    console.error("Error calling set_liquidity_b RPC:", error);
-    throw new Error("b값 변경 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as LiquiditySettingRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2247,14 +2200,9 @@ export const getWalletBalance = async (
 };
 
 export const distributeWeeklyCoins = async (amount = 300) => {
-  const { data, error } = await supabase.rpc("distribute_weekly_coins", {
+  const data = await callAdminRpc("distribute_weekly_coins", {
     p_amount: amount,
   });
-
-  if (error) {
-    console.error("Error calling distribute_weekly_coins RPC:", error);
-    throw new Error("전체 코인 지급 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as WeeklyCoinsRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2269,15 +2217,10 @@ export const distributeWeeklyCoins = async (amount = 300) => {
 };
 
 export const adminGrantCoins = async (userId: string, amount: number) => {
-  const { data, error } = await supabase.rpc("admin_grant_coins", {
+  const data = await callAdminRpc("admin_grant_coins", {
     p_user_id: userId,
     p_amount: amount,
   });
-
-  if (error) {
-    console.error("Error calling admin_grant_coins RPC:", error);
-    throw new Error("코인 지급 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as AdminGrantCoinsRpcResponse | null;
   if (!rpcResult?.success) {
@@ -2307,14 +2250,9 @@ export const getUsersForAdmin = async (): Promise<AdminUser[]> => {
 };
 
 export const adminResetPassword = async (studentNumber: number) => {
-  const { data, error } = await supabase.rpc("admin_reset_password", {
+  const data = await callAdminRpc("admin_reset_password", {
     p_student_number: studentNumber,
   });
-
-  if (error) {
-    console.error("Error calling admin_reset_password RPC:", error);
-    throw new Error("비밀번호 초기화 중 오류가 발생했습니다");
-  }
 
   const rpcResult = data as {
     success: boolean;
