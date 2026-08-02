@@ -8,6 +8,7 @@ import AdminAuthGate, {
 import MemberManagement from "@/components/admin/MemberManagement";
 import OperatorManagement from "@/components/admin/OperatorManagement";
 import KboSyncManagement from "@/components/admin/KboSyncManagement";
+import OperationsSearch from "@/components/admin/OperationsSearch";
 import SettlementRecovery from "@/components/admin/SettlementRecovery";
 import MatchCorrection from "@/components/admin/MatchCorrection";
 import TeamManagement from "@/components/admin/TeamManagement";
@@ -502,6 +503,7 @@ function MatchManagement({
           </Button>
         </div>
       </div>
+      <OperationsSearch />
 
       {saveMessage ? (
         <div
