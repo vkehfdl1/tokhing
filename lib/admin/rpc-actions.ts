@@ -4,18 +4,6 @@ const EmptyArgs = z.object({}).strict();
 
 export const AdminRpcRequestSchema = z.discriminatedUnion("action", [
   z.object({
-    action: z.literal("create_season"),
-    args: z.object({
-      p_name: z.string().min(1),
-      p_start_date: z.iso.date(),
-      p_end_date: z.iso.date(),
-    }),
-  }),
-  z.object({
-    action: z.literal("activate_season"),
-    args: z.object({ p_season_id: z.number().int().positive() }),
-  }),
-  z.object({
     action: z.literal("end_season"),
     args: z.object({ p_season_id: z.number().int().positive() }),
   }),
@@ -71,7 +59,6 @@ export const AdminRpcRequestSchema = z.discriminatedUnion("action", [
 export type AdminRpcRequest = z.infer<typeof AdminRpcRequestSchema>;
 
 const CRITICAL_ACTIONS = new Set<AdminRpcRequest["action"]>([
-  "activate_season",
   "end_season",
   "settle_market",
   "cancel_market",

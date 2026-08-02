@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
 
 test("managed operator login protects the dashboard @issue-36", async ({
   page,
@@ -46,6 +47,7 @@ test("managed operator login protects the dashboard @issue-36", async ({
   });
 });
 
+<<<<<<< HEAD
 test("member lifecycle management is available @issue-37", async ({
   browser,
   page,
@@ -149,7 +151,7 @@ test("member lifecycle management is available @issue-37", async ({
   });
 });
 
-test("team master data management is available @issue-38", async ({
+test("draft season policy management is available @issue-39", async ({
   page,
 }, testInfo) => {
   await page.goto("/admin");
@@ -157,126 +159,97 @@ test("team master data management is available @issue-38", async ({
   await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
   await page.getByRole("button", { name: "로그인" }).click();
 
-  const teamCard = page
-    .getByRole("heading", { name: "팀 관리" })
+  const seasonCard = page
+    .getByRole("heading", { name: "시즌 관리" })
     .locator("..");
-  await teamCard.getByRole("button", { name: "접속" }).click();
+  await seasonCard.getByRole("button", { name: "접속" }).click();
+  await expect(page.getByText("초기 지급액 1,000코인").first()).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "팀 관리" }),
+    page.getByText(
+      "ACTIVE와 ARCHIVED 시즌의 이름, 기간, 초기 지급액은 잠겨 있습니다.",
+    ).first(),
   ).toBeVisible();
-
-  await page.getByLabel("팀 이름").fill("테스트 원본팀");
-  await page.getByLabel("약칭").fill("TSRC");
-  await page.getByLabel("팀 색상", { exact: true }).fill("#112244");
-  await page.getByRole("button", { name: "팀 저장" }).click();
-  await expect(page.getByText("팀을 등록했습니다.")).toBeVisible();
-
-  await page.getByLabel("팀 이름").fill("테스트 유지팀");
-  await page.getByLabel("약칭").fill("TDST");
-  await page.getByLabel("팀 색상", { exact: true }).fill("#335566");
-  await page.getByRole("button", { name: "팀 저장" }).click();
-  await expect(page.getByText("팀을 등록했습니다.")).toBeVisible();
-
-  await page.getByLabel("팀 이름").fill("약칭 충돌팀");
-  await page.getByLabel("약칭").fill("TDST");
-  await page.getByLabel("팀 색상", { exact: true }).fill("#778899");
-  await page.getByRole("button", { name: "팀 저장" }).click();
-  await expect(
-    page.getByText("팀 이름, 약칭 또는 같은 소스의 별칭이 이미 사용 중입니다."),
-  ).toBeVisible();
-
-  await page.getByRole("button", { name: /테스트 원본팀.*TSRC/ }).click();
-  await page.getByLabel("팀 이름").fill("테스트 원본팀 수정");
-  await page.getByRole("button", { name: "팀 저장" }).click();
-  await expect(page.getByText("팀 정보를 수정했습니다.")).toBeVisible();
-  await page.getByLabel("소스").selectOption("WBC");
-  await page.getByLabel("별칭").fill("Test Source");
-  await page.getByRole("button", { name: "별칭 추가" }).click();
-  await expect(page.getByText("소스 별칭을 추가했습니다.")).toBeVisible();
-
-  await page.getByRole("button", { name: /승인 대기/ }).click();
-  await page.getByLabel("소스").selectOption("WBC");
-  await page
-    .getByLabel("외부 팀명")
-    .fill("Test Source, Unmapped Nine");
-  await page.getByRole("button", { name: "매핑 미리보기" }).click();
-  const preview = page.getByLabel("매핑 미리보기 결과");
-  await expect(preview.getByText(/자동 매핑 · 테스트 원본팀 수정/)).toBeVisible();
-  await expect(preview.getByText("승인 필요")).toBeVisible();
-
-  const namesBeforeApproval = await page.evaluate(async () => {
-    const response = await fetch("/api/admin/teams");
-    const body = (await response.json()) as {
-      teams: Array<{ name: string }>;
-    };
-    return body.teams.map((team) => team.name);
-  });
-  expect(namesBeforeApproval).not.toContain("Unmapped Nine");
-
-  await page.getByLabel("기존 팀에 매핑").selectOption({
-    label: "테스트 유지팀 (TDST)",
-  });
-  await page.getByRole("button", { name: "매핑 승인" }).click();
-  await expect(
-    page.getByText("Unmapped Nine 매핑을 승인했습니다."),
-  ).toBeVisible();
-
-  const teamIds = await page.evaluate(async () => {
-    const response = await fetch("/api/admin/teams");
-    const body = (await response.json()) as {
-      teams: Array<{ id: number; name: string }>;
-    };
-    return {
-      source: body.teams.find((team) => team.name === "테스트 원본팀 수정")!
-        .id,
-      target: body.teams.find((team) => team.name === "테스트 유지팀")!.id,
-    };
-  });
-  const gameSave = await page.evaluate(async ({ source, target }) => {
-    const date = new Date();
-    date.setDate(date.getDate() + 14);
-    const response = await fetch("/api/admin/game-data", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "save_games",
-        games: [
-          {
-            game_date: date.toISOString().slice(0, 10),
-            game_time: "18:30",
-            home_team_id: source,
-            away_team_id: 1,
-            home_pitcher: "",
-            away_pitcher: "",
-            home_score: null,
-            away_score: null,
-            game_status: "SCHEDULED",
-          },
-        ],
-      }),
-    });
-    return { ok: response.ok, target };
-  }, teamIds);
-  expect(gameSave.ok).toBe(true);
-
-  await page.getByRole("button", { name: "팀 병합" }).click();
-  await page.getByLabel("병합 원본 팀").selectOption(String(teamIds.source));
-  await page.getByLabel("병합 유지 팀").selectOption(String(teamIds.target));
-  await page.getByRole("button", { name: "영향 확인" }).click();
-  await expect(page.getByText("영향 경기 1건")).toBeVisible();
 
   page.on("dialog", async (dialog) => {
-    await dialog.accept(
-      dialog.type() === "prompt" ? "OwnerPass!234" : undefined,
-    );
+    await dialog.accept("OwnerPass!234");
   });
-  await page.getByRole("button", { name: "확인 후 병합 실행" }).click();
-  await expect(page.getByText("팀 병합을 완료했습니다.")).toBeVisible();
-  await page.getByRole("button", { name: "팀 목록" }).click();
-  await expect(page.getByText("TSRC · 병합됨")).toBeVisible();
+
+  let draftCard = page.getByLabel("Season 2 시즌");
+  await draftCard.getByRole("button", { name: "수정" }).click();
+  await page.getByLabel("시즌 이름").fill("Season 2 Edited");
+  await page.getByLabel("초기 지급액").fill("1500");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByText("DRAFT 시즌을 수정했습니다.")).toBeVisible();
+
+  draftCard = page.getByLabel("Season 2 Edited 시즌");
+  await expect(draftCard.getByText("활성화 예정: 3명 · 총 4,500코인")).toBeVisible();
+  await draftCard.getByRole("button", { name: "삭제" }).click();
+  const deleteDialog = page.getByRole("dialog");
+  await expect(deleteDialog.getByText(/연결 경기 0건 · 연결 마켓 0건/)).toBeVisible();
+  await deleteDialog.getByRole("button", { name: "삭제" }).click();
+  await expect(page.getByText("DRAFT 시즌을 삭제했습니다.")).toBeVisible();
+
+  await page.getByRole("button", { name: "새 시즌" }).click();
+  await page.getByLabel("시즌 이름").fill("UI Season");
+  await page.getByLabel("시작일").fill("2027-04-10");
+  await page.getByLabel("종료일").fill("2027-04-01");
+  await page.getByLabel("초기 지급액").fill("1500");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(
+    page.getByText("시작일은 종료일보다 빨라야 합니다."),
+  ).toBeVisible();
+  await page.getByLabel("시작일").fill("2027-04-01");
+  await page.getByLabel("종료일").fill("2027-04-30");
+  await page.getByRole("button", { name: "저장" }).click();
+  await expect(page.getByText("DRAFT 시즌을 생성했습니다.")).toBeVisible();
+
+  const uiSeason = page.getByLabel("UI Season 시즌");
+  await expect(uiSeason.getByText("활성화 예정: 3명 · 총 4,500코인")).toBeVisible();
+
+  const service = createLocalServiceClient();
+  const marketCleanup = await service
+    .from("markets")
+    .update({ status: "CANCELED" })
+    .eq("season_id", 1);
+  expect(marketCleanup.error).toBeNull();
+
+  await uiSeason.getByRole("button", { name: "시즌 시작" }).click();
+  const activateDialog = page.getByRole("dialog");
+  await expect(
+    activateDialog.getByText(/대상 회원 3명 · 1인당 1,500코인 · 총 4,500코인/),
+  ).toBeVisible();
+  await activateDialog.getByRole("button", { name: "활성화" }).click();
+  await expect(
+    page.getByText("새 시즌을 활성화하고 초기 코인을 지급했습니다."),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("UI Season 시즌").getByText("ACTIVE", { exact: true }),
+  ).toBeVisible();
+
+  const activated = await service
+    .from("seasons")
+    .select("id")
+    .eq("name", "UI Season")
+    .single();
+  expect(activated.error).toBeNull();
+  const [wallets, grants] = await Promise.all([
+    service
+      .from("wallets")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", activated.data!.id)
+      .eq("balance", 1500),
+    service
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("season_id", activated.data!.id)
+      .eq("type", "SEASON_GRANT")
+      .eq("amount", 1500),
+  ]);
+  expect(wallets.count).toBe(3);
+  expect(grants.count).toBe(3);
 
   await page.screenshot({
-    path: testInfo.outputPath("issue-38-team-management.png"),
+    path: testInfo.outputPath("issue-39-draft-season-policy.png"),
     fullPage: true,
   });
 });
