@@ -149,3 +149,4 @@ test("draft season policy management is available @issue-39", async ({
     fullPage: true,
   });
 });
+test("season incident recovery is available @issue-47",async({page})=>{await page.goto("/admin");await page.getByPlaceholder("운영자 아이디").fill("owner");await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");await page.getByRole("button",{name:"로그인"}).click();const c=page.getByRole("heading",{name:"시즌 관리"}).locator("..");await c.getByRole("button",{name:"접속"}).click();await expect(page.getByRole("heading",{name:"시즌 사고 복구"})).toBeVisible();});
