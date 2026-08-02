@@ -6,6 +6,7 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import OperatorManagement from "@/components/admin/OperatorManagement";
+import OperationsSearch from "@/components/admin/OperationsSearch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -569,6 +570,7 @@ function MatchManagement({
           </Button>
         </div>
       </div>
+      <OperationsSearch />
 
       {saveMessage ? (
         <div
