@@ -9,7 +9,6 @@ type Props = Readonly<{
   onEdit: () => void;
   onDelete: () => void;
   onActivate: () => void;
-  onEnd: () => void;
 }>;
 
 const statusStyle = {
@@ -27,7 +26,6 @@ export default function SeasonCard({
   onEdit,
   onDelete,
   onActivate,
-  onEnd,
 }: Props) {
   const preview = season.activation_preview;
   const impact = season.delete_impact;
@@ -87,14 +85,6 @@ export default function SeasonCard({
             시즌 시작
           </Button>
         </div>
-      ) : season.status === "ACTIVE" ? (
-        <Button
-          variant="outline"
-          className="mt-4 h-12 w-full border-red-200 text-red-600"
-          onClick={onEnd}
-        >
-          시즌 종료
-        </Button>
       ) : null}
     </Card>
   );

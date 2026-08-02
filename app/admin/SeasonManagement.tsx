@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import SeasonCard from "@/components/admin/SeasonCard";
+import SeasonCloseConsole from "@/components/admin/SeasonCloseConsole";
 import SeasonConfirm, {
   type SeasonConfirmation,
 } from "@/components/admin/SeasonConfirm";
@@ -10,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import {
   activateDraftSeason,
   deleteDraftSeason,
-  endActiveSeason,
   fetchManagedSeasons,
   type ManagedSeason,
 } from "@/lib/admin/season-client";
@@ -105,21 +105,8 @@ export function SeasonManagement({ onReauthenticate }: Props) {
     });
   }
 
-  function requestEnd(season: ManagedSeason) {
-    setConfirmation({
-      title: "시즌 종료",
-      description: `${season.name}을(를) ARCHIVED 상태로 전환합니다.`,
-      confirmLabel: "종료",
-      variant: "destructive",
-      onConfirm: () =>
-        runHighRisk(
-          () => endActiveSeason(season.id),
-          "시즌을 종료했습니다.",
-        ),
-    });
-  }
-
   const hasDraft = seasons.some((season) => season.status === "DRAFT");
+  const activeSeason = seasons.find((season) => season.status === "ACTIVE");
 
   return (
     <div className="space-y-5 pb-4">
@@ -156,6 +143,13 @@ export function SeasonManagement({ onReauthenticate }: Props) {
         <p className="text-sm text-muted-foreground">불러오는 중...</p>
       ) : (
         <div className="space-y-4">
+          {activeSeason ? (
+            <SeasonCloseConsole
+              seasonId={activeSeason.id}
+              onReauthenticate={onReauthenticate}
+              onSeasonClosed={refresh}
+            />
+          ) : null}
           {seasons.map((season) => (
             <SeasonCard
               key={season.id}
@@ -163,7 +157,6 @@ export function SeasonManagement({ onReauthenticate }: Props) {
               onEdit={() => setEditing(season)}
               onDelete={() => requestDelete(season)}
               onActivate={() => requestActivate(season)}
-              onEnd={() => requestEnd(season)}
             />
           ))}
         </div>
