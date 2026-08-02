@@ -8,6 +8,7 @@ import AdminAuthGate, {
 import MemberManagement from "@/components/admin/MemberManagement";
 import OperatorManagement from "@/components/admin/OperatorManagement";
 import KboSyncManagement from "@/components/admin/KboSyncManagement";
+import SettlementRecovery from "@/components/admin/SettlementRecovery";
 import MatchCorrection from "@/components/admin/MatchCorrection";
 import TeamManagement from "@/components/admin/TeamManagement";
 import WalletRecovery from "@/components/admin/WalletRecovery";
@@ -2088,6 +2089,7 @@ function AdminDashboard({
 
       <WalletRecovery onReauthenticate={controls.reauthenticate} />
       <MatchCorrection />
+      <SettlementRecovery />
 
       <div
         className={`grid gap-6 ${
