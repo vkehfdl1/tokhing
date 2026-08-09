@@ -16,18 +16,39 @@ function hashToken(token: string): string {
 
 export async function createAdminSession(
   operatorId: string,
+  expectedPasswordHash: string,
+  rateIdentity: string,
+  attemptId: number,
+  context: Readonly<{
+    ipAddress: string | null;
+    userAgent: string | null;
+  }>,
 ): Promise<Readonly<{ token: string; expiresAt: Date }>> {
   const token = randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + ADMIN_SESSION_MAX_AGE_SECONDS * 1000);
-  const { error } = await createAdminServiceClient()
-    .from("admin_sessions")
-    .insert({
-      operator_id: operatorId,
-      token_hash: hashToken(token),
-      expires_at: expiresAt.toISOString(),
+  const { data, error } = await createAdminServiceClient().rpc(
+    "admin_complete_login",
+    {
+      p_operator_id: operatorId,
+      p_expected_password_hash: expectedPasswordHash,
+      p_token_hash: hashToken(token),
+      p_expires_at: expiresAt.toISOString(),
+      p_rate_identity: rateIdentity,
+      p_attempt_id: attemptId,
+      p_ip_address: context.ipAddress,
+      p_user_agent: context.userAgent,
     });
 
   if (error) throw new Error(`관리자 세션 생성 실패: ${error.message}`);
+  const result = data as
+    | Readonly<{ success: true; sessionId: string }>
+    | Readonly<{ success: false; error: string }>
+    | null;
+  if (!result?.success) {
+    throw new Error(
+      `관리자 세션 생성 실패: ${result?.error ?? "알 수 없는 오류"}`,
+    );
+  }
   return { token, expiresAt };
 }
 

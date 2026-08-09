@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import localSupabase from "@/scripts/local-supabase-env.cjs";
+import localSupabase from "@/scripts/local-supabase-env.mjs";
 
 const { loadLocalSupabaseEnv } = localSupabase;
 

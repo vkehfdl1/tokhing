@@ -525,14 +525,16 @@ export default function MarketDetailPage() {
     } finally {
       setIsDataLoading(false);
     }
-  }, [isMarketIdValid, marketId, session?.user_id]);
+  }, [isMarketIdValid, marketId, session]);
 
   useEffect(() => {
     if (!session?.user_id || !isMarketIdValid) {
       return;
     }
 
-    void loadMarketData();
+    queueMicrotask(() => {
+      void loadMarketData();
+    });
   }, [isMarketIdValid, loadMarketData, session?.user_id]);
 
   useEffect(() => {
@@ -563,7 +565,9 @@ export default function MarketDetailPage() {
     );
 
     if (fallbackOutcome) {
-      setSelectedOutcome(fallbackOutcome);
+      queueMicrotask(() => {
+        setSelectedOutcome(fallbackOutcome);
+      });
     }
   }, [positions, selectedOutcome, tradeSide]);
 
@@ -572,20 +576,24 @@ export default function MarketDetailPage() {
       setClosedHours(isMarketClosedHours());
       setCurrentTime(Date.now());
     };
-    checkClosed();
+    queueMicrotask(checkClosed);
     const id = window.setInterval(checkClosed, 30000);
     return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
     if (tradeSide !== "SELL") {
-      setCooldownRemaining("");
+      queueMicrotask(() => {
+        setCooldownRemaining("");
+      });
       return;
     }
 
     const purchasedAt = positions[selectedOutcome]?.purchasedAt;
     if (!purchasedAt) {
-      setCooldownRemaining("");
+      queueMicrotask(() => {
+        setCooldownRemaining("");
+      });
       return;
     }
 
@@ -604,7 +612,9 @@ export default function MarketDetailPage() {
       return true;
     };
 
-    if (!update()) return;
+    queueMicrotask(() => {
+      update();
+    });
     const id = window.setInterval(() => {
       if (!update()) window.clearInterval(id);
     }, 1000);

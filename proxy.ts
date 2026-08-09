@@ -1,10 +1,10 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
  * US-001 인증은 localStorage/sessionStorage 기반 클라이언트 세션으로 동작한다.
  * Supabase Auth 미들웨어 리다이렉트를 비활성화해 /change-password 접근을 허용한다.
  */
-export function proxy(_request: NextRequest) {
+export function proxy() {
   return NextResponse.next();
 }
 

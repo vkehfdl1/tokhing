@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { getAdminRequestContext } from "@/lib/admin/audit";
 import { requireAdminSession } from "@/lib/admin/authorization";
 import { adminErrorResponse, AdminRequestError } from "@/lib/admin/errors";
 import {
@@ -8,7 +8,6 @@ import {
   verifyAdminPassword,
 } from "@/lib/admin/password";
 import { createAdminServiceClient } from "@/lib/admin/service";
-import { revokeOperatorSessions } from "@/lib/admin/session";
 
 const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
@@ -17,7 +16,7 @@ const ChangePasswordSchema = z.object({
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
-    const session = await requireAdminSession(request);
+    const session = await requireAdminSession(request, "password:change");
     const input = ChangePasswordSchema.parse(await request.json());
     const service = createAdminServiceClient();
     const { data, error } = await service
@@ -39,25 +38,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const passwordHash = await hashAdminPassword(input.newPassword);
-    const { error: updateError } = await service
-      .from("admin_operators")
-      .update({
-        password_hash: passwordHash,
-        must_change_password: false,
-        password_changed_at: new Date().toISOString(),
-      })
-      .eq("id", session.operator.id);
-    if (updateError) throw updateError;
+    const context = getAdminRequestContext(request);
+    const { data: resultData, error: changeError } = await service.rpc(
+      "admin_change_operator_password",
+      {
+        p_operator_id: session.operator.id,
+        p_session_id: session.id,
+        p_expected_password_hash: data.password_hash,
+        p_password_hash: passwordHash,
+        p_ip_address: context.ipAddress,
+        p_user_agent: context.userAgent,
+      },
+    );
+    if (changeError) throw changeError;
+    const result = resultData as
+      | Readonly<{ success: true }>
+      | Readonly<{ success: false; error: string }>
+      | null;
+    if (!result?.success) {
+      throw new AdminRequestError(
+        400,
+        "ADMIN_PASSWORD_CHANGE_FAILED",
+        result?.error ?? "비밀번호 변경에 실패했습니다.",
+      );
+    }
 
-    await revokeOperatorSessions(session.operator.id, session.id);
-    await recordAdminAudit(request, {
-      operatorId: session.operator.id,
-      action: "ADMIN_PASSWORD_CHANGED",
-      targetType: "admin_operator",
-      targetId: session.operator.id,
+    return NextResponse.json({
       success: true,
     });
-    return NextResponse.json({ success: true });
   } catch (error) {
     return adminErrorResponse(error);
   }

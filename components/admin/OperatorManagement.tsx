@@ -40,7 +40,9 @@ export default function OperatorManagement({
   }, []);
 
   useEffect(() => {
-    void loadOperators();
+    queueMicrotask(() => {
+      void loadOperators();
+    });
   }, [loadOperators]);
 
   async function handleCreate() {

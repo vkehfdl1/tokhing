@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import localSupabase from "./scripts/local-supabase-env.cjs";
+import localSupabase from "./scripts/local-supabase-env.mjs";
 
 const { loadLocalSupabaseEnv } = localSupabase;
 Object.assign(process.env, loadLocalSupabaseEnv());

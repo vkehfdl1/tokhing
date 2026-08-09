@@ -12,12 +12,24 @@ type AuditInput = Readonly<{
   errorMessage?: string;
 }>;
 
+export function getAdminRequestContext(
+  request: Pick<Request, "headers">,
+): {
+  ipAddress: string | null;
+  userAgent: string | null;
+} {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  return {
+    ipAddress: forwardedFor?.split(",")[0]?.trim() || null,
+    userAgent: request.headers.get("user-agent"),
+  };
+}
+
 export async function recordAdminAudit(
   request: Pick<Request, "headers">,
   input: AuditInput,
 ): Promise<void> {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  const ipAddress = forwardedFor?.split(",")[0]?.trim() || null;
+  const context = getAdminRequestContext(request);
   const { error } = await createAdminServiceClient()
     .from("admin_audit_logs")
     .insert({
@@ -29,8 +41,8 @@ export async function recordAdminAudit(
       after_state: input.afterState ?? null,
       success: input.success,
       error_message: input.errorMessage ?? null,
-      ip_address: ipAddress,
-      user_agent: request.headers.get("user-agent"),
+      ip_address: context.ipAddress,
+      user_agent: context.userAgent,
     });
 
   if (error) {

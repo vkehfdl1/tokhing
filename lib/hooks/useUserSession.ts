@@ -25,8 +25,10 @@ export const useUserSession = ({
       setSession(getUserSession());
     };
 
-    syncSession();
-    setIsLoading(false);
+    queueMicrotask(() => {
+      syncSession();
+      setIsLoading(false);
+    });
 
     const handleStorage = (event: StorageEvent) => {
       if (event.key === null || event.key === USER_SESSION_KEY) {
