@@ -2,7 +2,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import localSupabase from "@/scripts/local-supabase-env.cjs";
+import localSupabase from "@/scripts/local-supabase-env.mjs";
 import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
 
 const { loadLocalSupabaseEnv } = localSupabase;

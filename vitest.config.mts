@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
-import localSupabase from "./scripts/local-supabase-env.cjs";
+import localSupabase from "./scripts/local-supabase-env.mjs";
 
 const { loadLocalSupabaseEnv } = localSupabase;
 Object.assign(process.env, loadLocalSupabaseEnv());

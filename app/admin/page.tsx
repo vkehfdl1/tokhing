@@ -1,6 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import AdminAuditLog from "@/components/admin/AdminAuditLog";
 import AdminAuthGate, {
   type AdminControls,
@@ -128,12 +133,12 @@ function MatchManagement({
   const [initialPrices, setInitialPrices] = useState<InitialPricesFormState>(
     DEFAULT_INITIAL_PRICES
   );
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const isMobile = useIsMobile();
 
   const targetDate = selectedDate || getKSTDate(0);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     const { data, error } = await supabase
       .from("teams")
       .select("*")
@@ -145,9 +150,9 @@ function MatchManagement({
     } else {
       setTeams(data || []);
     }
-  };
+  }, [supabase]);
 
-  const fetchGames = async () => {
+  const fetchGames = useCallback(async () => {
     setLoading(true);
     setSaveMessage(null);
     const { data, error } = await supabase
@@ -162,13 +167,14 @@ function MatchManagement({
       setGames(data || []);
     }
     setLoading(false);
-  };
+  }, [supabase, targetDate]);
 
   useEffect(() => {
-    fetchTeams();
-    fetchGames();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetDate]);
+    queueMicrotask(() => {
+      void fetchTeams();
+      void fetchGames();
+    });
+  }, [fetchGames, fetchTeams]);
 
   const addNewGame = () => {
     const newGame: Game = {
@@ -405,7 +411,7 @@ function MatchManagement({
       const existingGameIds = existingGames
         .map((game) => Number(game.id))
         .filter((gameId) => Number.isFinite(gameId) && gameId > 0);
-      const insertedGameIds = await saveAdminGames([
+      const insertedGameIds = await saveAdminGames(targetDate, [
         ...existingGames,
         ...newGames,
       ]);
@@ -1007,7 +1013,9 @@ function LiquiditySettingsManagement() {
   };
 
   useEffect(() => {
-    void fetchLiquidityB();
+    queueMicrotask(() => {
+      void fetchLiquidityB();
+    });
   }, []);
 
   const handleSave = async (event: React.FormEvent) => {
@@ -1130,28 +1138,38 @@ function MarketSettlementManagement() {
     text: string;
   } | null>(null);
 
-  const getDefaultOutcome = (market: MarketListItem): MarketOutcome | null => {
-    if (market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED") {
+  const getDefaultOutcome = useCallback(
+    (market: MarketListItem): MarketOutcome | null => {
+      if (
+        market.gameStatus === "CANCELED" ||
+        market.marketStatus === "CANCELED"
+      ) {
+        return null;
+      }
+
+      const result = market.result?.toUpperCase();
+      if (
+        result === "HOME" ||
+        result === "AWAY" ||
+        result === "DRAW"
+      ) {
+        return result;
+      }
+
+      if (
+        market.gameStatus === "FINISHED" &&
+        market.homeScore != null &&
+        market.awayScore != null
+      ) {
+        if (market.homeScore > market.awayScore) return "HOME";
+        if (market.awayScore > market.homeScore) return "AWAY";
+        return "DRAW";
+      }
+
       return null;
-    }
-
-    const result = market.result?.toUpperCase();
-    if (result === "HOME" || result === "AWAY" || result === "DRAW") {
-      return result;
-    }
-
-    if (
-      market.gameStatus === "FINISHED" &&
-      market.homeScore != null &&
-      market.awayScore != null
-    ) {
-      if (market.homeScore > market.awayScore) return "HOME";
-      if (market.awayScore > market.homeScore) return "AWAY";
-      return "DRAW";
-    }
-
-    return null;
-  };
+    },
+    [],
+  );
 
   const isAutoDetected = (market: MarketListItem): boolean => {
     if (market.result) return false;
@@ -1166,7 +1184,7 @@ function MarketSettlementManagement() {
   const isGameCanceled = (market: MarketListItem): boolean =>
     market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED";
 
-  const fetchMarkets = async () => {
+  const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
       const marketList = await getMarkets(selectedDate);
@@ -1195,12 +1213,13 @@ function MarketSettlementManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getDefaultOutcome, selectedDate]);
 
   useEffect(() => {
-    void fetchMarkets();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+    queueMicrotask(() => {
+      void fetchMarkets();
+    });
+  }, [fetchMarkets]);
 
   const updateSelectedResult = (marketId: number, value: string) => {
     if (value !== "HOME" && value !== "AWAY" && value !== "DRAW") {
@@ -1698,8 +1717,10 @@ function CoinGrantManagement({
       }
     };
 
-    void refreshCronStatus();
-    void fetchUsers();
+    queueMicrotask(() => {
+      void refreshCronStatus();
+      void fetchUsers();
+    });
   }, []);
 
   const parseAmount = (raw: string) => {

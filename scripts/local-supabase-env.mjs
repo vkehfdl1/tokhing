@@ -1,4 +1,4 @@
-const { execFileSync, spawnSync } = require("node:child_process");
+import { execFileSync, spawnSync } from "node:child_process";
 
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
@@ -48,7 +48,7 @@ function assertLoopbackUrl(value, label) {
  * @param {string} [cwd]
  * @returns {Readonly<Record<string, string>>}
  */
-function loadLocalSupabaseEnv(cwd = process.cwd()) {
+export function loadLocalSupabaseEnv(cwd = process.cwd()) {
   const output = execFileSync("supabase", ["status", "-o", "env"], {
     cwd,
     encoding: "utf8",
@@ -98,7 +98,10 @@ function runCommand(command, args) {
   process.exit(result.status ?? 1);
 }
 
-if (require.main === module) {
+if (
+  process.argv[1] &&
+  process.argv[1].endsWith("local-supabase-env.mjs")
+) {
   const [, , command, ...args] = process.argv;
   if (!command) {
     throw new Error("실행할 로컬 명령이 필요합니다.");
@@ -106,6 +109,8 @@ if (require.main === module) {
   runCommand(command, args);
 }
 
-module.exports = {
+const localSupabase = {
   loadLocalSupabaseEnv,
 };
+
+export default localSupabase;

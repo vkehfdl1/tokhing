@@ -155,13 +155,14 @@ export async function createAdminTeams(
 }
 
 export async function saveAdminGames(
+  targetDate: string,
   games: readonly AdminGameInput[],
 ): Promise<number[]> {
   const response = await fetch("/api/admin/game-data", {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "save_games", games }),
+    body: JSON.stringify({ action: "save_games", targetDate, games }),
   });
   return (await readJson<{ insertedIds: number[] }>(response)).insertedIds;
 }

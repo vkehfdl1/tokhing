@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { getAdminRequestContext } from "@/lib/admin/audit";
 import { requireAdminSession } from "@/lib/admin/authorization";
 import {
   adminErrorResponse,
@@ -8,7 +8,6 @@ import {
 } from "@/lib/admin/errors";
 import { hashAdminPassword } from "@/lib/admin/password";
 import { createAdminServiceClient } from "@/lib/admin/service";
-import { revokeOperatorSessions } from "@/lib/admin/session";
 import { AdminRoleSchema, parseAdminOperator } from "@/lib/admin/types";
 
 const UpdateOperatorSchema = z
@@ -35,36 +34,6 @@ export async function PATCH(
     const { id } = await context.params;
     const input = UpdateOperatorSchema.parse(await request.json());
     const service = createAdminServiceClient();
-    const { data: beforeData, error: beforeError } = await service
-      .from("admin_operators")
-      .select(
-        "id, username, display_name, role, is_active, must_change_password, last_login_at, created_at, updated_at",
-      )
-      .eq("id", id)
-      .single();
-    if (beforeError) throw beforeError;
-
-    const before = parseAdminOperator(beforeData);
-    const removesOwner =
-      before.role === "OWNER" &&
-      (input.role !== undefined && input.role !== "OWNER" ||
-        input.isActive === false);
-    if (removesOwner) {
-      const { count, error } = await service
-        .from("admin_operators")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "OWNER")
-        .eq("is_active", true);
-      if (error) throw error;
-      if ((count ?? 0) <= 1) {
-        throw new AdminRequestError(
-          409,
-          "LAST_OWNER_REQUIRED",
-          "마지막 활성 OWNER는 변경하거나 비활성화할 수 없습니다.",
-        );
-      }
-    }
-
     const updates: Record<string, unknown> = {};
     if (input.displayName !== undefined) {
       updates.display_name = input.displayName;
@@ -73,46 +42,33 @@ export async function PATCH(
     if (input.isActive !== undefined) updates.is_active = input.isActive;
     if (input.temporaryPassword !== undefined) {
       updates.password_hash = await hashAdminPassword(input.temporaryPassword);
-      updates.must_change_password = true;
-      updates.password_changed_at = new Date().toISOString();
     }
-
-    const { data, error } = await service
-      .from("admin_operators")
-      .update(updates)
-      .eq("id", id)
-      .select(
-        "id, username, display_name, role, is_active, must_change_password, last_login_at, created_at, updated_at",
-      )
-      .single();
+    const requestContext = getAdminRequestContext(request);
+    const { data, error } = await service.rpc("admin_update_operator", {
+      p_actor_id: session.operator.id,
+      p_operator_id: id,
+      p_updates: updates,
+      p_ip_address: requestContext.ipAddress,
+      p_user_agent: requestContext.userAgent,
+    });
     if (error) throw error;
-
-    const operator = parseAdminOperator(data);
-    if (input.isActive === false || input.temporaryPassword !== undefined) {
-      await revokeOperatorSessions(id);
-    }
-    try {
-      await recordAdminAudit(request, {
-        operatorId: session.operator.id,
-        action: "ADMIN_OPERATOR_UPDATED",
-        targetType: "admin_operator",
-        targetId: id,
-        beforeState: before,
-        afterState: operator,
-        success: true,
-      });
-    } catch (auditError) {
-      await service
-        .from("admin_operators")
-        .update({
-          display_name: before.displayName,
-          role: before.role,
-          is_active: before.isActive,
-        })
-        .eq("id", id);
-      throw auditError;
+    const result = data as
+      | Readonly<{ success: true; operator: unknown }>
+      | Readonly<{ success: false; error: string }>
+      | null;
+    if (!result?.success) {
+      const lastOwner =
+        result?.error.includes("마지막 활성 OWNER") ?? false;
+      throw new AdminRequestError(
+        lastOwner ? 409 : 400,
+        lastOwner
+          ? "LAST_OWNER_REQUIRED"
+          : "ADMIN_OPERATOR_UPDATE_FAILED",
+        result?.error ?? "운영자 변경에 실패했습니다.",
+      );
     }
 
+    const operator = parseAdminOperator(result.operator);
     return NextResponse.json({ operator });
   } catch (error) {
     return adminErrorResponse(error);

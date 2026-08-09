@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import localSupabase from "@/scripts/local-supabase-env.cjs";
+import localSupabase from "@/scripts/local-supabase-env.mjs";
 
 const { loadLocalSupabaseEnv } = localSupabase;
 describe("local Supabase environment guard", () => {

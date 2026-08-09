@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { getAdminRequestContext } from "@/lib/admin/audit";
 import { requireAdminSession } from "@/lib/admin/authorization";
-import { adminErrorResponse } from "@/lib/admin/errors";
+import {
+  adminErrorResponse,
+  AdminRequestError,
+} from "@/lib/admin/errors";
 import { createAdminServiceClient } from "@/lib/admin/service";
 
 const TeamInputSchema = z.object({
@@ -31,6 +34,7 @@ const GameDataRequestSchema = z.discriminatedUnion("action", [
   }),
   z.object({
     action: z.literal("save_games"),
+    targetDate: z.iso.date(),
     games: z.array(GameInputSchema).max(100),
   }),
 ]);
@@ -39,60 +43,34 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const session = await requireAdminSession(request, "admin:mutate");
     const input = GameDataRequestSchema.parse(await request.json());
+    const context = getAdminRequestContext(request);
     const service = createAdminServiceClient();
-
-    if (input.action === "create_teams") {
-      const { data, error } = await service
-        .from("teams")
-        .insert(input.teams)
-        .select("id, name, short_name, team_color");
-      if (error) throw error;
-
-      await recordAdminAudit(request, {
-        operatorId: session.operator.id,
-        action: "ADMIN_TEAMS_CREATED",
-        targetType: "team",
-        afterState: data,
-        success: true,
-      });
-      return NextResponse.json({ teams: data ?? [] });
-    }
-
-    const insertedIds: number[] = [];
-    const beforeRows: unknown[] = [];
-    for (const game of input.games) {
-      const { id, ...values } = game;
-      if (id) {
-        const { data: before, error: beforeError } = await service
-          .from("games")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (beforeError) throw beforeError;
-        beforeRows.push(before);
-
-        const { error } = await service.from("games").update(values).eq("id", id);
-        if (error) throw error;
-      } else {
-        const { data, error } = await service
-          .from("games")
-          .insert(values)
-          .select("id")
-          .single();
-        if (error) throw error;
-        insertedIds.push(Number(data.id));
-      }
-    }
-
-    await recordAdminAudit(request, {
-      operatorId: session.operator.id,
-      action: "ADMIN_GAMES_SAVED",
-      targetType: "game",
-      beforeState: beforeRows,
-      afterState: { games: input.games, insertedIds },
-      success: true,
+    const { data, error } = await service.rpc("admin_apply_game_data", {
+      p_operator_id: session.operator.id,
+      p_payload: input,
+      p_ip_address: context.ipAddress,
+      p_user_agent: context.userAgent,
     });
-    return NextResponse.json({ insertedIds });
+    if (error) throw error;
+
+    const result = data as
+      | Readonly<{
+          success: true;
+          teams?: unknown;
+          insertedIds?: unknown;
+          deletedIds?: unknown;
+        }>
+      | Readonly<{ success: false; error: string }>
+      | null;
+    if (!result?.success) {
+      throw new AdminRequestError(
+        400,
+        "ADMIN_GAME_DATA_FAILED",
+        result?.error ?? "경기 데이터 저장에 실패했습니다.",
+      );
+    }
+
+    return NextResponse.json(result);
   } catch (error) {
     return adminErrorResponse(error);
   }

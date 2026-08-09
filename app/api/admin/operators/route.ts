@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { recordAdminAudit } from "@/lib/admin/audit";
+import { getAdminRequestContext } from "@/lib/admin/audit";
 import { requireAdminSession } from "@/lib/admin/authorization";
-import { adminErrorResponse } from "@/lib/admin/errors";
+import {
+  adminErrorResponse,
+  AdminRequestError,
+} from "@/lib/admin/errors";
 import { hashAdminPassword } from "@/lib/admin/password";
 import { createAdminServiceClient } from "@/lib/admin/service";
 import { AdminRoleSchema, parseAdminOperator } from "@/lib/admin/types";
@@ -46,37 +49,31 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
     const input = CreateOperatorSchema.parse(await request.json());
     const passwordHash = await hashAdminPassword(input.temporaryPassword);
+    const context = getAdminRequestContext(request);
     const service = createAdminServiceClient();
-    const { data, error } = await service
-      .from("admin_operators")
-      .insert({
-        username: input.username,
-        display_name: input.displayName,
-        role: input.role,
-        password_hash: passwordHash,
-        created_by: session.operator.id,
-      })
-      .select(
-        "id, username, display_name, role, is_active, must_change_password, last_login_at, created_at, updated_at",
-      )
-      .single();
-
+    const { data, error } = await service.rpc("admin_create_operator", {
+      p_actor_id: session.operator.id,
+      p_username: input.username,
+      p_display_name: input.displayName,
+      p_role: input.role,
+      p_password_hash: passwordHash,
+      p_ip_address: context.ipAddress,
+      p_user_agent: context.userAgent,
+    });
     if (error) throw error;
-    const operator = parseAdminOperator(data);
-    try {
-      await recordAdminAudit(request, {
-        operatorId: session.operator.id,
-        action: "ADMIN_OPERATOR_CREATED",
-        targetType: "admin_operator",
-        targetId: operator.id,
-        afterState: operator,
-        success: true,
-      });
-    } catch (auditError) {
-      await service.from("admin_operators").delete().eq("id", operator.id);
-      throw auditError;
+    const result = data as
+      | Readonly<{ success: true; operator: unknown }>
+      | Readonly<{ success: false; error: string }>
+      | null;
+    if (!result?.success) {
+      throw new AdminRequestError(
+        400,
+        "ADMIN_OPERATOR_CREATE_FAILED",
+        result?.error ?? "운영자 생성에 실패했습니다.",
+      );
     }
 
+    const operator = parseAdminOperator(result.operator);
     return NextResponse.json({ operator }, { status: 201 });
   } catch (error) {
     return adminErrorResponse(error);
