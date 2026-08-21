@@ -13,7 +13,7 @@ type Props = Readonly<{
   editing: boolean;
   teams: readonly AdminTeamRef[];
   onChange: (form: AdminMemberInput) => void;
-  onSave: (resetPassword: boolean) => Promise<void>;
+  onSave: () => Promise<void>;
 }>;
 
 export default function MemberEditor({
@@ -26,6 +26,11 @@ export default function MemberEditor({
   return (
     <Card className="space-y-3 rounded-2xl p-4 shadow">
       <h2 className="font-bold">{editing ? "회원 수정" : "회원 추가"}</h2>
+      {!editing ? (
+        <p className="text-xs text-muted-foreground">
+          초기 비밀번호는 입력한 전화번호로 자동 설정됩니다.
+        </p>
+      ) : null}
       <Input
         type="number"
         placeholder="학번"
@@ -69,12 +74,9 @@ export default function MemberEditor({
           </option>
         ))}
       </select>
-      <div className="grid grid-cols-2 gap-2">
-        <Button onClick={() => void onSave(false)}>저장</Button>
-        <Button variant="outline" onClick={() => void onSave(true)}>
-          저장 + 비밀번호 초기화
-        </Button>
-      </div>
+      <Button className="w-full" onClick={() => void onSave()}>
+        {editing ? "수정 내용 저장" : "회원 바로 추가"}
+      </Button>
     </Card>
   );
 }

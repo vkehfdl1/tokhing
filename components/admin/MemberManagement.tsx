@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  getAdminMemberImpact,
   listAdminMembers,
   repairAdminMemberWallet,
   resetAdminMemberPassword,
@@ -22,7 +21,6 @@ import type { AdminOperator } from "@/lib/admin/types";
 type Props = Readonly<{
   operator: AdminOperator;
   onBack: () => void;
-  onReauthenticate: () => Promise<boolean>;
 }>;
 const EMPTY_FORM: AdminMemberInput = {
   student_number: 0,
@@ -38,7 +36,6 @@ const formatCoins = (value: number | null): string =>
 export default function MemberManagement({
   operator,
   onBack,
-  onReauthenticate,
 }: Props) {
   const [members, setMembers] = useState<AdminMember[]>([]);
   const [teams, setTeams] = useState<AdminTeamRef[]>([]);
@@ -73,13 +70,10 @@ export default function MemberManagement({
     });
   }
 
-  async function saveMember(resetPassword = false) {
-    if (!(await onReauthenticate())) return;
+  async function saveMember() {
     try {
-      await upsertAdminMember({ ...form, reset_password: resetPassword });
-      setMessage(
-        resetPassword ? "회원 정보와 초기 비밀번호를 갱신했습니다." : "회원 정보를 저장했습니다.",
-      );
+      await upsertAdminMember(form);
+      setMessage(editingId ? "회원 정보를 수정했습니다." : "회원을 추가했습니다.");
       setForm(EMPTY_FORM);
       setEditingId(null);
       await loadMembers();
@@ -90,17 +84,10 @@ export default function MemberManagement({
 
   async function toggleMember(member: AdminMember) {
     try {
-      const impact = await getAdminMemberImpact(member.id);
-      const confirmation = member.is_active
-        ? window.confirm(
-            `미정산 포지션 ${impact.open_position_count}개와 기록은 유지됩니다. 비활성화할까요?`,
-          )
-        : true;
-      if (!confirmation || !(await onReauthenticate())) return;
       await setAdminMemberActive(
         member.id,
         !member.is_active,
-        confirmation,
+        true,
         member.is_active ? "관리자 비활성화" : undefined,
       );
       setMessage(member.is_active ? "회원을 비활성화했습니다." : "회원을 재활성화했습니다.");
@@ -112,7 +99,6 @@ export default function MemberManagement({
 
   async function repairWallet(member: AdminMember) {
     try {
-      if (!(await onReauthenticate())) return;
       await repairAdminMemberWallet(member.id);
       setMessage("활성 시즌 지갑을 복구했습니다.");
       await loadMembers();
@@ -123,7 +109,6 @@ export default function MemberManagement({
 
   async function resetPassword(member: AdminMember) {
     try {
-      if (!(await onReauthenticate())) return;
       await resetAdminMemberPassword(member.id);
       setMessage("전화번호 기준 초기 비밀번호로 재설정했습니다.");
       await loadMembers();
@@ -186,7 +171,6 @@ export default function MemberManagement({
           members={members}
           teams={teams}
           onApplied={loadMembers}
-          onReauthenticate={onReauthenticate}
         />
       )}
 

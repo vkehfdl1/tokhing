@@ -49,7 +49,7 @@ export async function PATCH(
   context: RouteContext,
 ): Promise<NextResponse> {
   try {
-    const session = await requireAdminSession(request, "admin:mutate", true);
+    const session = await requireAdminSession(request, "admin:mutate");
     const { id } = await context.params;
     const input = ActionSchema.parse(await request.json());
     const service = createAdminServiceClient();

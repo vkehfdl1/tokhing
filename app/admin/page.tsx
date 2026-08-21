@@ -2021,7 +2021,6 @@ function AdminDashboard({
       <MemberManagement
         operator={operator}
         onBack={() => setCurrentView("dashboard")}
-        onReauthenticate={controls.reauthenticate}
       />
     );
   }

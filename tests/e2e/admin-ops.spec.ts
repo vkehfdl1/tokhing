@@ -28,17 +28,18 @@ test("member lifecycle management is available @issue-37", async ({
   page,
 }, testInfo) => {
   test.setTimeout(60_000);
+  let dialogCount = 0;
   page.on("dialog", (dialog) => {
-    if (dialog.type() === "prompt") {
-      void dialog.accept("OwnerPass!234");
-    } else {
-      void dialog.accept();
-    }
+    dialogCount += 1;
+    void dialog.dismiss();
   });
 
   await page.goto("/admin");
   await page.getByPlaceholder("운영진 비밀번호").fill("OwnerPass!234");
   await page.getByRole("button", { name: "프런트 인증하기" }).click();
+  await expect(
+    page.getByRole("heading", { name: "운영 대시보드" }),
+  ).toBeVisible();
 
   const memberCard = page.getByRole("heading", { name: "회원 관리" }).locator("..");
   await memberCard.getByRole("button", { name: "접속" }).click();
@@ -67,12 +68,21 @@ test("member lifecycle management is available @issue-37", async ({
   await page.getByPlaceholder("전화번호").fill("01077778888");
   await page.getByPlaceholder("학과", { exact: true }).fill("컴퓨터공학과");
   await page.getByLabel("선호팀").selectOption("1");
-  await page.getByRole("button", { name: "저장", exact: true }).click();
-  await expect(page.getByText("회원 정보를 저장했습니다.")).toBeVisible();
+  await page.getByRole("button", { name: "회원 바로 추가" }).click();
+  await expect(page.getByText("회원을 추가했습니다.")).toBeVisible();
 
   const createdMember = page.getByTestId("member-2099999999");
   await expect(createdMember.getByText("신규 회원 · 2099999999")).toBeVisible();
   await expect(createdMember.getByText(/1,?000코인/)).toBeVisible();
+  await createdMember.getByRole("button", { name: "수정" }).click();
+  await page.getByPlaceholder("이름", { exact: true }).fill("수정 회원");
+  await page.getByRole("button", { name: "수정 내용 저장" }).click();
+  await expect(page.getByText("회원 정보를 수정했습니다.")).toBeVisible();
+  await expect(createdMember.getByText("수정 회원 · 2099999999")).toBeVisible();
+  await createdMember.getByRole("button", { name: "비밀번호 초기화" }).click();
+  await expect(
+    page.getByText("전화번호 기준 초기 비밀번호로 재설정했습니다."),
+  ).toBeVisible();
   await createdMember.getByRole("button", { name: "비활성화" }).click();
   await expect(page.getByText("회원을 비활성화했습니다.")).toBeVisible();
   await expect(
@@ -111,6 +121,7 @@ test("member lifecycle management is available @issue-37", async ({
     page.getByText("1개 행을 반영했습니다. 오류 1개는 제외했습니다."),
   ).toBeVisible();
   await expect(page.getByTestId("member-2099999998")).toBeVisible();
+  expect(dialogCount).toBe(0);
 
   const downloadPromise = page.waitForEvent("download");
   await page

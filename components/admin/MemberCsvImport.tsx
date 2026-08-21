@@ -17,14 +17,12 @@ type Props = Readonly<{
   members: readonly AdminMember[];
   teams: readonly AdminTeamRef[];
   onApplied: () => Promise<void>;
-  onReauthenticate: () => Promise<boolean>;
 }>;
 
 export default function MemberCsvImport({
   members,
   teams,
   onApplied,
-  onReauthenticate,
 }: Props) {
   const [fileName, setFileName] = useState("");
   const [preview, setPreview] = useState<ReturnType<typeof previewMemberCsv>>(
@@ -42,7 +40,7 @@ export default function MemberCsvImport({
   }
 
   async function handleApply() {
-    if (validRows.length === 0 || !(await onReauthenticate())) return;
+    if (validRows.length === 0) return;
     try {
       await bulkUpsertAdminMembers(
         validRows.flatMap((row) => (row.member ? [row.member] : [])),
