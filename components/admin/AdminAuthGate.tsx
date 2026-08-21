@@ -25,7 +25,6 @@ type Props = Readonly<{
 
 export default function AdminAuthGate({ children }: Props) {
   const [operator, setOperator] = useState<AdminOperator | null>(null);
-  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -50,7 +49,7 @@ export default function AdminAuthGate({ children }: Props) {
     setLoading(true);
     setError("");
     try {
-      const loggedInOperator = await loginAdmin(username, password);
+      const loggedInOperator = await loginAdmin("owner", password);
       setOperator(loggedInOperator);
       if (!loggedInOperator.mustChangePassword) {
         setPassword("");
@@ -98,7 +97,6 @@ export default function AdminAuthGate({ children }: Props) {
     logout: async () => {
       await logoutAdmin();
       setOperator(null);
-      setUsername("");
       setPassword("");
     },
     reauthenticate: async () => {
@@ -210,23 +208,17 @@ export default function AdminAuthGate({ children }: Props) {
         <div className="mb-6 text-center">
           <h1 className="text-2xl font-bold">ToKHin&apos; 관리</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            서버에서 인증되는 운영자 계정으로 로그인하세요.
+            운영진 비밀번호를 입력하면 관리자 패널로 이동합니다.
           </p>
         </div>
         <form onSubmit={handleLogin} className="space-y-4">
           <Input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="운영자 아이디"
-            autoComplete="username"
-            required
-          />
-          <Input
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="운영자 비밀번호"
+            placeholder="운영진 비밀번호"
             autoComplete="current-password"
+            autoFocus
             required
           />
           {error && (
@@ -239,7 +231,7 @@ export default function AdminAuthGate({ children }: Props) {
             className="h-12 w-full rounded-lg"
             disabled={loading}
           >
-            {loading ? "로그인 중..." : "로그인"}
+            {loading ? "인증 중..." : "프런트 인증하기"}
           </Button>
         </form>
       </Card>

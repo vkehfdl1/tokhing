@@ -11,7 +11,6 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import MemberManagement from "@/components/admin/MemberManagement";
-import OperatorManagement from "@/components/admin/OperatorManagement";
 import KboSyncManagement from "@/components/admin/KboSyncManagement";
 import OperationsSearch from "@/components/admin/OperationsSearch";
 import SettlementRecovery from "@/components/admin/SettlementRecovery";
@@ -1994,7 +1993,6 @@ function AdminDashboard({
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
-    | "operators"
     | "audit"
     | "members"
     | "teams"
@@ -2013,16 +2011,6 @@ function AdminDashboard({
     const kst = new Date(utc + 9 * 3600000);
     return kst.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
   };
-
-  if (currentView === "operators") {
-    return (
-      <OperatorManagement
-        currentOperator={operator}
-        onBack={() => setCurrentView("dashboard")}
-        onReauthenticate={controls.reauthenticate}
-      />
-    );
-  }
 
   if (currentView === "audit") {
     return <AdminAuditLog onBack={() => setCurrentView("dashboard")} />;
@@ -2103,7 +2091,7 @@ function AdminDashboard({
           운영 대시보드
         </h1>
         <p className="text-muted-foreground">
-          {operator.displayName} · {operator.role}
+          경기, 시즌, 회원과 마켓 운영 기능을 관리합니다.
         </p>
         <div className="text-sm text-muted-foreground mt-2">
           현재 시각: {getCurrentKSTTime()}
@@ -2132,23 +2120,6 @@ function AdminDashboard({
           </p>
           <Button
             onClick={() => setCurrentView("teams")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            운영자 계정 관리
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            운영자 역할, 활성 상태, 임시 비밀번호를 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("operators")}
             className={isMobile ? "w-full" : ""}
           >
             접속
@@ -2303,19 +2274,13 @@ function AdminDashboard({
           isMobile ? "flex justify-center" : "flex justify-end"
         }`}
       >
-        <div className="grid w-full max-w-sm grid-cols-3 gap-2">
+        <div className="grid w-full max-w-sm grid-cols-2 gap-2">
           <Button
             variant="outline"
             onClick={() => void controls.reauthenticate()}
             className="flex-1"
           >
             재인증
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => void controls.changePassword()}
-          >
-            비밀번호 변경
           </Button>
           <Button
             variant="outline"
