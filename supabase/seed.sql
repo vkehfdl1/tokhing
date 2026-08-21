@@ -55,7 +55,7 @@ INSERT INTO public.admin_operators (
   must_change_password, password_changed_at, created_at, updated_at
 )
 VALUES (
-  'b1111111-1111-1111-1111-111111111111',
+  'b1111111-1111-4111-8111-111111111111',
   'owner',
   '로컬 초기 운영자',
   'OWNER',

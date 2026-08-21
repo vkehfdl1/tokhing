@@ -2,6 +2,12 @@ begin;
 
 select plan(16);
 
+-- The local seed includes the sample OWNER used for manual testing. Disable it
+-- inside this rolled-back test transaction so this fixture remains isolated.
+update public.admin_operators
+set is_active = false
+where username = 'owner';
+
 insert into public.admin_operators (
   id,
   username,
