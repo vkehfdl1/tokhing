@@ -11,7 +11,6 @@ import AdminAuthGate, {
   type AdminControls,
 } from "@/components/admin/AdminAuthGate";
 import MemberManagement from "@/components/admin/MemberManagement";
-import KboSyncManagement from "@/components/admin/KboSyncManagement";
 import OperationsSearch from "@/components/admin/OperationsSearch";
 import SettlementRecovery from "@/components/admin/SettlementRecovery";
 import MatchCorrection from "@/components/admin/MatchCorrection";
@@ -508,7 +507,6 @@ function MatchManagement({
           </Button>
         </div>
       </div>
-      <OperationsSearch />
 
       {saveMessage ? (
         <div
@@ -2002,6 +2000,10 @@ function AdminDashboard({
     | "markets"
     | "liquidity"
     | "password"
+    | "wallet"
+    | "matchCheck"
+    | "settlementCheck"
+    | "operations"
   >("dashboard");
   const [selectedMatchDate, setSelectedMatchDate] = useState(getKSTDate(0));
 
@@ -2058,6 +2060,14 @@ function AdminDashboard({
             selectedDate={selectedMatchDate}
             onDateChange={setSelectedMatchDate}
           />
+        ) : currentView === "wallet" ? (
+          <WalletRecovery />
+        ) : currentView === "matchCheck" ? (
+          <MatchCorrection />
+        ) : currentView === "settlementCheck" ? (
+          <SettlementRecovery />
+        ) : currentView === "operations" ? (
+          <OperationsSearch />
         ) : (
           <div className="text-sm text-muted-foreground">잘못된 메뉴 상태입니다.</div>
         )}
@@ -2096,10 +2106,6 @@ function AdminDashboard({
           현재 시각: {getCurrentKSTTime()}
         </div>
       </div>
-
-      <WalletRecovery onReauthenticate={controls.reauthenticate} />
-      <MatchCorrection />
-      <SettlementRecovery />
 
       <div
         className={`grid gap-6 ${
@@ -2262,10 +2268,74 @@ function AdminDashboard({
             접속
           </Button>
         </Card>
-      </div>
 
-      <div className="mt-8">
-        <KboSyncManagement onReauthenticate={controls.reauthenticate} />
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            지갑 조정
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            특정 회원의 잔액을 직접 더하거나 빼고, 잘못된 지급을 되돌립니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("wallet")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            경기 삭제 점검
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            경기를 지우기 전에 거래가 걸려 있는지 미리 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("matchCheck")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            정산 점검
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            정산된 마켓의 지급 내역과 회수 가능 여부를 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("settlementCheck")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            운영 현황 조회
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            시즌별 회원 잔액과 거래 활동을 조회 전용으로 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("operations")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
       </div>
 
       <div
@@ -2273,21 +2343,13 @@ function AdminDashboard({
           isMobile ? "flex justify-center" : "flex justify-end"
         }`}
       >
-        <div className="grid w-full max-w-sm grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            onClick={() => void controls.reauthenticate()}
-            className="flex-1"
-          >
-            재인증
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => void controls.logout()}
-          >
-            로그아웃
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={() => void controls.logout()}
+          className={isMobile ? "w-full max-w-xs" : ""}
+        >
+          로그아웃
+        </Button>
       </div>
     </div>
   );

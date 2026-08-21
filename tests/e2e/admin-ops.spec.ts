@@ -41,9 +41,20 @@ test("member lifecycle management is available @issue-37", async ({
     page.getByRole("heading", { name: "운영 대시보드" }),
   ).toBeVisible();
 
-  const memberCard = page.getByRole("heading", { name: "회원 관리" }).locator("..");
-  await memberCard.getByRole("button", { name: "접속" }).click();
-  await expect(page.getByRole("heading", { name: "회원 관리" })).toBeVisible();
+  const dashboardHeading = page.getByRole("heading", { name: "운영 대시보드" });
+  const memberBackButton = page.getByRole("button", { name: "돌아가기" });
+  const openMemberScreen = async () => {
+    if (await dashboardHeading.isVisible()) {
+      await page
+        .getByRole("heading", { name: "회원 관리" })
+        .locator("..")
+        .getByRole("button", { name: "접속" })
+        .click();
+    }
+    await expect(memberBackButton).toBeVisible();
+  };
+
+  await openMemberScreen();
 
   const userContext = await browser.newContext({
     baseURL: "http://127.0.0.1:3000",
@@ -59,10 +70,7 @@ test("member lifecycle management is available @issue-37", async ({
   await userPage.getByRole("button", { name: "변경 완료" }).click();
   await expect(userPage).toHaveURL(/\/$/);
 
-  if (await memberCard.isVisible()) {
-    await memberCard.getByRole("button", { name: "접속" }).click();
-  }
-  await expect(page.getByRole("heading", { name: "회원 관리" })).toBeVisible();
+  await openMemberScreen();
   await page.getByRole("spinbutton", { name: "학번" }).fill("2099999999");
   await page.getByPlaceholder("이름", { exact: true }).fill("신규 회원");
   await page.getByPlaceholder("전화번호").fill("01077778888");
@@ -98,10 +106,7 @@ test("member lifecycle management is available @issue-37", async ({
   await expect(userPage).toHaveURL(/\/login/);
   await userContext.close();
 
-  if (await memberCard.isVisible()) {
-    await memberCard.getByRole("button", { name: "접속" }).click();
-  }
-  await expect(page.getByRole("heading", { name: "회원 관리" })).toBeVisible();
+  await openMemberScreen();
   const csv = [
     "student_number,username,phone_number,department,favorite_team,reset_password",
     "2099999998,CSV 회원,01012341234,통계학과,1,false",

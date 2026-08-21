@@ -76,14 +76,16 @@ ON CONFLICT (id) DO UPDATE SET
   password_changed_at = NOW(),
   updated_at = NOW();
 
--- 3) 오늘 경기 5개 (다양한 상태)
+-- 3) 오늘(KST 기준) 경기 5개 (다양한 상태)
+-- 앱은 KST 날짜로 경기를 조회하므로 UTC CURRENT_DATE를 쓰면
+-- KST 자정~오전 9시 사이에 "오늘 경기"가 비어 보인다.
 INSERT INTO public.games (id, game_date, game_time, home_team_id, away_team_id, home_pitcher, away_pitcher, home_score, away_score, game_status, created_at, updated_at)
 VALUES
-  (901, CURRENT_DATE, '18:30', 1, 6, '양현종', '원태인', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
-  (902, CURRENT_DATE, '18:30', 9, 4, '임찬규', '곽빈', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
-  (903, CURRENT_DATE, '18:30', 2, 8, '류진욱', '박세웅', 3, 1, 'IN_PROGRESS', NOW(), NOW()),
-  (904, CURRENT_DATE, '18:30', 5, 3, '벤자민', '에르난데스', 5, 2, 'FINISHED', NOW(), NOW()),
-  (905, CURRENT_DATE, '18:30', 7, 10, '김광현', '문동주', NULL, NULL, 'CANCELED', NOW(), NOW());
+  (901, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 1, 6, '양현종', '원태인', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
+  (902, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 9, 4, '임찬규', '곽빈', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
+  (903, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 2, 8, '류진욱', '박세웅', 3, 1, 'IN_PROGRESS', NOW(), NOW()),
+  (904, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 5, 3, '벤자민', '에르난데스', 5, 2, 'FINISHED', NOW(), NOW()),
+  (905, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 7, 10, '김광현', '문동주', NULL, NULL, 'CANCELED', NOW(), NOW());
 
 -- 4) settings (b값)
 INSERT INTO public.settings (key, value, updated_at)
