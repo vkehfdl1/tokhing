@@ -25,18 +25,20 @@
 ```bash
 supabase start
 npm run db:reset:local
-
-ADMIN_BOOTSTRAP_CONFIRM=CREATE_INITIAL_OWNER \
-ADMIN_BOOTSTRAP_USERNAME=owner \
-ADMIN_BOOTSTRAP_DISPLAY_NAME='초기 운영자' \
-ADMIN_BOOTSTRAP_PASSWORD='12자 이상의 강한 비밀번호' \
-npm run admin:bootstrap:local
-
 npm run dev:local
 ```
 
-`admin:bootstrap:local`은 `supabase status -o env`에서 얻은
-`127.0.0.1` URL과 로컬 service-role key만 사용합니다.
+`db:reset:local`이 로컬 전용 샘플 데이터를 넣습니다.
+
+- 어드민: `owner` / `OwnerPass!234`
+- 일반 회원: `2024001` / `01012345678`
+- 일반 회원: `2024002` / `01087654321`
+- 일반 회원: `2024003` / `01011112222`
+- Supabase Studio: `http://127.0.0.1:54323`
+
+샘플 OWNER를 쓰지 않고 빈 DB에 직접 생성할 때만
+`admin:bootstrap:local`을 사용합니다. 이 명령은 `supabase status -o env`에서
+얻은 `127.0.0.1` URL과 로컬 service-role key만 사용합니다.
 
 ## 기존 운영 환경의 최초 OWNER 이관
 

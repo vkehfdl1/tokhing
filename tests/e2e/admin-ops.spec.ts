@@ -221,7 +221,6 @@ test("draft season policy management is available @issue-39", async ({
   await page.getByPlaceholder("운영자 비밀번호").fill("OwnerPass!234");
   await page.getByRole("button", { name: "로그인" }).click();
 
-<<<<<<< HEAD
   const seasonCard = page
     .getByRole("heading", { name: "시즌 관리" })
     .locator("..");

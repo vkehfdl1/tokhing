@@ -48,6 +48,34 @@ VALUES
   ('a3333333-3333-3333-3333-333333333333', 2024003, '이마켓', '01011112222', '통계학과', 'member', 2,
    encode(digest('01011112222', 'sha256'), 'hex'), FALSE, NOW(), NOW());
 
+-- 2-1) 로컬 어드민 샘플 계정 (seed 전용; 운영 DB에는 삽입하지 않음)
+-- 아이디: owner / 비밀번호: OwnerPass!234
+INSERT INTO public.admin_operators (
+  id, username, display_name, role, password_hash, is_active,
+  must_change_password, password_changed_at, created_at, updated_at
+)
+VALUES (
+  'b1111111-1111-1111-1111-111111111111',
+  'owner',
+  '로컬 초기 운영자',
+  'OWNER',
+  'scrypt$00112233445566778899aabbccddeeff$8c8b48bd684b1f1dc51c529377189d81fb3f74ea1ef096f97c6905b5f2f747d5fbf418f9add7e55fb2b1e3aff65153cd0910706d147b0ad342cf243adf0a2653',
+  TRUE,
+  FALSE,
+  NOW(),
+  NOW(),
+  NOW()
+)
+ON CONFLICT (id) DO UPDATE SET
+  username = EXCLUDED.username,
+  display_name = EXCLUDED.display_name,
+  role = EXCLUDED.role,
+  password_hash = EXCLUDED.password_hash,
+  is_active = TRUE,
+  must_change_password = FALSE,
+  password_changed_at = NOW(),
+  updated_at = NOW();
+
 -- 3) 오늘 경기 5개 (다양한 상태)
 INSERT INTO public.games (id, game_date, game_time, home_team_id, away_team_id, home_pitcher, away_pitcher, home_score, away_score, game_status, created_at, updated_at)
 VALUES
