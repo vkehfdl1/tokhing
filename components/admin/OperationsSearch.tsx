@@ -12,9 +12,9 @@ type OperationsUser = Readonly<{
   username: string;
   department: string;
   wallets: ReadonlyArray<{ season_id: number; balance: number }>;
-  orders: ReadonlyArray<{ id: number }>;
-  positions: ReadonlyArray<{ id: number }>;
-  transactions: ReadonlyArray<{ id: number }>;
+  order_count: number;
+  position_count: number;
+  transaction_count: number;
 }>;
 
 type OperationsResponse = Readonly<{
@@ -87,9 +87,9 @@ export default function OperationsSearch() {
         user.username,
         user.department,
         String(user.wallets[0]?.balance ?? 0),
-        String(user.orders.length),
-        String(user.positions.length),
-        String(user.transactions.length),
+        String(user.order_count),
+        String(user.position_count),
+        String(user.transaction_count),
       ]),
     ];
     const csv = rows
@@ -200,7 +200,9 @@ export default function OperationsSearch() {
             <p className="font-bold text-black">
               {user.username} · {user.student_number}
             </p>
-            <p className="text-xs text-muted-foreground">{user.department}</p>
+            {user.department ? (
+              <p className="text-xs text-muted-foreground">{user.department}</p>
+            ) : null}
             <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs">
               <div className="rounded-lg bg-gray-50 p-2">
                 <p className="text-muted-foreground">잔액</p>
@@ -210,16 +212,16 @@ export default function OperationsSearch() {
               </div>
               <div className="rounded-lg bg-gray-50 p-2">
                 <p className="text-muted-foreground">주문</p>
-                <p className="font-bold text-black">{user.orders.length}</p>
+                <p className="font-bold text-black">{user.order_count}</p>
               </div>
               <div className="rounded-lg bg-gray-50 p-2">
                 <p className="text-muted-foreground">포지션</p>
-                <p className="font-bold text-black">{user.positions.length}</p>
+                <p className="font-bold text-black">{user.position_count}</p>
               </div>
               <div className="rounded-lg bg-gray-50 p-2">
                 <p className="text-muted-foreground">거래</p>
                 <p className="font-bold text-black">
-                  {user.transactions.length}
+                  {user.transaction_count}
                 </p>
               </div>
             </div>
