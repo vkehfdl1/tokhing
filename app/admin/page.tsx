@@ -2114,6 +2114,74 @@ function AdminDashboard({
             : "grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"
         }`}
       >
+        <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
+          <h3
+            className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            경기 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            날짜를 직접 선택해 경기 정보를 조회/수정합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("matches")}
+            className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
+          <h3
+            className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            마켓 정산/상태 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            정산 실행, CLOSE, CANCEL(원가 환급)을 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("markets")}
+            className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            회원 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            회원 검색, 등록, 비활성화, CSV 반영, 지갑 복구를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("members")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            시즌 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            시즌 생성, 활성화, 종료를 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("seasons")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
@@ -2149,74 +2217,6 @@ function AdminDashboard({
             </Button>
           </Card>
         )}
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            회원 관리
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            회원 검색, 등록, 비활성화, CSV 반영, 지갑 복구를 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("members")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
-          <h3
-            className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            시즌 관리
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            시즌 생성, 활성화, 종료를 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("seasons")}
-            className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            경기 관리
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            날짜를 직접 선택해 경기 정보를 조회/수정합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("matches")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
-
-        <Card className={isMobile ? "p-4" : "p-6"}>
-          <h3
-            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
-          >
-            마켓 정산/상태 관리
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            정산 실행, CLOSE, CANCEL(원가 환급)을 관리합니다.
-          </p>
-          <Button
-            onClick={() => setCurrentView("markets")}
-            className={isMobile ? "w-full" : ""}
-          >
-            접속
-          </Button>
-        </Card>
 
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
