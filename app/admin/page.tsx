@@ -1,6 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import AdminAuditLog from "@/components/admin/AdminAuditLog";
+import AdminAuthGate, {
+  type AdminControls,
+} from "@/components/admin/AdminAuthGate";
+import MemberManagement from "@/components/admin/MemberManagement";
+import OperationsSearch from "@/components/admin/OperationsSearch";
+import SettlementRecovery from "@/components/admin/SettlementRecovery";
+import MatchCorrection from "@/components/admin/MatchCorrection";
+import TeamManagement from "@/components/admin/TeamManagement";
+import WalletRecovery from "@/components/admin/WalletRecovery";
+import WeeklyGrantManagement from "@/components/admin/WeeklyGrantManagement";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -9,6 +25,9 @@ import { Select } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { useIsMobile } from "@/lib/hooks/useResponsive";
 import { DefaultInput } from "@/components/ui/default_input";
+import { saveAdminGames } from "@/lib/admin/client";
+import { resolveAdminTeamMappings } from "@/lib/admin/team-client";
+import type { AdminOperator } from "@/lib/admin/types";
 import {
   adminGrantCoins,
   adminResetPassword,
@@ -94,38 +113,6 @@ const formatDateTimeLabel = (date: string, time: string | null) => {
 
 const normalizeTeamKey = (value: string) => value.trim().toLowerCase();
 
-const createUniqueShortName = (
-  teamName: string,
-  usedShortNames: Set<string>
-): string => {
-  const sanitized = teamName.replace(/\s+/g, "").replace(/[^0-9A-Za-z가-힣]/g, "");
-  const base = (sanitized || "TEAM").slice(0, 10);
-
-  let candidate = base;
-  let suffix = 2;
-  while (usedShortNames.has(normalizeTeamKey(candidate))) {
-    const suffixText = String(suffix);
-    const prefix = base.slice(0, Math.max(1, 10 - suffixText.length));
-    candidate = `${prefix}${suffixText}`.slice(0, 10);
-    suffix += 1;
-  }
-
-  usedShortNames.add(normalizeTeamKey(candidate));
-  return candidate;
-};
-
-const createUniqueRandomColor = (usedColors: Set<string>): string => {
-  for (let attempt = 0; attempt < 2000; attempt += 1) {
-    const random = Math.floor(Math.random() * 0xffffff);
-    const color = `#${random.toString(16).toUpperCase().padStart(6, "0")}`;
-    if (!usedColors.has(color)) {
-      usedColors.add(color);
-      return color;
-    }
-  }
-  throw new Error("고유한 팀 컬러 생성에 실패했습니다.");
-};
-
 // Match Management Component
 function MatchManagement({
   selectedDate,
@@ -144,15 +131,16 @@ function MatchManagement({
   const [initialPrices, setInitialPrices] = useState<InitialPricesFormState>(
     DEFAULT_INITIAL_PRICES
   );
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const isMobile = useIsMobile();
 
   const targetDate = selectedDate || getKSTDate(0);
 
-  const fetchTeams = async () => {
+  const fetchTeams = useCallback(async () => {
     const { data, error } = await supabase
       .from("teams")
       .select("*")
+      .eq("is_active", true)
       .order("name");
 
     if (error) {
@@ -160,9 +148,9 @@ function MatchManagement({
     } else {
       setTeams(data || []);
     }
-  };
+  }, [supabase]);
 
-  const fetchGames = async () => {
+  const fetchGames = useCallback(async () => {
     setLoading(true);
     setSaveMessage(null);
     const { data, error } = await supabase
@@ -177,15 +165,14 @@ function MatchManagement({
       setGames(data || []);
     }
     setLoading(false);
-  };
+  }, [supabase, targetDate]);
 
   useEffect(() => {
     queueMicrotask(() => {
       void fetchTeams();
       void fetchGames();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targetDate]);
+  }, [fetchGames, fetchTeams]);
 
   const addNewGame = () => {
     const newGame: Game = {
@@ -257,6 +244,7 @@ function MatchManagement({
   };
 
   const autoFillMatchesBySource = async (
+    sourceCode: "KBO" | "WBC",
     sourceLabel: string,
     fetchMatches: () => Promise<CrawledMatch[] | null>
   ) => {
@@ -270,86 +258,30 @@ function MatchManagement({
         return;
       }
 
-      // First, get team name to ID mappings
-      const { data: teamsData, error: teamsError } = await supabase
-        .from("teams")
-        .select("id, name, short_name, team_color");
-
-      if (teamsError) {
-        console.error("Error fetching teams:", teamsError);
-        alert("Error fetching team data.");
-        return;
-      }
-
-      const currentTeams: Team[] = (teamsData ?? []) as Team[];
-      const teamNameToId = new Map<string, number>();
-      const registerTeamAliases = (team: Team) => {
-        teamNameToId.set(normalizeTeamKey(team.name), team.id);
-        teamNameToId.set(normalizeTeamKey(team.short_name), team.id);
-      };
-
-      currentTeams.forEach(registerTeamAliases);
-
-      const missingTeamNames = [
+      const externalTeamNames = [
         ...new Set(
           crawledData
             .flatMap((match) => [match.homeTeam, match.awayTeam])
             .map((name) => name.trim())
             .filter((name) => name.length > 0)
-            .filter((name) => !teamNameToId.has(normalizeTeamKey(name)))
         ),
       ];
-
-      let insertedTeamsCount = 0;
-      if (missingTeamNames.length > 0) {
-        const usedShortNames = new Set(
-          currentTeams.map((team) => normalizeTeamKey(team.short_name))
-        );
-        const usedColors = new Set(
-          currentTeams
-            .map((team) => team.team_color)
-            .filter(
-              (color): color is string =>
-                typeof color === "string" && /^#[0-9A-F]{6}$/i.test(color)
-            )
-            .map((color) => color.toUpperCase())
-        );
-
-        const newTeamsPayload = missingTeamNames.map((name) => ({
-          name,
-          short_name: createUniqueShortName(name, usedShortNames),
-          team_color: createUniqueRandomColor(usedColors),
-        }));
-
-        const { data: insertedTeams, error: insertTeamsError } = await supabase
-          .from("teams")
-          .insert(newTeamsPayload)
-          .select("id, name, short_name, team_color");
-
-        if (insertTeamsError) {
-          console.error("Error auto-mapping missing teams:", insertTeamsError);
-          alert(
-            `누락 팀 자동 매핑 중 오류가 발생했습니다: ${insertTeamsError.message}`
-          );
-          return;
-        }
-
-        const inserted = (insertedTeams ?? []) as Team[];
-        insertedTeamsCount = inserted.length;
-        inserted.forEach(registerTeamAliases);
-
-        if (inserted.length > 0) {
-          setTeams((prev) => {
-            const byId = new Map<number, Team>();
-            [...prev, ...inserted].forEach((team) => {
-              byId.set(team.id, team);
-            });
-            return Array.from(byId.values()).sort((a, b) =>
-              a.name.localeCompare(b.name, "ko-KR")
-            );
-          });
-        }
-      }
+      const mappings = await resolveAdminTeamMappings(
+        sourceCode,
+        externalTeamNames,
+      );
+      const teamNameToId = new Map(
+        mappings
+          .filter(
+            (mapping): mapping is typeof mapping & { team_id: number } =>
+              mapping.mapping_status === "MAPPED" &&
+              typeof mapping.team_id === "number",
+          )
+          .map((mapping) => [
+            normalizeTeamKey(mapping.external_name),
+            mapping.team_id,
+          ]),
+      );
 
       // Convert crawled data to Game objects
       const crawledGames: Game[] = [];
@@ -365,12 +297,15 @@ function MatchManagement({
         if (!awayTeamId) {
           unmatchedTeams.push(match.awayTeam);
         }
+        if (!homeTeamId || !awayTeamId) {
+          return;
+        }
 
         crawledGames.push({
           game_date: targetDate,
           game_time: match.startTime,
-          home_team_id: homeTeamId || 0,
-          away_team_id: awayTeamId || 0,
+          home_team_id: homeTeamId,
+          away_team_id: awayTeamId,
           home_pitcher: match.homePitcher || "",
           away_pitcher: match.awayPitcher || "",
           home_score: match.score ? match.score.home || 0 : 0,
@@ -432,15 +367,11 @@ function MatchManagement({
         newMatchesCount - updatedMatchesCount
       }개의 새로운 경기가 추가되었고, ${updatedMatchesCount}개의 기존 경기가 업데이트되었습니다.`;
 
-      if (insertedTeamsCount > 0) {
-        message += `\n\n팀 자동 매핑: ${insertedTeamsCount}개 팀을 teams에 신규 등록했습니다.`;
-      }
-
       if (unmatchedTeams.length > 0) {
         const uniqueUnmatchedTeams = [...new Set(unmatchedTeams)];
-        message += `\n\n경고: 자동 매핑 이후에도 일부 팀을 찾을 수 없어 ID 0으로 설정했습니다: ${uniqueUnmatchedTeams.join(
-          ", "
-        )}`;
+        message += `\n\n승인 필요: ${uniqueUnmatchedTeams.join(
+          ", ",
+        )}. 임의 팀을 만들지 않고 팀 관리의 승인 대기 목록으로 보냈으며, 해당 경기는 제외했습니다.`;
       }
 
       message += "\n\n변경 사항을 검토하고 저장해 주세요.";
@@ -454,11 +385,13 @@ function MatchManagement({
   };
 
   const autoFillMatches = async () => {
-    await autoFillMatchesBySource("KBO", () => getGameData(targetDate));
+    await autoFillMatchesBySource("KBO", "KBO", () =>
+      getGameData(targetDate),
+    );
   };
 
   const autoFillMatchesFromNaverSports = async () => {
-    await autoFillMatchesBySource("네이버 스포츠", () =>
+    await autoFillMatchesBySource("WBC", "네이버 스포츠", () =>
       getNaverWbcGameData(targetDate)
     );
   };
@@ -476,41 +409,10 @@ function MatchManagement({
       const existingGameIds = existingGames
         .map((game) => Number(game.id))
         .filter((gameId) => Number.isFinite(gameId) && gameId > 0);
-      const insertedGameIds: number[] = [];
-
-      // Update existing games
-      for (const game of existingGames) {
-        const { id, ...gameData } = game;
-        const { error } = await supabase
-          .from("games")
-          .update(gameData)
-          .eq("id", id);
-
-        if (error) {
-          console.error("Error updating game:", error);
-          throw error;
-        }
-      }
-
-      // Insert new games
-      if (newGames.length > 0) {
-        const { data, error } = await supabase
-          .from("games")
-          .insert(newGames)
-          .select("id");
-
-        if (error) {
-          console.error("Error inserting games:", error);
-          throw error;
-        }
-
-        (data ?? []).forEach((row) => {
-          const parsed = Number((row as { id: number | string }).id);
-          if (Number.isFinite(parsed) && parsed > 0) {
-            insertedGameIds.push(parsed);
-          }
-        });
-      }
+      const insertedGameIds = await saveAdminGames(targetDate, [
+        ...existingGames,
+        ...newGames,
+      ]);
 
       const gameIdsForMarketSync = [...existingGameIds, ...insertedGameIds];
       const marketSyncResult = await ensureMarketsForGames(
@@ -1233,28 +1135,38 @@ function MarketSettlementManagement() {
     text: string;
   } | null>(null);
 
-  const getDefaultOutcome = (market: MarketListItem): MarketOutcome | null => {
-    if (market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED") {
+  const getDefaultOutcome = useCallback(
+    (market: MarketListItem): MarketOutcome | null => {
+      if (
+        market.gameStatus === "CANCELED" ||
+        market.marketStatus === "CANCELED"
+      ) {
+        return null;
+      }
+
+      const result = market.result?.toUpperCase();
+      if (
+        result === "HOME" ||
+        result === "AWAY" ||
+        result === "DRAW"
+      ) {
+        return result;
+      }
+
+      if (
+        market.gameStatus === "FINISHED" &&
+        market.homeScore != null &&
+        market.awayScore != null
+      ) {
+        if (market.homeScore > market.awayScore) return "HOME";
+        if (market.awayScore > market.homeScore) return "AWAY";
+        return "DRAW";
+      }
+
       return null;
-    }
-
-    const result = market.result?.toUpperCase();
-    if (result === "HOME" || result === "AWAY" || result === "DRAW") {
-      return result;
-    }
-
-    if (
-      market.gameStatus === "FINISHED" &&
-      market.homeScore != null &&
-      market.awayScore != null
-    ) {
-      if (market.homeScore > market.awayScore) return "HOME";
-      if (market.awayScore > market.homeScore) return "AWAY";
-      return "DRAW";
-    }
-
-    return null;
-  };
+    },
+    [],
+  );
 
   const isAutoDetected = (market: MarketListItem): boolean => {
     if (market.result) return false;
@@ -1269,7 +1181,7 @@ function MarketSettlementManagement() {
   const isGameCanceled = (market: MarketListItem): boolean =>
     market.gameStatus === "CANCELED" || market.marketStatus === "CANCELED";
 
-  const fetchMarkets = async () => {
+  const fetchMarkets = useCallback(async () => {
     try {
       setLoading(true);
       const marketList = await getMarkets(selectedDate);
@@ -1298,14 +1210,13 @@ function MarketSettlementManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getDefaultOutcome, selectedDate]);
 
   useEffect(() => {
     queueMicrotask(() => {
       void fetchMarkets();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate]);
+  }, [fetchMarkets]);
 
   const updateSelectedResult = (marketId: number, value: string) => {
     if (value !== "HOME" && value !== "AWAY" && value !== "DRAW") {
@@ -1738,7 +1649,11 @@ function PasswordResetManagement() {
   );
 }
 
-function CoinGrantManagement() {
+function CoinGrantManagement({
+  onReauthenticate,
+}: {
+  onReauthenticate: () => Promise<boolean>;
+}) {
   const isMobile = useIsMobile();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
@@ -1946,7 +1861,9 @@ function CoinGrantManagement() {
         </div>
       ) : null}
 
-      <Card className={isMobile ? "p-4" : "p-6"}>
+      <WeeklyGrantManagement onReauthenticate={onReauthenticate} />
+
+      <Card className="hidden">
         <div className={`${isMobile ? "space-y-3" : "flex items-center justify-between"}`}>
           <div>
             <h3 className="font-semibold text-black mb-2">pg_cron 자동 지급 상태</h3>
@@ -1979,7 +1896,7 @@ function CoinGrantManagement() {
         </div>
       </Card>
 
-      <Card className={isMobile ? "p-4" : "p-6"}>
+      <Card className="hidden">
         <h3 className="font-semibold text-black mb-2">전체 유저 코인 지급</h3>
         <p className="text-sm text-muted-foreground mb-4">
           distribute_weekly_coins(p_amount) RPC를 즉시 실행합니다.
@@ -2064,16 +1981,29 @@ function CoinGrantManagement() {
 }
 
 // Admin Dashboard Component
-function AdminDashboard() {
+function AdminDashboard({
+  operator,
+  controls,
+}: {
+  operator: AdminOperator;
+  controls: AdminControls;
+}) {
   const isMobile = useIsMobile();
   const [currentView, setCurrentView] = useState<
     | "dashboard"
+    | "audit"
+    | "members"
+    | "teams"
     | "seasons"
     | "matches"
     | "coins"
     | "markets"
     | "liquidity"
     | "password"
+    | "wallet"
+    | "matchCheck"
+    | "settlementCheck"
+    | "operations"
   >("dashboard");
   const [selectedMatchDate, setSelectedMatchDate] = useState(getKSTDate(0));
 
@@ -2083,6 +2013,19 @@ function AdminDashboard() {
     const kst = new Date(utc + 9 * 3600000);
     return kst.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
   };
+
+  if (currentView === "audit") {
+    return <AdminAuditLog onBack={() => setCurrentView("dashboard")} />;
+  }
+
+  if (currentView === "members") {
+    return (
+      <MemberManagement
+        operator={operator}
+        onBack={() => setCurrentView("dashboard")}
+      />
+    );
+  }
 
   if (currentView !== "dashboard") {
     return (
@@ -2101,9 +2044,11 @@ function AdminDashboard() {
         </div>
 
         {currentView === "seasons" ? (
-          <SeasonManagement />
+          <SeasonManagement onReauthenticate={controls.reauthenticate} />
+        ) : currentView === "teams" ? (
+          <TeamManagement onReauthenticate={controls.reauthenticate} />
         ) : currentView === "coins" ? (
-          <CoinGrantManagement />
+          <CoinGrantManagement onReauthenticate={controls.reauthenticate} />
         ) : currentView === "password" ? (
           <PasswordResetManagement />
         ) : currentView === "markets" ? (
@@ -2115,6 +2060,14 @@ function AdminDashboard() {
             selectedDate={selectedMatchDate}
             onDateChange={setSelectedMatchDate}
           />
+        ) : currentView === "wallet" ? (
+          <WalletRecovery />
+        ) : currentView === "matchCheck" ? (
+          <MatchCorrection />
+        ) : currentView === "settlementCheck" ? (
+          <SettlementRecovery />
+        ) : currentView === "operations" ? (
+          <OperationsSearch />
         ) : (
           <div className="text-sm text-muted-foreground">잘못된 메뉴 상태입니다.</div>
         )}
@@ -2126,13 +2079,10 @@ function AdminDashboard() {
         >
           <Button
             variant="outline"
-            onClick={() => {
-              sessionStorage.removeItem("admin_authenticated");
-              window.location.reload();
-            }}
+            onClick={() => void controls.logout()}
             className={isMobile ? "w-full max-w-xs" : ""}
           >
-            Logout
+            로그아웃
           </Button>
         </div>
       </div>
@@ -2147,10 +2097,10 @@ function AdminDashboard() {
             isMobile ? "text-2xl" : "text-3xl"
           }`}
         >
-          ToKHin&apos; 관리자 대시보드
+          운영 대시보드
         </h1>
         <p className="text-muted-foreground">
-          ToKHin&apos; 관리 대시보드에 오신 것을 환영합니다.
+          경기, 시즌, 회원과 마켓 운영 기능을 관리합니다.
         </p>
         <div className="text-sm text-muted-foreground mt-2">
           현재 시각: {getCurrentKSTTime()}
@@ -2168,13 +2118,30 @@ function AdminDashboard() {
           <h3
             className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
           >
-            시즌 관리
+            경기 관리
           </h3>
           <p className="text-muted-foreground mb-4">
-            시즌 생성, 활성화, 종료를 관리합니다.
+            날짜를 직접 선택해 경기 정보를 조회/수정합니다.
           </p>
           <Button
-            onClick={() => setCurrentView("seasons")}
+            onClick={() => setCurrentView("matches")}
+            className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={`rounded-2xl border-tokhin-green/30 bg-tokhin-green/5 ${isMobile ? "p-4" : "p-6"}`}>
+          <h3
+            className={`font-bold mb-3 text-black ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            마켓 정산/상태 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            정산 실행, CLOSE, CANCEL(원가 환급)을 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("markets")}
             className={`bg-tokhin-green text-white hover:bg-tokhin-green/90 ${isMobile ? "w-full" : ""}`}
           >
             접속
@@ -2185,13 +2152,13 @@ function AdminDashboard() {
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
           >
-            경기 관리
+            회원 관리
           </h3>
           <p className="text-muted-foreground mb-4">
-            날짜를 직접 선택해 경기 정보를 조회/수정합니다.
+            회원 검색, 등록, 비활성화, CSV 반영, 지갑 복구를 관리합니다.
           </p>
           <Button
-            onClick={() => setCurrentView("matches")}
+            onClick={() => setCurrentView("members")}
             className={isMobile ? "w-full" : ""}
           >
             접속
@@ -2202,18 +2169,54 @@ function AdminDashboard() {
           <h3
             className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
           >
-            마켓 정산/상태 관리
+            시즌 관리
           </h3>
           <p className="text-muted-foreground mb-4">
-            정산 실행, CLOSE, CANCEL(원가 환급)을 관리합니다.
+            시즌 생성, 활성화, 종료를 관리합니다.
           </p>
           <Button
-            onClick={() => setCurrentView("markets")}
+            onClick={() => setCurrentView("seasons")}
             className={isMobile ? "w-full" : ""}
           >
             접속
           </Button>
         </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            팀 관리
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            팀 원장, 소스 별칭, 승인 대기 매핑과 중복 병합을 관리합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("teams")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        {operator.role !== "VIEWER" && (
+          <Card className={isMobile ? "p-4" : "p-6"}>
+            <h3
+              className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+            >
+              작업 감사 로그
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              운영자 변경 작업의 성공·실패 이력을 확인합니다.
+            </p>
+            <Button
+              onClick={() => setCurrentView("audit")}
+              className={isMobile ? "w-full" : ""}
+            >
+              접속
+            </Button>
+          </Card>
+        )}
 
         <Card className={isMobile ? "p-4" : "p-6"}>
           <h3
@@ -2265,6 +2268,74 @@ function AdminDashboard() {
             접속
           </Button>
         </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            지갑 조정
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            특정 회원의 잔액을 직접 더하거나 빼고, 잘못된 지급을 되돌립니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("wallet")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            경기 삭제 점검
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            경기를 지우기 전에 거래가 걸려 있는지 미리 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("matchCheck")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            정산 점검
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            정산된 마켓의 지급 내역과 회수 가능 여부를 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("settlementCheck")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
+
+        <Card className={isMobile ? "p-4" : "p-6"}>
+          <h3
+            className={`font-semibold mb-3 ${isMobile ? "text-lg" : "text-xl"}`}
+          >
+            운영 현황 조회
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            시즌별 회원 잔액과 거래 활동을 조회 전용으로 확인합니다.
+          </p>
+          <Button
+            onClick={() => setCurrentView("operations")}
+            className={isMobile ? "w-full" : ""}
+          >
+            접속
+          </Button>
+        </Card>
       </div>
 
       <div
@@ -2274,10 +2345,7 @@ function AdminDashboard() {
       >
         <Button
           variant="outline"
-          onClick={() => {
-            sessionStorage.removeItem("admin_authenticated");
-            window.location.reload();
-          }}
+          onClick={() => void controls.logout()}
           className={isMobile ? "w-full max-w-xs" : ""}
         >
           로그아웃
@@ -2287,131 +2355,13 @@ function AdminDashboard() {
   );
 }
 
-// Login Form Component
-function LoginForm({ onAuthenticated }: { onAuthenticated: () => void }) {
-  const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Hash function using Web Crypto API
-  async function hashPassword(password: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest("SHA-256", data);
-    const hashArray = Array.from(new Uint8Array(hash));
-    return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
-
-    try {
-      // Hash the input password
-      const hashedInput = await hashPassword(password);
-
-      // Get the stored hash from environment variable
-      // In production, you'll set NEXT_PUBLIC_ADMIN_PASSWORD_HASH in your environment
-      const storedHash = process.env.NEXT_PUBLIC_ADMIN_PASSWORD_HASH;
-
-      if (!storedHash) {
-        setError("Admin authentication not configured");
-        setIsLoading(false);
-        return;
-      }
-
-      // Compare hashes
-      if (hashedInput === storedHash) {
-        // Store authentication state in session storage
-        sessionStorage.setItem("admin_authenticated", "true");
-        onAuthenticated();
-      } else {
-        setError("Invalid password");
-      }
-    } catch (err) {
-      console.error("Authentication error:", err);
-      setError("Authentication failed");
-    }
-
-    setIsLoading(false);
-    setPassword(""); // Clear password field for security
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <Card className="w-full max-w-md p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold mb-2">ToKHin&apos; 관리</h1>
-          <p className="text-muted-foreground">
-            프런트 인증을 위해 비밀번호를 입력하세요
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Input
-              type="password"
-              placeholder="운영진 비밀번호"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-              autoFocus
-            />
-          </div>
-
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={isLoading || !password}
-          >
-            {isLoading ? "인증 중..." : "프런트 인증하기"}
-          </Button>
-        </form>
-
-        <div className="mt-6 text-xs text-muted-foreground">
-          <p>⚠️ 이 메뉴는 루킹 프런트만 접근할 수 있습니다.</p>
-        </div>
-      </Card>
-    </div>
-  );
-}
-
 // Main Admin Page Component
 export default function AdminPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    queueMicrotask(() => {
-      const authenticated =
-        sessionStorage.getItem("admin_authenticated") === "true";
-      setIsAuthenticated(authenticated);
-      setIsLoading(false);
-    });
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm onAuthenticated={() => setIsAuthenticated(true)} />;
-  }
-
-  return <AdminDashboard />;
+  return (
+    <AdminAuthGate>
+      {(operator, controls) => (
+        <AdminDashboard operator={operator} controls={controls} />
+      )}
+    </AdminAuthGate>
+  );
 }
