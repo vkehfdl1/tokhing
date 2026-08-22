@@ -108,7 +108,9 @@ export function SeasonManagement() {
   };
 
   useEffect(() => {
-    void fetchAll();
+    queueMicrotask(() => {
+      void fetchAll();
+    });
   }, []);
 
   const openCreate = () => {

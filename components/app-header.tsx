@@ -42,7 +42,7 @@ export default function AppHeader() {
     } catch (error) {
       console.error("Failed to refresh wallet balance:", error);
     }
-  }, [session?.user_id]);
+  }, [session]);
 
   const handleLogout = useCallback(() => {
     clearAllAuthState();
@@ -51,11 +51,15 @@ export default function AppHeader() {
 
   useEffect(() => {
     if (!canShowBalance) {
-      setBalance(null);
+      queueMicrotask(() => {
+        setBalance(null);
+      });
       return;
     }
 
-    void refreshBalance();
+    queueMicrotask(() => {
+      void refreshBalance();
+    });
 
     const intervalId = window.setInterval(() => {
       void refreshBalance();

@@ -123,3 +123,4 @@ ToKHin' 은 시즌 단위로 코인이 격리된다. 각 시즌은 독립된 잔
 ### Migrations
 - `20260518000000_us_seasons_schema.sql` — 테이블, 컬럼, 백필, UNIQUE swap, SEASON_GRANT 합성
 - `20260518000001_us_seasons_rpcs.sql` — 시즌 라이프사이클 RPC 5개 + 기존 RPC 17개 시즌-인식 업데이트
+

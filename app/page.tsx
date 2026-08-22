@@ -227,7 +227,9 @@ export default function HomePage() {
       return;
     }
 
-    void fetchAndSetMarkets();
+    queueMicrotask(() => {
+      void fetchAndSetMarkets();
+    });
   }, [fetchAndSetMarkets, session?.user_id]);
 
   useEffect(() => {
@@ -235,7 +237,7 @@ export default function HomePage() {
       setClosedHours(isMarketClosedHours());
       setCurrentTime(Date.now());
     };
-    checkClosed();
+    queueMicrotask(checkClosed);
     const id = window.setInterval(checkClosed, 30000);
     return () => window.clearInterval(id);
   }, []);
