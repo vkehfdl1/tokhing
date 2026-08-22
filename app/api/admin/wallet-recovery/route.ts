@@ -38,14 +38,55 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdminSession(request);
     const service = createAdminServiceClient();
-    const { data, error } = await service
-      .from("users")
-      .select(
-        "id,student_number,username,wallets(id,season_id,balance),transactions(id,season_id,type,amount,balance_after,reason,internal_memo,reverses_transaction_id,created_at)",
-      )
+    const { data: publicUsers, error: userError } = await service
+      .from("users_public")
+      .select("id,student_number,username")
       .order("student_number");
-    if (error) fail(error.message);
-    return NextResponse.json({ users: data });
+    if (userError) fail(userError.message);
+
+    const [{ data: wallets, error: walletError }, txResult] = await Promise.all([
+      service.from("wallets").select("id,user_id,season_id,balance"),
+      service
+        .from("transactions")
+        .select(
+          "id,user_id,season_id,type,amount,balance_after,reason,internal_memo,reverses_transaction_id,created_at",
+        )
+        .order("created_at", { ascending: false }),
+    ]);
+    if (walletError) fail(walletError.message);
+
+    let transactions: Array<Record<string, unknown>> | null = txResult.data;
+    if (txResult.error) {
+      const fallback = await service
+        .from("transactions")
+        .select("id,user_id,season_id,type,amount,balance_after,created_at")
+        .order("created_at", { ascending: false });
+      if (fallback.error) fail(fallback.error.message);
+      transactions = fallback.data;
+    }
+
+    const walletsByUser = new Map<string, unknown[]>();
+    for (const wallet of wallets ?? []) {
+      const list = walletsByUser.get(wallet.user_id) ?? [];
+      list.push(wallet);
+      walletsByUser.set(wallet.user_id, list);
+    }
+    const txByUser = new Map<string, unknown[]>();
+    for (const tx of transactions ?? []) {
+      const userId = String(tx.user_id ?? "");
+      if (!userId) continue;
+      const list = txByUser.get(userId) ?? [];
+      list.push(tx);
+      txByUser.set(userId, list);
+    }
+
+    return NextResponse.json({
+      users: (publicUsers ?? []).map((user) => ({
+        ...user,
+        wallets: walletsByUser.get(user.id) ?? [],
+        transactions: txByUser.get(user.id) ?? [],
+      })),
+    });
   } catch (error) {
     return adminErrorResponse(error);
   }
