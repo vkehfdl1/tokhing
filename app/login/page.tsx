@@ -52,12 +52,7 @@ export default function LoginPage() {
     try {
       const result = await login(studentNumber.trim(), password);
 
-      if (
-        !result.success ||
-        !result.user_id ||
-        !result.username ||
-        typeof result.session_version !== "number"
-      ) {
+      if (!result.success || !result.user_id || !result.username) {
         setError(result.error || "학번 또는 비밀번호가 올바르지 않습니다");
         setIsLoading(false);
         return;
@@ -67,7 +62,6 @@ export default function LoginPage() {
         user_id: result.user_id,
         username: result.username,
         student_number: studentNumber.trim(),
-        session_version: result.session_version,
       };
 
       if (result.password_changed) {

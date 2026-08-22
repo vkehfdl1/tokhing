@@ -15,25 +15,27 @@ import { changePassword } from "@/lib/api";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const [hasCurrentSession] = useState(() => Boolean(getUserSession()));
-  const [pendingSession] = useState<UserSession | null>(() =>
-    getPendingPasswordChangeSession(),
-  );
+  const [pendingSession, setPendingSession] = useState<UserSession | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (hasCurrentSession) {
+    const currentSession = getUserSession();
+    if (currentSession) {
       router.replace("/");
       return;
     }
 
-    if (!pendingSession) {
+    const pending = getPendingPasswordChangeSession();
+    if (!pending) {
       router.replace("/login");
+      return;
     }
-  }, [hasCurrentSession, pendingSession, router]);
+
+    setPendingSession(pending);
+  }, [router]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();

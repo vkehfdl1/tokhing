@@ -32,60 +32,24 @@ VALUES
   (10, '한화 이글스', '한화', '#F37321', NOW())
 ON CONFLICT (id) DO NOTHING;
 
-SELECT setval(
-  pg_get_serial_sequence('public.teams', 'id'),
-  (SELECT MAX(id) FROM public.teams),
-  true
-);
-
 -- 2) 테스트 유저 3명
 INSERT INTO public.users (id, student_number, username, phone_number, department, type, favorite_team_id, password_hash, password_changed, created_at, updated_at)
 VALUES
-  ('a1111111-1111-4111-8111-111111111111', 2024001, '김테스트', '01012345678', '컴퓨터공학과', 'member', 1,
+  ('a1111111-1111-1111-1111-111111111111', 2024001, '김테스트', '01012345678', '컴퓨터공학과', 'member', 1,
    encode(digest('01012345678', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
-  ('a2222222-2222-4222-8222-222222222222', 2024002, '박예측', '01087654321', '경영학과', 'member', 9,
+  ('a2222222-2222-2222-2222-222222222222', 2024002, '박예측', '01087654321', '경영학과', 'member', 9,
    encode(digest('01087654321', 'sha256'), 'hex'), FALSE, NOW(), NOW()),
-  ('a3333333-3333-4333-8333-333333333333', 2024003, '이마켓', '01011112222', '통계학과', 'member', 2,
+  ('a3333333-3333-3333-3333-333333333333', 2024003, '이마켓', '01011112222', '통계학과', 'member', 2,
    encode(digest('01011112222', 'sha256'), 'hex'), FALSE, NOW(), NOW());
 
--- 2-1) 로컬 어드민 샘플 계정 (seed 전용; 운영 DB에는 삽입하지 않음)
--- 아이디: owner / 비밀번호: OwnerPass!234
-INSERT INTO public.admin_operators (
-  id, username, display_name, role, password_hash, is_active,
-  must_change_password, password_changed_at, created_at, updated_at
-)
-VALUES (
-  'b1111111-1111-4111-8111-111111111111',
-  'owner',
-  '로컬 초기 운영자',
-  'OWNER',
-  'scrypt$00112233445566778899aabbccddeeff$8c8b48bd684b1f1dc51c529377189d81fb3f74ea1ef096f97c6905b5f2f747d5fbf418f9add7e55fb2b1e3aff65153cd0910706d147b0ad342cf243adf0a2653',
-  TRUE,
-  FALSE,
-  NOW(),
-  NOW(),
-  NOW()
-)
-ON CONFLICT (id) DO UPDATE SET
-  username = EXCLUDED.username,
-  display_name = EXCLUDED.display_name,
-  role = EXCLUDED.role,
-  password_hash = EXCLUDED.password_hash,
-  is_active = TRUE,
-  must_change_password = FALSE,
-  password_changed_at = NOW(),
-  updated_at = NOW();
-
--- 3) 오늘(KST 기준) 경기 5개 (다양한 상태)
--- 앱은 KST 날짜로 경기를 조회하므로 UTC CURRENT_DATE를 쓰면
--- KST 자정~오전 9시 사이에 "오늘 경기"가 비어 보인다.
+-- 3) 오늘 경기 5개 (다양한 상태)
 INSERT INTO public.games (id, game_date, game_time, home_team_id, away_team_id, home_pitcher, away_pitcher, home_score, away_score, game_status, created_at, updated_at)
 VALUES
-  (901, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 1, 6, '양현종', '원태인', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
-  (902, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 9, 4, '임찬규', '곽빈', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
-  (903, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 2, 8, '류진욱', '박세웅', 3, 1, 'IN_PROGRESS', NOW(), NOW()),
-  (904, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 5, 3, '벤자민', '에르난데스', 5, 2, 'FINISHED', NOW(), NOW()),
-  (905, (NOW() AT TIME ZONE 'Asia/Seoul')::date, '18:30', 7, 10, '김광현', '문동주', NULL, NULL, 'CANCELED', NOW(), NOW());
+  (901, CURRENT_DATE, '18:30', 1, 6, '양현종', '원태인', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
+  (902, CURRENT_DATE, '18:30', 9, 4, '임찬규', '곽빈', NULL, NULL, 'SCHEDULED', NOW(), NOW()),
+  (903, CURRENT_DATE, '18:30', 2, 8, '류진욱', '박세웅', 3, 1, 'IN_PROGRESS', NOW(), NOW()),
+  (904, CURRENT_DATE, '18:30', 5, 3, '벤자민', '에르난데스', 5, 2, 'FINISHED', NOW(), NOW()),
+  (905, CURRENT_DATE, '18:30', 7, 10, '김광현', '문동주', NULL, NULL, 'CANCELED', NOW(), NOW());
 
 -- 4) settings (b값)
 INSERT INTO public.settings (key, value, updated_at)
@@ -106,19 +70,19 @@ UPDATE public.markets SET status = 'CANCELED' WHERE game_id = 905;
 -- 6) 지갑 생성 + 초기 코인 지급 (각 5000코인) - active 시즌(Season 1) 기준
 INSERT INTO public.wallets (id, user_id, season_id, balance, created_at, updated_at)
 VALUES
-  (gen_random_uuid(), 'a1111111-1111-4111-8111-111111111111', 1, 5000, NOW(), NOW()),
-  (gen_random_uuid(), 'a2222222-2222-4222-8222-222222222222', 1, 5000, NOW(), NOW()),
-  (gen_random_uuid(), 'a3333333-3333-4333-8333-333333333333', 1, 5000, NOW(), NOW());
+  (gen_random_uuid(), 'a1111111-1111-1111-1111-111111111111', 1, 5000, NOW(), NOW()),
+  (gen_random_uuid(), 'a2222222-2222-2222-2222-222222222222', 1, 5000, NOW(), NOW()),
+  (gen_random_uuid(), 'a3333333-3333-3333-3333-333333333333', 1, 5000, NOW(), NOW());
 
 INSERT INTO public.transactions (user_id, season_id, type, amount, balance_after, description, created_at)
 VALUES
-  ('a1111111-1111-4111-8111-111111111111', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
-  ('a2222222-2222-4222-8222-222222222222', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
-  ('a3333333-3333-4333-8333-333333333333', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW());
+  ('a1111111-1111-1111-1111-111111111111', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
+  ('a2222222-2222-2222-2222-222222222222', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW()),
+  ('a3333333-3333-3333-3333-333333333333', 1, 'WEEKLY_GRANT', 5000, 5000, '초기 코인 지급', NOW());
 
 -- 7) 테스트 거래: 김테스트가 KIA vs 삼성에서 HOME 10주 매수
 SELECT execute_buy_order(
-  'a1111111-1111-4111-8111-111111111111'::UUID,
+  'a1111111-1111-1111-1111-111111111111'::UUID,
   (SELECT id FROM public.markets WHERE game_id = 901),
   'HOME',
   10
@@ -126,7 +90,7 @@ SELECT execute_buy_order(
 
 -- 박예측이 LG vs 두산에서 AWAY 5주 매수
 SELECT execute_buy_order(
-  'a2222222-2222-4222-8222-222222222222'::UUID,
+  'a2222222-2222-2222-2222-222222222222'::UUID,
   (SELECT id FROM public.markets WHERE game_id = 902),
   'AWAY',
   5
@@ -134,7 +98,7 @@ SELECT execute_buy_order(
 
 -- 이마켓이 NC vs 롯데에서 HOME 8주 매수
 SELECT execute_buy_order(
-  'a3333333-3333-4333-8333-333333333333'::UUID,
+  'a3333333-3333-3333-3333-333333333333'::UUID,
   (SELECT id FROM public.markets WHERE game_id = 903),
   'HOME',
   8

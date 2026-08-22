@@ -1,10 +1,7 @@
-import { createClient } from "@/lib/supabase/client";
-
 export interface UserSession {
   user_id: string;
   username: string;
   student_number: string;
-  session_version: number;
 }
 
 export const USER_SESSION_KEY = "tokhin_user_session";
@@ -27,14 +24,12 @@ const parseSession = (value: string | null): UserSession | null => {
     if (
       typeof parsed.user_id === "string" &&
       typeof parsed.username === "string" &&
-      typeof parsed.student_number === "string" &&
-      typeof parsed.session_version === "number"
+      typeof parsed.student_number === "string"
     ) {
       return {
         user_id: parsed.user_id,
         username: parsed.username,
         student_number: parsed.student_number,
-        session_version: parsed.session_version,
       };
     }
   } catch {
@@ -82,17 +77,4 @@ export const clearPendingPasswordChangeSession = () => {
 export const clearAllAuthState = () => {
   clearUserSession();
   clearPendingPasswordChangeSession();
-};
-
-export const validateUserSession = async (
-  session: UserSession,
-): Promise<boolean> => {
-  const { data, error } = await createClient().rpc("validate_user_session", {
-    p_user_id: session.user_id,
-    p_session_version: session.session_version,
-  });
-
-  if (error) return false;
-  const result = data as { success?: boolean; valid?: boolean } | null;
-  return result?.success === true && result.valid === true;
 };
