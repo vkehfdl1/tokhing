@@ -6,9 +6,9 @@ const { loadLocalSupabaseEnv } = localSupabase;
 
 export const LOCAL_FIXTURES = {
   users: {
-    first: "a1111111-1111-1111-1111-111111111111",
-    second: "a2222222-2222-2222-2222-222222222222",
-    third: "a3333333-3333-3333-3333-333333333333",
+    first: "a1111111-1111-4111-8111-111111111111",
+    second: "a2222222-2222-4222-8222-222222222222",
+    third: "a3333333-3333-4333-8333-333333333333",
   },
   games: {
     scheduled: 901,

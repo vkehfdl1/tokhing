@@ -1,6 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   createLocalServiceClient,
   LOCAL_FIXTURES,
@@ -28,5 +29,19 @@ describe("deterministic local admin fixtures", () => {
     expect(games.count).toBe(5);
     expect(markets.count).toBe(5);
     expect(activeSeason.data?.id).toBe(LOCAL_FIXTURES.activeSeasonId);
+  });
+
+  it("seeds users with RFC-valid uuids that admin routes accept", async () => {
+    const uuid = z.uuid();
+    for (const id of Object.values(LOCAL_FIXTURES.users)) {
+      expect(uuid.safeParse(id).success).toBe(true);
+    }
+
+    const supabase = createLocalServiceClient();
+    const { data, error } = await supabase.from("users").select("id");
+    expect(error).toBeNull();
+    for (const row of data ?? []) {
+      expect(uuid.safeParse(row.id).success).toBe(true);
+    }
   });
 });

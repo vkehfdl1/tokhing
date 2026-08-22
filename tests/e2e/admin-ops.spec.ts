@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
-import { createLocalServiceClient } from "@/tests/helpers/local-supabase";
+import {
+  createLocalServiceClient,
+  LOCAL_FIXTURES,
+} from "@/tests/helpers/local-supabase";
 
 test("managed operator login protects the dashboard @issue-36", async ({
   page,
@@ -403,6 +406,66 @@ test("weekly grant policy management is available @issue-41", async ({
 
   await page.screenshot({
     path: testInfo.outputPath("issue-41-weekly-grant-policy.png"),
+    fullPage: true,
+  });
+});
+
+test("wallet adjustment applies from the dashboard menu @issue-43", async ({
+  page,
+}, testInfo) => {
+  const service = createLocalServiceClient();
+  const userId = LOCAL_FIXTURES.users.first;
+
+  const before = await service
+    .from("wallets")
+    .select("balance")
+    .eq("user_id", userId)
+    .eq("season_id", LOCAL_FIXTURES.activeSeasonId)
+    .single();
+  expect(before.error).toBeNull();
+
+  await page.goto("/admin");
+  await page.getByPlaceholder("운영진 비밀번호").fill("OwnerPass!234");
+  await page.getByRole("button", { name: "프런트 인증하기" }).click();
+  await expect(
+    page.getByRole("heading", { name: "운영 대시보드" }),
+  ).toBeVisible();
+
+  await page
+    .getByRole("heading", { name: "지갑 조정", exact: true })
+    .locator("..")
+    .getByRole("button", { name: "접속" })
+    .click();
+  await expect(page.getByRole("heading", { name: "1. 회원 선택" })).toBeVisible();
+
+  await page.getByRole("button", { name: "회원 2024001" }).click();
+  await page.getByLabel("조정 금액", { exact: true }).fill("250");
+  await page.getByLabel("조정 사유").fill("정산 오류 보상");
+  await page.getByLabel("내부 메모").fill("E2E-43");
+  await page.getByRole("button", { name: "지갑 조정 실행" }).click();
+
+  await expect(page.getByRole("status")).toContainText("지급했습니다");
+
+  const grant = await service
+    .from("transactions")
+    .select("amount,type")
+    .eq("user_id", userId)
+    .eq("reason", "정산 오류 보상")
+    .single();
+  expect(grant.error).toBeNull();
+  expect(grant.data?.type).toBe("ADMIN_GRANT");
+  expect(Number(grant.data?.amount)).toBe(250);
+
+  const after = await service
+    .from("wallets")
+    .select("balance")
+    .eq("user_id", userId)
+    .eq("season_id", LOCAL_FIXTURES.activeSeasonId)
+    .single();
+  expect(Number(after.data?.balance) - Number(before.data?.balance)).toBe(250);
+
+  await page.screenshot({
+    path: testInfo.outputPath("issue-43-wallet-adjust.png"),
     fullPage: true,
   });
 });
