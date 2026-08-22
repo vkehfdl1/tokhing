@@ -29,19 +29,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     await requireAdminSession(request, "operators:read");
     const service = createAdminServiceClient();
     const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+    // remote DB grants anon SELECT on users_public only, not users.
     let usersQuery = service
-      .from("users")
-      .select(
-        "id, student_number, username, phone_number, department, favorite_team_id, password_changed, created_at, teams(name, short_name)",
-      )
+      .from("users_public")
+      .select("id, student_number, username")
       .order("student_number", { ascending: true })
-      .limit(200);
+      .limit(2000);
 
     if (query) {
-      const filters = [
-        `username.ilike.%${query}%`,
-        `department.ilike.%${query}%`,
-      ];
+      const filters = [`username.ilike.%${query}%`];
       if (/^[0-9]+$/.test(query)) {
         filters.push(`student_number.eq.${query}`);
       }
@@ -50,21 +46,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const [{ data: users, error }, { data: activeSeason }, { data: teams }] =
       await Promise.all([
         usersQuery,
-        service.from("seasons").select("id").eq("status", "ACTIVE").single(),
+        service.from("seasons").select("id").eq("status", "ACTIVE").maybeSingle(),
         service.from("teams").select("id, name, short_name").order("id"),
       ]);
     if (error) throw error;
 
-    const userIds = (users ?? []).map((user) => user.id);
-    const { data: wallets, error: walletError } =
-      userIds.length > 0 && activeSeason
-        ? await service
-            .from("wallets")
-            .select("user_id, balance")
-            .eq("season_id", activeSeason.id)
-            .in("user_id", userIds)
-        : { data: [], error: null };
-    if (walletError) throw walletError;
+    const { data: wallets, error: walletError } = activeSeason
+      ? await service
+          .from("wallets")
+          .select("user_id, balance")
+          .eq("season_id", activeSeason.id)
+      : { data: [], error: null };
+    if (walletError) {
+      console.error("회원 지갑 조회 실패", walletError.message);
+    }
     const walletByUser = new Map(
       (wallets ?? []).map((wallet) => [
         wallet.user_id,
@@ -74,7 +69,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.json({
       members: (users ?? []).map((user) => ({
-        ...user,
+        id: user.id,
+        student_number: user.student_number,
+        username: user.username,
+        phone_number: "",
+        department: "",
+        favorite_team_id: 0,
+        password_changed: true,
+        is_active: true,
+        session_version: 0,
+        deactivated_at: null,
+        deactivated_reason: null,
+        teams: null,
         has_active_wallet: walletByUser.has(user.id),
         active_wallet_balance: walletByUser.get(user.id) ?? null,
       })),
